@@ -7,7 +7,8 @@ import re
 from datetime import datetime
 
 from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_COLOR_INDEX
+from docx.shared import Pt, RGBColor
 from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.hyperlink import Hyperlink
@@ -45,6 +46,53 @@ _ALIGN_FROM_STR = {
 }
 _HEADING_STYLE_BY_LEVEL = {1: "Heading 1", 2: "Heading 2", 3: "Heading 3"}
 _LIST_STYLE_BY_TYPE = {"bullet": "List Bullet", "number": "List Number"}
+
+# The closed set of run-level styles the document toolbar offers, and the Word
+# property each one becomes. The toolbar, the field sanitizer and this table are
+# deliberately the same fixed vocabulary: a teacher can only apply formatting
+# that survives export, rather than styling something on screen and losing it in
+# the .docx. Extend all three together or not at all.
+_FONT_SIZE_BY_CLASS = {
+    "fs-sm": Pt(9),
+    "fs-md": Pt(11),
+    "fs-lg": Pt(14),
+    "fs-xl": Pt(18),
+}
+
+_FONT_COLOR_BY_CLASS = {
+    "fc-default": RGBColor(0x16, 0x23, 0x1E),
+    "fc-red": RGBColor(0xAB, 0x35, 0x24),
+    "fc-amber": RGBColor(0xB8, 0x84, 0x2E),
+    "fc-green": RGBColor(0x1C, 0x5C, 0x4E),
+    "fc-blue": RGBColor(0x1D, 0x4E, 0xD8),
+}
+
+# Word's highlight is a fixed enum rather than a free colour, which is why the
+# toolbar offers exactly these three plus "none".
+_HIGHLIGHT_BY_CLASS = {
+    "hl-none": None,
+    "hl-yellow": WD_COLOR_INDEX.YELLOW,
+    "hl-green": WD_COLOR_INDEX.BRIGHT_GREEN,
+    "hl-cyan": WD_COLOR_INDEX.TURQUOISE,
+}
+
+# Every class name the toolbar may send, for the route that validates an edit
+# before it reaches the document.
+FONT_SIZE_CLASSES = tuple(_FONT_SIZE_BY_CLASS)
+FONT_COLOR_CLASSES = tuple(_FONT_COLOR_BY_CLASS)
+HIGHLIGHT_CLASSES = tuple(_HIGHLIGHT_BY_CLASS)
+
+
+def _apply_run_style_classes(run, size_cls=None, color_cls=None, highlight_cls=None):
+    """Apply the fixed-vocabulary classes to one Word run. An unknown class is
+    ignored rather than raising, so a stale page sending an old name degrades to
+    plain text instead of failing the whole export."""
+    if size_cls in _FONT_SIZE_BY_CLASS:
+        run.font.size = _FONT_SIZE_BY_CLASS[size_cls]
+    if color_cls in _FONT_COLOR_BY_CLASS:
+        run.font.color.rgb = _FONT_COLOR_BY_CLASS[color_cls]
+    if highlight_cls in _HIGHLIGHT_BY_CLASS:
+        run.font.highlight_color = _HIGHLIGHT_BY_CLASS[highlight_cls]
 
 def apply_content_edits(template_path, edits):
     """Apply a batch of paragraph-level edits — text changes, bold/italic/
@@ -138,7 +186,8 @@ def _apply_paragraph_edit(doc, el, edit):
                 except Exception:
                     pass
 
-    if any(k in edit for k in ("bold", "italic", "underline")):
+    run_keys = ("bold", "italic", "underline", "size", "color", "highlight")
+    if any(k in edit for k in run_keys):
         runs = para.runs
         if not runs and para.text:
             # _set_paragraph_text() above guarantees at least one run
@@ -151,6 +200,9 @@ def _apply_paragraph_edit(doc, el, edit):
                 run.italic = edit["italic"]
             if "underline" in edit:
                 run.underline = edit["underline"]
+            # The builder's toolbar applies these to a whole line, matching how
+            # it already treats bold, so they are set on every run of it.
+            _apply_run_style_classes(run, edit.get("size"), edit.get("color"), edit.get("highlight"))
 
 def render_template_html(fmt):
     """Render this format's real reference .docx as HTML that mirrors its actual
@@ -373,6 +425,15 @@ def _paragraph_align_style(para):
     css = _ALIGN_CSS.get(align)
     return f" text-align:{css};" if css else ""
 
+# Word's highlight enum back to a CSS colour, so a highlighted run in the file
+# still looks highlighted in the canvas.
+_HIGHLIGHT_CSS = {
+    WD_COLOR_INDEX.YELLOW: "#FDE68A",
+    WD_COLOR_INDEX.BRIGHT_GREEN: "#BBF7D0",
+    WD_COLOR_INDEX.TURQUOISE: "#A5F3FC",
+}
+
+
 def _run_style_css(run):
     parts = []
     if run.bold:
@@ -381,6 +442,29 @@ def _run_style_css(run):
         parts.append("font-style:italic")
     if run.underline:
         parts.append("text-decoration:underline")
+
+    # Read back with a try/except throughout: a run whose font properties are
+    # inherited from a style rather than set directly raises instead of
+    # returning None on some documents, and a canvas that renders is worth more
+    # than one that reports the exact colour.
+    try:
+        if run.font.size is not None:
+            parts.append(f"font-size:{run.font.size.pt:.0f}pt")
+    except Exception:
+        pass
+    try:
+        rgb = run.font.color.rgb if run.font.color is not None else None
+        if rgb is not None:
+            parts.append(f"color:#{rgb}")
+    except Exception:
+        pass
+    try:
+        css = _HIGHLIGHT_CSS.get(run.font.highlight_color)
+        if css:
+            parts.append(f"background-color:{css}")
+    except Exception:
+        pass
+
     return ";".join(parts)
 
 def _run_html(run):
@@ -879,6 +963,12 @@ class _RichLineParser(_html_parser.HTMLParser):
         self.bold = 0
         self.italic = 0
         self.underline = 0
+        # Nested <span class="fs-lg fc-red hl-yellow"> wrappers. A stack rather
+        # than a single value, so an inner span overrides an outer one and the
+        # outer one comes back when the inner closes. Every <span> is pushed,
+        # including one carrying no recognised class, so the pops stay aligned
+        # with the opens.
+        self.span_stack = []
 
     def _new_line(self, list_type=None):
         self.lines.append({"runs": [], "list": list_type})
@@ -902,6 +992,13 @@ class _RichLineParser(_html_parser.HTMLParser):
                 self._new_line(list_type)
             else:
                 self.lines[-1]["list"] = list_type
+        elif tag == "span":
+            classes = set((dict(attrs).get("class") or "").split())
+            self.span_stack.append({
+                "size": next((c for c in classes if c in _FONT_SIZE_BY_CLASS), None),
+                "color": next((c for c in classes if c in _FONT_COLOR_BY_CLASS), None),
+                "highlight": next((c for c in classes if c in _HIGHLIGHT_BY_CLASS), None),
+            })
 
     def handle_endtag(self, tag):
         if tag in ("b", "strong"):
@@ -912,15 +1009,26 @@ class _RichLineParser(_html_parser.HTMLParser):
             self.underline = max(0, self.underline - 1)
         elif tag in ("ul", "ol") and self.list_stack:
             self.list_stack.pop()
+        elif tag == "span" and self.span_stack:
+            self.span_stack.pop()
 
     def handle_data(self, data):
         if not data:
             return
+        def innermost(key):
+            for frame in reversed(self.span_stack):
+                if frame[key]:
+                    return frame[key]
+            return None
+
         self.lines[-1]["runs"].append({
             "text": data,
             "bold": bool(self.bold),
             "italic": bool(self.italic),
             "underline": bool(self.underline),
+            "size": innermost("size"),
+            "color": innermost("color"),
+            "highlight": innermost("highlight"),
         })
 
 def parse_rich_value(html_str):
@@ -931,13 +1039,17 @@ def parse_rich_value(html_str):
     parser.feed(html_str or "")
     lines = [l for l in parser.lines if any(r["text"].strip() for r in l["runs"])]
     if not lines:
-        lines = [{"runs": [{"text": "-", "bold": False, "italic": False, "underline": False}], "list": None}]
+        lines = [{"runs": [{"text": "-", "bold": False, "italic": False, "underline": False,
+                            "size": None, "color": None, "highlight": None}], "list": None}]
     return lines
 
 def _apply_run_marks(run, r):
     run.bold = bool(r["bold"])
     run.italic = bool(r["italic"])
     run.underline = bool(r["underline"])
+    # The size/colour/highlight a teacher picked in the document toolbar. Read
+    # with .get() because a value stored before these existed has no such key.
+    _apply_run_style_classes(run, r.get("size"), r.get("color"), r.get("highlight"))
 
 def _set_paragraph_rich(doc, para_el, line, template_run=None):
     """Like _set_paragraph_text, but writes one line's runs (each with its
@@ -946,7 +1058,8 @@ def _set_paragraph_rich(doc, para_el, line, template_run=None):
     an <li>."""
     para = Paragraph(para_el, doc)
     existing = list(para.runs)
-    runs = line["runs"] or [{"text": "", "bold": False, "italic": False, "underline": False}]
+    runs = line["runs"] or [{"text": "", "bold": False, "italic": False, "underline": False,
+                             "size": None, "color": None, "highlight": None}]
 
     for i, r in enumerate(runs):
         if i < len(existing):

@@ -1047,6 +1047,20 @@ async function initLiveDocView() {
 const RICH_VALUE_TAGS = new Set(["B", "STRONG", "I", "EM", "U", "UL", "OL", "LI", "BR"]);
 const RICH_VALUE_BLOCK_TAGS = new Set(["DIV", "P"]);
 
+// The closed set of classes a <span> may carry through the sanitizer. These are
+// the only styles the Word export knows how to reproduce, so allowing anything
+// else would let a teacher apply formatting on screen that silently disappeared
+// on export. A span whose classes are all rejected is unwrapped to its text.
+const RICH_VALUE_SPAN_CLASSES = new Set([
+  "fs-sm", "fs-md", "fs-lg", "fs-xl",
+  "fc-default", "fc-red", "fc-amber", "fc-green", "fc-blue",
+  "hl-none", "hl-yellow", "hl-green", "hl-cyan",
+]);
+
+function allowedSpanClasses(el) {
+  return Array.from(el.classList).filter((cls) => RICH_VALUE_SPAN_CLASSES.has(cls));
+}
+
 function sanitizeRichValueHtml(node) {
   let out = "";
   node.childNodes.forEach((child) => {
@@ -1058,6 +1072,13 @@ function sanitizeRichValueHtml(node) {
     const tag = child.tagName;
     if (tag === "BR") {
       out += "<br>";
+    } else if (tag === "SPAN") {
+      // Kept only for the vocabulary classes, and only those: the class
+      // attribute is rebuilt from the allowlist rather than copied, so nothing
+      // arbitrary can ride along in it.
+      const classes = allowedSpanClasses(child);
+      const inner = sanitizeRichValueHtml(child);
+      out += classes.length ? `<span class="${classes.join(" ")}">${inner}</span>` : inner;
     } else if (RICH_VALUE_TAGS.has(tag)) {
       out += `<${tag.toLowerCase()}>${sanitizeRichValueHtml(child)}</${tag.toLowerCase()}>`;
     } else {
@@ -1087,7 +1108,7 @@ function wireLiveDocEditing() {
 }
 
 function updateLiveDocToolbarStates() {
-  ["bold", "italic", "underline"].forEach((cmd) => {
+  ["bold", "italic", "underline", "justifyLeft", "justifyCenter", "justifyRight", "justifyFull"].forEach((cmd) => {
     const btn = liveDocToolbar.querySelector(`[data-cmd="${cmd}"]`);
     if (!btn) return;
     let active = false;
@@ -1096,39 +1117,172 @@ function updateLiveDocToolbarStates() {
   });
 }
 
-function wireLiveDocToolbar() {
-  // Keep the field's selection alive when a toolbar button is clicked —
-  // otherwise the button would steal focus and execCommand would have
-  // nothing to act on.
-  liveDocToolbar.querySelectorAll("button").forEach((btn) => {
-    btn.addEventListener("mousedown", (e) => e.preventDefault());
+// The field slot the caret is currently in, or null. Every text tool needs one:
+// applying a style with the caret outside the document would either do nothing
+// or edit the page around it.
+function activeFieldEl() {
+  const el = document.activeElement;
+  if (el && el.dataset && el.dataset.fieldKey) return el;
+  // A click straight onto a toolbar button can move focus off the slot even
+  // with mousedown suppressed, so fall back to whatever the selection is in.
+  const selection = window.getSelection();
+  if (!selection || !selection.anchorNode) return null;
+  const node = selection.anchorNode.nodeType === Node.ELEMENT_NODE
+    ? selection.anchorNode
+    : selection.anchorNode.parentElement;
+  const slot = node && node.closest ? node.closest("[data-field-key]") : null;
+  return slot && liveDocWrap.contains(slot) ? slot : null;
+}
+
+// Wraps the current selection in a span carrying one class out of the fixed
+// vocabulary, replacing any previous class of the same kind. execCommand has no
+// command for this, and its styleWithCSS output is inline CSS the sanitizer
+// deliberately drops, so the span is built here instead.
+function applyDocSpanClass(prefixes, className) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+    showToast("Select some text first, then choose a style.", true);
+    return false;
+  }
+
+  const range = selection.getRangeAt(0);
+  const contents = range.extractContents();
+
+  // Strip any existing class of the same kind from the selected fragment, so
+  // picking red over blue replaces it rather than nesting the two.
+  contents.querySelectorAll("span").forEach((span) => {
+    prefixes.forEach((prefix) => {
+      Array.from(span.classList)
+        .filter((cls) => cls.startsWith(prefix))
+        .forEach((cls) => span.classList.remove(cls));
+    });
+    // A span left with no classes is noise; unwrap it.
+    if (!span.classList.length) span.replaceWith(...span.childNodes);
   });
+
+  // "Default" and "None" mean "remove the styling", so no new span is added.
+  const isReset = className === "fc-default" || className === "hl-none" || className === "";
+  if (isReset) {
+    range.insertNode(contents);
+  } else {
+    const wrapper = document.createElement("span");
+    wrapper.className = className;
+    wrapper.appendChild(contents);
+    range.insertNode(wrapper);
+  }
+
+  selection.removeAllRanges();
+  return true;
+}
+
+function wireLiveDocToolbar() {
+  // Built from the shared module, so this toolbar and the format builder's are
+  // the same set of tools rather than two hand-kept copies.
+  liveDocToolbar.innerHTML = renderDocToolbar({ variant: "generator" });
+  paintDocToolbarIcons(liveDocToolbar);
+
+  // Keep the field's selection alive when a toolbar control is clicked —
+  // otherwise the button would steal focus and the command would have nothing
+  // to act on.
+  liveDocToolbar.querySelectorAll("button, select").forEach((el) => {
+    el.addEventListener("mousedown", (e) => {
+      // Selects must stay clickable, so only buttons suppress mousedown.
+      if (el.tagName === "BUTTON") e.preventDefault();
+    });
+  });
+
+  // Applies a change to the field the caret is in, then writes the result back
+  // into fieldValues/fieldRichValues. Every tool below goes through here so
+  // none of them can forget to persist what it just did.
+  function withActiveField(warning, fn) {
+    const el = activeFieldEl();
+    if (!el) {
+      showToast(warning, true);
+      return;
+    }
+    // execCommand needs the slot focused, which it may not be after a click.
+    if (document.activeElement !== el) el.focus();
+    fn(el);
+    updateLiveDocToolbarStates();
+    syncFieldFromEl(el);
+    markDirty();
+  }
 
   liveDocToolbar.querySelectorAll(".doc-tool-btn[data-cmd]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const el = document.activeElement;
-      if (!el || !el.dataset || !el.dataset.fieldKey) {
-        showToast("Click into a field first, then choose a style.", true);
+      const cmd = btn.dataset.cmd;
+      // Undo and redo are document-wide and meaningful even with the caret
+      // between fields, so they don't demand an active slot.
+      if (cmd === "undo" || cmd === "redo") {
+        document.execCommand(cmd, false, null);
+        const el = activeFieldEl();
+        if (el) syncFieldFromEl(el);
+        markDirty();
         return;
       }
-      document.execCommand(btn.dataset.cmd, false, null);
-      updateLiveDocToolbarStates();
-      syncFieldFromEl(el);
-      markDirty();
+      withActiveField("Click into a field first, then choose a style.", () => {
+        document.execCommand(cmd, false, null);
+      });
     });
   });
 
   liveDocToolbar.querySelectorAll(".doc-tool-btn[data-list]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const el = document.activeElement;
-      if (!el || !el.dataset || !el.dataset.fieldKey) {
-        showToast("Click into a field first, then choose a list style.", true);
-        return;
-      }
-      document.execCommand(btn.dataset.list === "bullet" ? "insertUnorderedList" : "insertOrderedList", false, null);
-      syncFieldFromEl(el);
-      markDirty();
+      withActiveField("Click into a field first, then choose a list style.", () => {
+        document.execCommand(
+          btn.dataset.list === "bullet" ? "insertUnorderedList" : "insertOrderedList",
+          false,
+          null
+        );
+      });
     });
+  });
+
+  // Heading style inside a filled plan means emphasis on the selected text, not
+  // a document heading: a field slot sits inside the template's own structure,
+  // so wrapping it in an <h2> would fight the layout the format defines. The
+  // sizes map onto the same fixed vocabulary as the size picker.
+  const headingSelect = liveDocToolbar.querySelector("#doc-heading-select");
+  if (headingSelect) {
+    const HEADING_TO_SIZE = { p: "", h1: "fs-xl", h2: "fs-lg", h3: "fs-md" };
+    headingSelect.addEventListener("change", () => {
+      const cls = HEADING_TO_SIZE[headingSelect.value] || "";
+      withActiveField("Click into a field first, then choose a style.", () => {
+        if (applyDocSpanClass(["fs-"], cls) && headingSelect.value !== "p") {
+          // A heading is bold as well as bigger, which is what makes it read
+          // as a heading rather than just large text.
+          document.execCommand("bold", false, null);
+        }
+      });
+      headingSelect.value = "p";
+    });
+  }
+
+  const sizeSelect = liveDocToolbar.querySelector("#doc-size-select");
+  if (sizeSelect) {
+    sizeSelect.addEventListener("change", () => {
+      const cls = sizeSelect.value;
+      withActiveField("Click into a field first, then choose a size.", () => {
+        applyDocSpanClass(["fs-"], cls);
+      });
+      sizeSelect.value = "";
+    });
+  }
+
+  initDocToolbarMenus({
+    toolbarEl: liveDocToolbar,
+    onPick: (kind, className) => {
+      const prefix = kind === "color" ? "fc-" : "hl-";
+      withActiveField("Select some text in a field first.", () => {
+        applyDocSpanClass([prefix], className);
+      });
+    },
+  });
+
+  initDocViewControls({
+    toolbarEl: liveDocToolbar,
+    wrapEl: liveDocWrap,
+    storageKey: "alignedDocZoom:generator",
   });
 
   liveDocWrap.addEventListener("keyup", updateLiveDocToolbarStates);

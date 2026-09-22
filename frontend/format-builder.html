@@ -144,43 +144,7 @@
             you save — there's nothing to define here.
           </p>
 
-          <div id="doc-toolbar" class="doc-toolbar">
-            <div class="doc-toolbar-group">
-              <button type="button" class="doc-tool-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
-              <button type="button" class="doc-tool-btn" data-cmd="italic" title="Italic"><em>I</em></button>
-              <button type="button" class="doc-tool-btn" data-cmd="underline" title="Underline"><span style="text-decoration:underline;">U</span></button>
-            </div>
-            <div class="doc-toolbar-sep"></div>
-            <div class="doc-toolbar-group">
-              <select id="doc-heading-select" class="doc-tool-select" title="Paragraph style">
-                <option value="p">Normal text</option>
-                <option value="h1">Heading 1</option>
-                <option value="h2">Heading 2</option>
-                <option value="h3">Heading 3</option>
-              </select>
-            </div>
-            <div class="doc-toolbar-sep"></div>
-            <div class="doc-toolbar-group">
-              <button type="button" class="doc-tool-btn" data-cmd="justifyLeft" data-icon="alignLeft" title="Align left"></button>
-              <button type="button" class="doc-tool-btn" data-cmd="justifyCenter" data-icon="alignCenter" title="Align center"></button>
-              <button type="button" class="doc-tool-btn" data-cmd="justifyRight" data-icon="alignRight" title="Align right"></button>
-              <button type="button" class="doc-tool-btn" data-cmd="justifyFull" data-icon="alignJustify" title="Justify"></button>
-            </div>
-            <div class="doc-toolbar-sep"></div>
-            <div class="doc-toolbar-group">
-              <button type="button" class="doc-tool-btn" data-list="bullet" data-icon="list" title="Bulleted list"></button>
-              <button type="button" class="doc-tool-btn" data-list="number" title="Numbered list">1.</button>
-            </div>
-            <div class="doc-toolbar-sep"></div>
-            <div class="doc-toolbar-group">
-              <button type="button" id="doc-delete-line-btn" class="doc-tool-btn danger" data-icon="trash" data-icon-label="Delete" title="Delete this line"></button>
-            </div>
-            <div class="doc-toolbar-save">
-              <span class="text-sm" id="doc-content-status"></span>
-              <button type="button" id="doc-save-content-btn" class="btn btn-primary btn-sm" disabled>Save changes to document</button>
-            </div>
-          </div>
-
+          <div id="doc-toolbar" class="doc-toolbar"></div>
           <div class="lp-doc-wrap doc-builder-canvas" id="doc-builder-canvas"></div>
         </div>
 
@@ -233,6 +197,7 @@
 
   <script src="js/api.js"></script>
   <script src="js/icons.js"></script>
+  <script src="js/doc-toolbar.js"></script>
   <script src="js/format-builder.js"></script>
 </body>
 </html>

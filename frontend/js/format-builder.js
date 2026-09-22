@@ -27,7 +27,18 @@ const docFieldEditor = document.getElementById("doc-field-editor");
 const docBuilderCanvas = document.getElementById("doc-builder-canvas");
 
 const docToolbar = document.getElementById("doc-toolbar");
+
+// Built from the shared module before anything inside it is looked up, so this
+// toolbar and the generator's offer the same tools rather than two hand-kept
+// copies that drift apart. "builder" adds the two controls that only make sense
+// against the template document itself: deleting a line, and saving the edits.
+if (docToolbar) {
+  docToolbar.innerHTML = renderDocToolbar({ variant: "builder" });
+  paintDocToolbarIcons(docToolbar);
+}
+
 const docHeadingSelect = document.getElementById("doc-heading-select");
+const docSizeSelect = document.getElementById("doc-size-select");
 const docDeleteLineBtn = document.getElementById("doc-delete-line-btn");
 const docSaveContentBtn = document.getElementById("doc-save-content-btn");
 const docContentStatus = document.getElementById("doc-content-status");
@@ -47,6 +58,12 @@ let editingFormatId = null;
 let contentSnapshot = {}; // anchor_index -> { text, bold, italic, underline, align }
 let headingEdits = {};    // anchor_index -> 0|1|2|3, only set once the teacher changes it
 let listEdits = {};       // anchor_index -> "bullet" | "number" | null, only set once changed
+// Font size, colour and highlight, applied to a whole line here rather than to a
+// selection. The builder's whole edit model is per-line (bold and alignment work
+// the same way), and the saved .docx carries these on every run of the line.
+let sizeEdits = {};       // anchor_index -> "fs-sm" | "fs-md" | "fs-lg" | "fs-xl" | ""
+let colorEdits = {};      // anchor_index -> "fc-default" | "fc-red" | ...
+let highlightEdits = {};  // anchor_index -> "hl-none" | "hl-yellow" | ...
 let deletedAnchors = new Set();
 
 function showError(message) {
@@ -161,6 +178,9 @@ function snapshotContentState() {
   contentSnapshot = {};
   headingEdits = {};
   listEdits = {};
+  sizeEdits = {};
+  colorEdits = {};
+  highlightEdits = {};
   deletedAnchors = new Set();
   docBuilderCanvas.querySelectorAll(".doc-preview-h1, .doc-preview-h2, .doc-preview-h3, .doc-preview-bullet, .doc-preview-number, .doc-marked-delete")
     .forEach((el) => el.classList.remove("doc-preview-h1", "doc-preview-h2", "doc-preview-h3", "doc-preview-bullet", "doc-preview-number", "doc-marked-delete"));
@@ -198,6 +218,9 @@ function buildContentEdits() {
     if (now.align !== before.align) patch.align = now.align;
     if (headingEdits[idx] !== undefined) patch.heading = headingEdits[idx];
     if (listEdits[idx] !== undefined) patch.list = listEdits[idx];
+    if (sizeEdits[idx]) patch.size = sizeEdits[idx];
+    if (colorEdits[idx]) patch.color = colorEdits[idx];
+    if (highlightEdits[idx]) patch.highlight = highlightEdits[idx];
 
     if (Object.keys(patch).length) edits.push({ anchor_index: idx, action: "format", ...patch });
   });
@@ -229,6 +252,56 @@ if (docToolbar) {
   docToolbar.querySelectorAll("button").forEach((btn) => {
     btn.addEventListener("mousedown", (e) => e.preventDefault());
   });
+
+  // The view controls (zoom, fullscreen) behave identically on both document
+  // screens, so they come straight from the shared module.
+  initDocViewControls({
+    toolbarEl: docToolbar,
+    wrapEl: docBuilderCanvas,
+    storageKey: "alignedDocZoom:builder",
+  });
+
+  // Font size, text colour and highlight apply to the whole selected line,
+  // matching how this page already treats bold and alignment: its edit model is
+  // per-line, keyed by anchor index, and the saved .docx carries the property on
+  // every run of that line. Styling an arbitrary selection instead would look
+  // right in the canvas and then be dropped by the per-line save.
+  function applyLineStyle(kind, className) {
+    const anchors = getSelectedAnchorEls();
+    if (!anchors.length) {
+      showToast("Click into a line first, then choose a style.", true);
+      return;
+    }
+
+    const store = kind === "size" ? sizeEdits : kind === "color" ? colorEdits : highlightEdits;
+    const prefix = kind === "size" ? "fs-" : kind === "color" ? "fc-" : "hl-";
+
+    anchors.forEach((el) => {
+      const idx = parseInt(el.dataset.anchorIndex, 10);
+      store[idx] = className;
+
+      // Preview it immediately. The class is swapped rather than added, so
+      // picking red after blue replaces it.
+      Array.from(el.classList)
+        .filter((cls) => cls.startsWith(prefix))
+        .forEach((cls) => el.classList.remove(cls));
+      if (className) el.classList.add(className);
+    });
+
+    updateSaveContentButton();
+  }
+
+  initDocToolbarMenus({
+    toolbarEl: docToolbar,
+    onPick: (kind, className) => applyLineStyle(kind, className),
+  });
+
+  if (docSizeSelect) {
+    docSizeSelect.addEventListener("change", () => {
+      applyLineStyle("size", docSizeSelect.value);
+      docSizeSelect.value = "";
+    });
+  }
 
   docToolbar.querySelectorAll(".doc-tool-btn[data-cmd]").forEach((btn) => {
     btn.addEventListener("click", () => {

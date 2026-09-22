@@ -4335,3 +4335,145 @@ body.auth-page::after {
 .lp-doc .field-needs-answer {
   padding: 1px 4px;
 }
+
+/* ---------------------------------------------------------------------------
+   Shared document toolbar: zoom, fullscreen, colour menus, and the fixed
+   size/colour vocabulary that the Word export also understands.
+   --------------------------------------------------------------------------- */
+
+/* The toolbar can now hold a lot of controls, so it wraps rather than pushing
+   the document sideways, and sticks to the top of a fullscreen document. */
+.doc-toolbar {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.doc-tool-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.doc-color-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 30;
+  min-width: 132px;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgba(22, 35, 30, 0.16);
+}
+
+.doc-color-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-heading);
+  text-align: left;
+  cursor: pointer;
+}
+
+.doc-color-option:hover {
+  background: var(--primary-tint);
+}
+
+.doc-color-swatch {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.doc-zoom-readout {
+  min-width: 48px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Zoom scales the page itself. transform rather than font-size so tables and
+   images scale with the text, and transform-origin at the top so the document
+   grows downward instead of drifting off the left edge. */
+.lp-doc-wrap {
+  --doc-zoom: 1;
+}
+
+.lp-doc-wrap.is-zoomed {
+  /* The wrapper has to scroll in both directions once the page is scaled past
+     its own width, or a zoomed-in document would simply be clipped. */
+  overflow: auto;
+}
+
+.lp-doc-wrap.is-zoomed .lp-doc {
+  transform: scale(var(--doc-zoom));
+  transform-origin: top center;
+  /* Counteracts the gap or overlap the scale leaves behind, so the wrapper's
+     scroll height matches what is actually drawn. */
+  margin-bottom: calc((var(--doc-zoom) - 1) * 100%);
+}
+
+/* Native fullscreen: the wrapper becomes the whole screen, so it supplies its
+   own page background and scrolling. */
+.lp-doc-wrap:fullscreen {
+  overflow: auto;
+  padding: 24px;
+  background: var(--bg);
+}
+
+/* The fallback for browsers that refuse the fullscreen request. Fixed to the
+   viewport rather than the page, so it covers the sidebar and topbar too. */
+.lp-doc-wrap.is-pseudo-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: auto;
+  padding: 24px;
+  margin: 0;
+  background: var(--bg);
+  border-radius: 0;
+}
+
+/* --- The fixed formatting vocabulary ---
+   Every one of these class names is preserved by the field sanitizer and turned
+   into a real Word run property on export, so nothing a teacher applies here is
+   lost when the plan leaves the browser. Free-form inline styles are not kept,
+   which is why the choices are a closed set. */
+
+.lp-doc .fs-sm,
+.doc-builder-canvas .fs-sm { font-size: 0.85em; }
+.lp-doc .fs-md,
+.doc-builder-canvas .fs-md { font-size: 1em; }
+.lp-doc .fs-lg,
+.doc-builder-canvas .fs-lg { font-size: 1.2em; }
+.lp-doc .fs-xl,
+.doc-builder-canvas .fs-xl { font-size: 1.45em; }
+
+.lp-doc .fc-default,
+.doc-builder-canvas .fc-default { color: #16231E; }
+.lp-doc .fc-red,
+.doc-builder-canvas .fc-red { color: #AB3524; }
+.lp-doc .fc-amber,
+.doc-builder-canvas .fc-amber { color: #B8842E; }
+.lp-doc .fc-green,
+.doc-builder-canvas .fc-green { color: #1C5C4E; }
+.lp-doc .fc-blue,
+.doc-builder-canvas .fc-blue { color: #1D4ED8; }
+
+.lp-doc .hl-none,
+.doc-builder-canvas .hl-none { background: transparent; }
+.lp-doc .hl-yellow,
+.doc-builder-canvas .hl-yellow { background: #FDE68A; }
+.lp-doc .hl-green,
+.doc-builder-canvas .hl-green { background: #BBF7D0; }
+.lp-doc .hl-cyan,
+.doc-builder-canvas .hl-cyan { background: #A5F3FC; }

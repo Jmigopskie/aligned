@@ -381,6 +381,17 @@ def _sanitize_content_edits(raw_edits):
                     pass
             if "list" in e and (e["list"] in _LIST_VALUES or e["list"] is None):
                 edit["list"] = e["list"]
+            # Font size, text colour and highlight, validated against the same
+            # closed vocabulary the toolbar offers and the export understands.
+            # Anything outside it is dropped rather than passed through, so an
+            # edited request can't put arbitrary styling into the document.
+            for key, allowed in (
+                ("size", docx_service.FONT_SIZE_CLASSES),
+                ("color", docx_service.FONT_COLOR_CLASSES),
+                ("highlight", docx_service.HIGHLIGHT_CLASSES),
+            ):
+                if key in e and e[key] in allowed:
+                    edit[key] = e[key]
         edits.append(edit)
     return edits
 
