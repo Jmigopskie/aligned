@@ -4,6 +4,8 @@ const grid = document.getElementById("format-grid");
 const errorBox = document.getElementById("error-box");
 const searchRow = document.getElementById("format-search-row");
 const searchInput = document.getElementById("format-search");
+const draftsStrip = document.getElementById("drafts-strip");
+const draftsList = document.getElementById("drafts-list");
 
 let currentUser = null;
 let allFormats = [];
@@ -146,6 +148,10 @@ async function init() {
   // follows from.
   OwlGuide.show("plan-formats");
 
+  // Kicked off alongside the formats rather than after them: the strip is
+  // independent of the picker, so one shouldn't wait on the other.
+  loadDrafts();
+
   try {
     const data = await Api.listFormats();
     renderFormats(data.formats || []);
@@ -157,3 +163,73 @@ async function init() {
 }
 
 init();
+
+// ---- Unfinished work ------------------------------------------------------
+// A teacher's last few drafts, shown above the format picker so resuming is
+// the first thing on the page rather than something to go hunting for in the
+// plan list. Drafts are whatever the generator autosaved and nobody has
+// submitted yet, newest edit first.
+
+const DRAFTS_SHOWN = 4;
+
+function relativeTime(iso) {
+  if (!iso) return "";
+  const then = new Date(iso);
+  const minutes = Math.round((Date.now() - then.getTime()) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
+  return then.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+// How much of the plan is filled in, so a card says what is actually left to
+// do rather than just when it was touched.
+function draftProgress(plan) {
+  const values = plan.field_values || {};
+  const filled = Object.values(values).filter((v) => {
+    if (Array.isArray(v)) return v.some((item) => String(item).trim());
+    return String(v == null ? "" : v).trim();
+  }).length;
+  const total = Object.keys(values).length;
+  if (!total) return "Nothing filled in yet";
+  if (filled === total) return `All ${total} fields filled in`;
+  return `${filled} of ${total} fields filled in`;
+}
+
+function renderDrafts(plans) {
+  if (!plans.length) {
+    draftsStrip.hidden = true;
+    return;
+  }
+
+  draftsStrip.hidden = false;
+  draftsList.innerHTML = "";
+
+  plans.forEach((plan) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "draft-card";
+    card.innerHTML = `
+      <span class="draft-card-title">${escapeHtml(plan.title || "Untitled lesson plan")}</span>
+      <span class="draft-card-meta">${escapeHtml(draftProgress(plan))}</span>
+      <span class="draft-card-time">Edited ${escapeHtml(relativeTime(plan.updated_at))}</span>`;
+    card.addEventListener("click", () => {
+      window.location.href = `generator.html?plan_id=${plan.id}`;
+    });
+    draftsList.appendChild(card);
+  });
+}
+
+async function loadDrafts() {
+  try {
+    const data = await Api.listLessonPlans({ status: "draft", limit: DRAFTS_SHOWN });
+    renderDrafts(data.lesson_plans || []);
+  } catch (err) {
+    // The format picker below is the point of this page, so a failure here
+    // stays silent rather than showing an error for a convenience strip.
+    draftsStrip.hidden = true;
+  }
+}

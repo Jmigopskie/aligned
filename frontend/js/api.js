@@ -169,7 +169,18 @@ const Api = {
       body: JSON.stringify(payload),
     }),
 
-  listLessonPlans: () => apiFetch("/api/lesson-plans"),
+  // params: { status: "draft"|"submitted"|"reviewed", limit: number }
+  listLessonPlans: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return apiFetch(`/api/lesson-plans${qs ? `?${qs}` : ""}`);
+  },
+  // Re-saves a plan that already exists. Only the keys present are written,
+  // so an autosave can send just the field values without clearing the title.
+  updateLessonPlan: (planId, payload) =>
+    apiFetch(`/api/lesson-plans/${planId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
   saveLessonPlan: (payload) =>
     apiFetch("/api/lesson-plans", {
       method: "POST",

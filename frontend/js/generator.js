@@ -1163,7 +1163,115 @@ function markDirty() {
   exportBtn.style.pointerEvents = "none";
   exportBtn.style.opacity = "0.5";
   saveDraft();
+  scheduleServerSave();
 }
+
+// ---- Saving to the server -------------------------------------------------
+// One path writes a plan, used by both the autosave below and the Save button:
+// the first write POSTs and captures the new id, every write after it PATCHes
+// that same row. Without this the generator could only ever create plans, so an
+// unfinished plan either vanished or piled up a new row per save.
+
+const SERVER_SAVE_DELAY_MS = 2000;
+let serverSaveTimer = null;
+let serverSaveInFlight = false;
+// Set when the server refuses further edits (the plan was submitted or graded
+// in another tab). Autosaving stops rather than retrying into a wall.
+let serverSaveLocked = false;
+
+function planPayload() {
+  return {
+    format_id: fmt.id,
+    title: planTitle(),
+    subject: subjectInput.value.trim(),
+    grade_level: getClassLabel(),
+    field_values: fieldValues,
+    rich_field_values: fieldRichValues,
+    generation_mode: mode,
+    is_public: visibilityCheckbox.checked,
+  };
+}
+
+function planTitle() {
+  const subject = subjectInput.value.trim();
+  const topic = topicInput.value.trim();
+  // Topic first when there is one: a teacher's drafts are nearly all the same
+  // subject and format, so "Subject — Format" would give every card in the
+  // "continue where you left off" strip an identical name.
+  if (topic) return `${topic}${subject ? ` — ${subject}` : ""}`;
+  if (subject) return `${subject} — ${fmt.name}`;
+  return `Untitled ${fmt.name}`;
+}
+
+// A plan is only worth a row once it holds something a teacher would want
+// back. Without this, merely opening the generator would leave an empty draft
+// behind every time.
+function worthSaving() {
+  return hasAnyValue() || !!subjectInput.value.trim() || !!topicInput.value.trim();
+}
+
+async function persistPlan() {
+  if (!fmt) return null;
+  const payload = planPayload();
+  if (planId) {
+    const data = await Api.updateLessonPlan(planId, payload);
+    return data.lesson_plan;
+  }
+  const data = await Api.saveLessonPlan(payload);
+  planId = data.lesson_plan.id;
+  return data.lesson_plan;
+}
+
+function scheduleServerSave() {
+  if (serverSaveLocked || restoringDraft) return;
+  clearTimeout(serverSaveTimer);
+  serverSaveTimer = setTimeout(runServerSave, SERVER_SAVE_DELAY_MS);
+}
+
+async function runServerSave() {
+  if (serverSaveLocked || serverSaveInFlight || !fmt || !worthSaving()) return;
+
+  serverSaveInFlight = true;
+  const wasDirty = dirty;
+  try {
+    await persistPlan();
+    // Only claim saved if nothing changed while the request was in flight —
+    // otherwise the newer edit is still unsaved and saying otherwise would
+    // lie about it.
+    if (dirty === wasDirty) {
+      dirty = false;
+      saveStatus.textContent = `Draft saved ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`;
+      enableExport();
+    }
+  } catch (err) {
+    // 409 means the plan was submitted or graded elsewhere, so it will never
+    // accept another edit — stop autosaving and say so once.
+    if (/submitted/i.test(err.message || "")) {
+      serverSaveLocked = true;
+      saveStatus.textContent = "This plan has been submitted and can no longer be edited.";
+      showToast("This plan has been submitted, so your latest changes weren't saved.", true);
+    } else {
+      // A transient failure (offline, server restart) leaves the localStorage
+      // draft as the safety net and the page still marked unsaved.
+      saveStatus.textContent = "Couldn't save the draft automatically — use Save lesson plan.";
+    }
+  } finally {
+    serverSaveInFlight = false;
+  }
+}
+
+function enableExport() {
+  if (!planId) return;
+  exportBtn.href = Api.exportUrl(planId);
+  exportBtn.target = "_blank";
+  exportBtn.rel = "noopener";
+  exportBtn.style.pointerEvents = "auto";
+  exportBtn.style.opacity = "1";
+}
+
+// Nothing is sent on pagehide: the debounce window is short and the
+// localStorage draft below already survives navigation, so an unload-time
+// request would add a failure path without covering anything new.
 
 // ---- Draft autosave -------------------------------------------------------
 // This is a multi-page app: clicking a sidebar link, or opening the plan in
@@ -1177,8 +1285,12 @@ let draftTimer = null;
 let restoringDraft = false;
 
 function draftKey() {
-  const formatId = new URLSearchParams(window.location.search).get("format_id") || "none";
-  return `${DRAFT_PREFIX}${formatId}`;
+  const params = new URLSearchParams(window.location.search);
+  // A plan opened by id gets its own slot: keying only by format would make
+  // two drafts of the same format share one slot and overwrite each other.
+  const planKey = params.get("plan_id");
+  if (planKey) return `${DRAFT_PREFIX}plan:${planKey}`;
+  return `${DRAFT_PREFIX}${params.get("format_id") || "none"}`;
 }
 
 function saveDraft() {
@@ -1250,6 +1362,51 @@ function paintRestoredValues() {
   } else if (hasAnyValue()) {
     renderResults();
   }
+}
+
+// Populate the page from a plan row fetched by id, so reopening a draft shows
+// exactly what was saved. Mirrors restoreDraft()'s shape, including the
+// restoringDraft guard that stops the repaint from being written straight back
+// out as a fresh autosave.
+function applyOpenedPlan(plan) {
+  restoringDraft = true;
+  try {
+    planId = plan.id;
+    fieldValues = plan.field_values || {};
+    fieldRichValues = plan.rich_field_values || {};
+    if (plan.subject) subjectInput.value = plan.subject;
+    if (plan.is_public) visibilityCheckbox.checked = true;
+
+    // Only the author can write to a plan. getLessonPlan also serves public
+    // plans and the submissions of a teacher's own sections, so anything not
+    // owned by the signed-in user opens read-only rather than autosaving into
+    // a rejected request.
+    const isOwner = currentUser && plan.user_id === currentUser.id;
+    if (!isOwner) {
+      serverSaveLocked = true;
+      // Detached from the row so editing on can't overwrite the original;
+      // Save then writes a new plan of the reader's own.
+      planId = null;
+      saveStatus.textContent = "You're viewing someone else's plan. Save to keep your own copy.";
+    } else if (plan.status === "submitted" || plan.status === "reviewed") {
+      // A plan already submitted or graded can't take further edits, so the
+      // page says so rather than letting the teacher type into a dead end.
+      serverSaveLocked = true;
+      saveStatus.textContent =
+        plan.status === "reviewed"
+          ? "This plan has been reviewed, so it can no longer be edited."
+          : "This plan has been submitted, so it can no longer be edited.";
+    }
+
+    paintRestoredValues();
+    enableExport();
+  } finally {
+    restoringDraft = false;
+  }
+
+
+  updateGate();
+  return true;
 }
 
 function restoreDraft() {
@@ -1637,30 +1794,19 @@ visibilityCheckbox.addEventListener("change", async () => {
 });
 
 saveBtn.addEventListener("click", async () => {
+  // A pending autosave would otherwise race this one and re-send the same
+  // payload a moment later.
+  clearTimeout(serverSaveTimer);
   setButtonLoading(saveBtn, true, "Saving");
   try {
-    const data = await Api.saveLessonPlan({
-      format_id: fmt.id,
-      title: `${subjectInput.value.trim()} — ${fmt.name}`,
-      subject: subjectInput.value.trim(),
-      grade_level: getClassLabel(),
-      field_values: fieldValues,
-      rich_field_values: fieldRichValues,
-      generation_mode: mode,
-      is_public: visibilityCheckbox.checked,
-    });
-    planId = data.lesson_plan.id;
+    await persistPlan();
     dirty = false;
     // The plan is on the server now and listed under "List of Lesson Plan",
     // so the local draft has done its job. Editing on from here marks the
     // page dirty again and starts a fresh draft.
     clearDraft();
     saveStatus.textContent = "Saved.";
-    exportBtn.href = Api.exportUrl(planId);
-    exportBtn.target = "_blank";
-    exportBtn.rel = "noopener";
-    exportBtn.style.pointerEvents = "auto";
-    exportBtn.style.opacity = "1";
+    enableExport();
     showToast("Lesson plan saved.");
     setOwlState("celebrate", "Saved! Export it as Word whenever you're ready.");
     revealSubmitControlsIfStudent();
@@ -1686,7 +1832,27 @@ async function init() {
   updateLevelFields();
   updateGate();
 
-  const formatId = new URLSearchParams(window.location.search).get("format_id");
+  // Two ways in: ?format_id= starts a new plan, ?plan_id= reopens one already
+  // saved (what the "continue where you left off" cards link to). A reopened
+  // plan supplies its own format, so the format id doesn't have to be passed
+  // alongside it.
+  const params = new URLSearchParams(window.location.search);
+  const requestedPlanId = params.get("plan_id");
+  let formatId = params.get("format_id");
+  let openedPlan = null;
+
+  if (requestedPlanId) {
+    try {
+      const data = await Api.getLessonPlan(requestedPlanId);
+      openedPlan = data.lesson_plan;
+      formatId = openedPlan.format_id;
+    } catch (err) {
+      loadingState.hidden = true;
+      showError(`That lesson plan couldn't be opened: ${err.message}`);
+      return;
+    }
+  }
+
   if (!formatId) {
     loadingState.hidden = true;
     showError("No format selected. Go back to Lesson Plan and pick a format.");
@@ -1713,14 +1879,17 @@ async function init() {
     await initLiveDocView();
 
     // Bring back anything left from a previous visit before the page is
-    // shown, so the teacher never sees their work blank out and refill.
-    const resumed = restoreDraft();
+    // shown, so the teacher never sees their work blank out and refill. A
+    // plan opened by id loads from its own saved row instead: that is the
+    // authoritative copy, and it may well have been written on another
+    // device where no local draft exists.
+    const resumed = openedPlan ? applyOpenedPlan(openedPlan) : restoreDraft();
 
     loadingState.hidden = true;
     content.hidden = false;
 
     if (resumed) {
-      showToast("Picked up where you left off.");
+      showToast(openedPlan ? "Draft reopened." : "Picked up where you left off.");
       setOwlState("guide", "I brought back what you had so far. Carry on where you left off.");
     }
   } catch (err) {

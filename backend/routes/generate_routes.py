@@ -132,13 +132,75 @@ def owl_chat():
 @generate_bp.get("/lesson-plans")
 @login_required
 def list_lesson_plans():
+    """The signed-in user's own plans, newest edit first. `status` narrows to
+    one stage (the Create Lesson Plan page asks for status=draft to show
+    unfinished work), and `limit` caps the list for that same preview strip so
+    it doesn't fetch a teacher's entire history to show three cards."""
     user = current_user()
-    plans = (
-        LessonPlan.query.filter_by(user_id=user.id)
-        .order_by(LessonPlan.updated_at.desc())
-        .all()
-    )
-    return jsonify({"status": "ok", "lesson_plans": [p.to_dict() for p in plans]})
+    query = LessonPlan.query.filter_by(user_id=user.id)
+
+    status_filter = (request.args.get("status") or "").strip()
+    if status_filter in ("draft", "submitted", "reviewed"):
+        query = query.filter_by(status=status_filter)
+
+    query = query.order_by(LessonPlan.updated_at.desc())
+
+    try:
+        limit = int(request.args.get("limit") or 0)
+    except (TypeError, ValueError):
+        limit = 0
+    if limit > 0:
+        query = query.limit(min(limit, 100))
+
+    return jsonify({"status": "ok", "lesson_plans": [p.to_dict() for p in query.all()]})
+
+
+# Statuses whose content is settled: a student has handed the plan in, or a
+# teacher has already graded it. Editing then would change what was assessed
+# out from under the teacher, so the autosave is refused rather than silently
+# rewriting a submission.
+_LOCKED_STATUSES = ("submitted", "reviewed")
+
+
+@generate_bp.patch("/lesson-plans/<int:plan_id>")
+@login_required
+def update_lesson_plan(plan_id):
+    """Owner-only update of a plan already saved, which is what makes the
+    generator's autosave possible: the first edit creates the row via POST and
+    every edit after it comes back here, so an unfinished plan keeps one draft
+    row instead of piling up a new one per save."""
+    user = current_user()
+    plan = LessonPlan.query.get_or_404(plan_id)
+    if plan.user_id != user.id:
+        return jsonify({"status": "error", "message": "You don't have access to this lesson plan."}), 403
+
+    if plan.status in _LOCKED_STATUSES:
+        return jsonify({
+            "status": "error",
+            "message": "This plan has already been submitted, so it can no longer be edited.",
+        }), 409
+
+    data = request.get_json(silent=True) or {}
+
+    # Only the fields actually present are touched, so an autosave carrying
+    # just the field values can't blank out the title alongside them.
+    if "title" in data:
+        title = (data.get("title") or "").strip()
+        plan.title = title or "Untitled Lesson Plan"
+    for attr in ("subject", "grade_level", "quarter", "date", "generation_mode"):
+        if attr in data:
+            setattr(plan, attr, data.get(attr))
+    if "section_id" in data:
+        plan.section_id = data.get("section_id")
+    if "is_public" in data:
+        plan.is_public = bool(data.get("is_public"))
+    if "field_values" in data:
+        plan.set_values(data.get("field_values") or {})
+    if "rich_field_values" in data:
+        plan.set_rich_values(data.get("rich_field_values") or {})
+
+    db.session.commit()
+    return jsonify({"status": "ok", "lesson_plan": plan.to_dict()})
 
 @generate_bp.post("/lesson-plans")
 @login_required
