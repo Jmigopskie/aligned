@@ -1,0 +1,78 @@
+import json
+from datetime import datetime
+
+from extensions import db
+
+class LessonPlan(db.Model):
+    __tablename__ = "lesson_plans"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    format_id = db.Column(db.Integer, db.ForeignKey("lesson_plan_formats.id"), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    subject = db.Column(db.String(120))
+    grade_level = db.Column(db.String(50))
+    quarter = db.Column(db.String(50))
+    date = db.Column(db.String(50))
+    field_values = db.Column(db.Text, nullable=False, default="{}")
+    # Sanitized rich-text HTML (bold/italic/underline/bullet/numbered lists —
+    # see docx_service.parse_rich_value) for any field the teacher styled
+    # directly in the live document editor, keyed by field_key. A field with
+    # no entry here was never manually styled and exports as plain text.
+    rich_field_values = db.Column(db.Text)
+    generation_mode = db.Column(db.String(10), nullable=False, default="full")
+    docx_path = db.Column(db.String(255))
+
+    # Student -> teacher submission workflow
+    section_id = db.Column(db.Integer, db.ForeignKey("sections.id"), nullable=True)
+    status = db.Column(db.String(20), nullable=False, default="draft")  # draft | submitted | reviewed
+    teacher_feedback = db.Column(db.Text)
+    score = db.Column(db.Integer, nullable=True)  # 1-100, set by the teacher on review
+    submitted_at = db.Column(db.DateTime)
+    reviewed_at = db.Column(db.DateTime)
+
+    # Any author (student or teacher) can share their own plan publicly so
+    # it shows up for everyone in the "Public plans" list.
+    is_public = db.Column(db.Boolean, nullable=False, default=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_values(self):
+        return json.loads(self.field_values or "{}")
+
+    def set_values(self, values: dict):
+        self.field_values = json.dumps(values)
+
+    def get_rich_values(self):
+        return json.loads(self.rich_field_values or "{}")
+
+    def set_rich_values(self, values: dict):
+        self.rich_field_values = json.dumps(values or {})
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "author_name": self.user.full_name if self.user else None,
+            "format_id": self.format_id,
+            "title": self.title,
+            "subject": self.subject,
+            "grade_level": self.grade_level,
+            "quarter": self.quarter,
+            "date": self.date,
+            "field_values": self.get_values(),
+            "rich_field_values": self.get_rich_values(),
+            "generation_mode": self.generation_mode,
+            "docx_path": self.docx_path,
+            "section_id": self.section_id,
+            "section_name": self.section.name if self.section else None,
+            "status": self.status,
+            "teacher_feedback": self.teacher_feedback,
+            "score": self.score,
+            "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
+            "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
+            "is_public": bool(self.is_public),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }

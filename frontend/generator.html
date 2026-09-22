@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generate lesson plan — AlignED</title>
+  <link rel="icon" href="img/Icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="page-transition" id="page-transition">
+    <img src="img/owl/alan-idle.png" alt="" />
+    <span>Loading&hellip;</span>
+  </div>
+  <div class="dash-shell">
+    <header class="dash-topbar">
+      <div class="brand-block">
+        <img src="img/Icon.png" alt="" />
+        <div>
+          <div class="brand-name">AlignED</div>
+          <div class="brand-sub">TLE-ICT Lesson Plan Maker</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" type="button" title="Notifications" aria-label="Notifications" id="bell-btn">
+          <span class="dot"></span>
+        </button>
+        <div class="avatar-menu">
+          <button class="avatar-btn" id="avatar-btn" type="button">
+            <span class="avatar-chip js-user-initials">&nbsp;</span>
+          </button>
+          <div class="avatar-dropdown" id="avatar-dropdown">
+            <div class="dd-user">
+              <strong class="js-user-name">&nbsp;</strong>
+              <span class="js-user-role">&nbsp;</span>
+            </div>
+            <button class="dd-item" type="button" onclick="window.location.href='settings.html'">Settings</button>
+            <button class="dd-item danger" id="dd-logout-btn" type="button">Log out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="dash-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav" id="sidebar-nav"></nav>
+        <div class="sidebar-footer">
+          <span class="avatar-chip js-user-initials">&nbsp;</span>
+          <div class="who">
+            <strong class="js-user-name">&nbsp;</strong>
+            <span class="js-user-role">&nbsp;</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="dash-main">
+      <a class="back-link" href="lesson-plan.html">&larr; Back to Lesson Plan</a>
+
+      <div class="page-header">
+        <h1 id="format-name">&nbsp;</h1>
+      </div>
+
+      <div id="error-box" class="alert alert-error" hidden></div>
+
+      <div id="loading-state" class="panel skeleton" style="height: 220px;"></div>
+
+      <div id="content" hidden>
+
+        <div class="gen-tabs" id="gen-tabs">
+          <button type="button" class="active" data-tab="setup">
+            <span class="tab-step-num">1</span> Setup
+          </button>
+          <button type="button" data-tab="generate">
+            <span class="tab-step-num">2</span> Generate &amp; review
+          </button>
+        </div>
+
+        <div id="tab-panel-setup" class="tab-panel">
+          <section class="panel setup-panel">
+            <div class="setup-intro">
+              <h2>Before we start</h2>
+              <p class="text-sm mt-0">Tell us who's teaching, what subject, and which course guide to base the lesson on.</p>
+            </div>
+
+            <div class="setup-section">
+              <div class="setup-section-head">
+                <h3>Teacher, subject &amp; class</h3>
+                <p>Who's the cooperating teacher, which subject this lesson is for, and which class it's for.</p>
+              </div>
+              <div class="intake-grid">
+                <div class="field">
+                  <label for="ctx-teacher-name">Cooperating teacher *</label>
+                  <input type="text" id="ctx-teacher-name" placeholder="e.g. Juan Dela Cruz" />
+                </div>
+                <div class="field">
+                  <label for="ctx-subject">Subject *</label>
+                  <select id="ctx-subject">
+                    <option value="" disabled selected>Select a subject…</option>
+                    <option value="ICT">ICT</option>
+                    <option value="CP (ComProg)">CP (ComProg)</option>
+                  </select>
+                </div>
+                <div class="field full-width">
+                  <label for="ctx-topic">Specific topic</label>
+                  <input type="text" id="ctx-topic" placeholder="e.g. Cell Formulas — a narrower topic within the subject above" />
+                </div>
+                <div class="field">
+                  <label for="ctx-level-type">Level *</label>
+                  <select id="ctx-level-type">
+                    <option value="k12" selected>K-12</option>
+                    <option value="college">College</option>
+                  </select>
+                </div>
+                <div class="field" id="ctx-section-wrap">
+                  <label for="ctx-section">Section</label>
+                  <input type="text" id="ctx-section" placeholder="e.g. Section A" />
+                </div>
+
+                <div class="field full-width" id="ctx-k12-grade-wrap">
+                  <label for="ctx-k12-grade">Grade level</label>
+                  <select id="ctx-k12-grade">
+                    <option value="" disabled selected>Select grade level…</option>
+                    <option value="Grade 4">Grade 4</option>
+                    <option value="Grade 5">Grade 5</option>
+                    <option value="Grade 6">Grade 6</option>
+                    <option value="Grade 7">Grade 7</option>
+                    <option value="Grade 8">Grade 8</option>
+                    <option value="Grade 9">Grade 9</option>
+                    <option value="Grade 10">Grade 10</option>
+                    <option value="Grade 11">Grade 11</option>
+                    <option value="Grade 12">Grade 12</option>
+                  </select>
+                </div>
+
+                <div class="field full-width intake-grid" id="ctx-college-fields-wrap" hidden>
+                  <div class="field">
+                    <label for="ctx-college-program">Program</label>
+                    <input type="text" id="ctx-college-program" placeholder="e.g. BS Information Technology" />
+                  </div>
+                  <div class="field">
+                    <label for="ctx-college-year">Year</label>
+                    <select id="ctx-college-year">
+                      <option value="" disabled selected>Select year…</option>
+                      <option value="1st Year">1st Year</option>
+                      <option value="2nd Year">2nd Year</option>
+                      <option value="3rd Year">3rd Year</option>
+                      <option value="4th Year">4th Year</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="setup-section">
+              <div class="setup-section-head">
+                <h3>Curriculum/Course guide *</h3>
+                <p>Base the lesson on a guide from the shared library, or upload your own.</p>
+              </div>
+              <div class="course-guide-picker">
+                <div class="cg-tabs" id="cg-tabs">
+                  <button type="button" class="active" data-tab="search">Search the shared library</button>
+                  <button type="button" data-tab="upload">Upload my own</button>
+                </div>
+
+                <div id="cg-tab-search" class="cg-tab-content">
+                  <div class="cg-search-row">
+                    <button type="button" id="cg-search-btn" class="btn btn-secondary btn-sm">
+                      <span id="cg-search-btn-label">Search for "this subject"</span>
+                    </button>
+                    <p class="hint cg-search-hint">We'll look for a matching course guide already shared by other teachers.</p>
+                  </div>
+                  <div id="cg-results" class="cg-results"></div>
+                  <div id="cg-no-topic" class="alert alert-warning mt-16" hidden>
+                    No course guide found for this subject yet. Upload one, or try a different subject and search again.
+                  </div>
+                </div>
+
+                <div id="cg-tab-upload" class="cg-tab-content" hidden>
+                  <div id="cg-dropzone" class="dropzone">
+                    <div>Drag a course guide here or <strong>browse</strong> (.docx, .dotx, .pdf)</div>
+                  </div>
+                  <input type="file" id="cg-file-input" accept=".docx,.dotx,.pdf" hidden />
+                  <p class="hint">Uploaded guides join the shared library so other teachers can find them too.</p>
+                </div>
+
+                <div id="cg-selected" class="mt-16" hidden></div>
+              </div>
+            </div>
+
+          </section>
+
+          <div class="generator-actions mt-24">
+            <button type="button" id="setup-continue-btn" class="btn btn-primary">Continue to generate &rarr;</button>
+          </div>
+        </div>
+
+        <div id="tab-panel-generate" class="tab-panel" hidden>
+
+          <div id="gate-lock" class="gate-lock">
+            Fill in the cooperating teacher, subject, and course guide in the Setup tab to continue.
+          </div>
+
+          <div id="unlocked-content" hidden>
+            <section class="panel generate-panel">
+              <div class="setup-intro">
+                <h2>Generate content</h2>
+                <p class="text-sm mt-0">Let AI write the whole plan at once, or write it yourself field by field with the owl's help.</p>
+              </div>
+
+              <div class="mode-switch" id="mode-switch">
+                <button type="button" class="active" data-mode="full">Building Proficiency</button>
+                <button type="button" data-mode="step">Guided mode</button>
+              </div>
+
+              <section id="full-controls" class="mt-24">
+                <div class="generator-actions">
+                  <button type="button" id="generate-full-btn" class="btn btn-primary">Generate full plan</button>
+                </div>
+                <div id="generation-progress" class="generation-progress mt-16" hidden></div>
+              </section>
+
+              <section id="step-controls" class="mt-24" hidden>
+                <p class="text-sm mt-0" style="margin-bottom:12px;">
+                  Write each field yourself. The next one unlocks once the current one is filled in.
+                  Need help? Ask the owl in the chat, and tap a suggestion to add it to the field.
+                </p>
+                <div class="step-nav-row">
+                  <span class="text-sm" id="step-progress-label">Field 1 of 1</span>
+                  <select class="step-nav-select" id="section-nav"></select>
+                </div>
+                <div class="generator-actions">
+                  <button type="button" id="step-continue-btn" class="btn btn-primary">Submit &amp; continue</button>
+                </div>
+              </section>
+
+              <div id="live-doc-hint" class="text-sm mt-24" hidden>
+                This mirrors your format's real reference document. Watch it fill in as content is generated,
+                or click into any spot to edit and style it directly.
+              </div>
+
+              <div id="live-doc-toolbar" class="doc-toolbar mt-16" hidden>
+                <div class="doc-toolbar-group">
+                  <button type="button" class="doc-tool-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
+                  <button type="button" class="doc-tool-btn" data-cmd="italic" title="Italic"><em>I</em></button>
+                  <button type="button" class="doc-tool-btn" data-cmd="underline" title="Underline"><span style="text-decoration:underline;">U</span></button>
+                </div>
+                <div class="doc-toolbar-sep"></div>
+                <div class="doc-toolbar-group">
+                  <button type="button" class="doc-tool-btn" data-list="bullet" data-icon="list" title="Bulleted list"></button>
+                  <button type="button" class="doc-tool-btn" data-list="number" title="Numbered list">1.</button>
+                </div>
+              </div>
+              <div id="live-doc-wrap" class="lp-doc-wrap" hidden></div>
+
+              <div id="results" class="mt-24"></div>
+
+              <div id="footer" class="generator-footer" hidden>
+                <div class="flex gap-8" style="align-items:center; flex-wrap:wrap;">
+                  <span class="text-sm" id="save-status">Not saved yet.</span>
+                  <label class="text-sm" id="visibility-toggle" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" id="visibility-checkbox" />
+                    Make this plan public
+                  </label>
+                </div>
+                <div class="flex gap-8" style="align-items:center; flex-wrap:wrap;">
+                  <select id="submit-section-select" hidden></select>
+                  <button type="button" id="submit-btn" class="btn btn-secondary" hidden>Submit to class</button>
+                  <button type="button" id="preview-btn" class="btn btn-secondary">Preview</button>
+                  <button type="button" id="save-btn" class="btn btn-secondary">Save lesson plan</button>
+                  <a id="export-btn" class="btn btn-primary" style="pointer-events:none; opacity:0.5;">Export as Word</a>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+      </main>
+    </div>
+  </div>
+
+  <section class="owl-chat" id="owl-chat" aria-label="Chat with the owl" hidden>
+    <div class="owl-chat-resizer" id="owl-chat-resizer" role="separator" aria-orientation="vertical"
+         tabindex="0" aria-label="Resize the chat panel. Use the left and right arrow keys."></div>
+    <header class="owl-chat-head">
+      <img class="owl-chat-avatar" src="img/owl/alan-idle.png" alt="" />
+      <div class="owl-chat-title">
+        <strong>Ask the owl</strong>
+        <span id="owl-chat-field">Guided mode</span>
+      </div>
+      <button type="button" class="owl-chat-toggle" id="owl-chat-history-btn" aria-pressed="false">History</button>
+      <button type="button" class="owl-chat-toggle" id="owl-chat-toggle" aria-expanded="true" aria-controls="owl-chat-body">Hide</button>
+    </header>
+    <div class="owl-chat-body" id="owl-chat-body">
+      <div class="owl-chat-log" id="owl-chat-log" role="log" aria-live="polite"></div>
+
+      <!-- Saved conversations, one thread per field, kept per format so a
+           teacher can read back what the owl said about a field they have
+           already moved past. -->
+      <div class="owl-chat-history" id="owl-chat-history" hidden>
+        <div class="owl-chat-history-head">
+          <button type="button" class="owl-chat-back" id="owl-chat-history-back" hidden>&larr; All conversations</button>
+          <span id="owl-chat-history-title">Saved conversations</span>
+        </div>
+        <div class="owl-chat-history-list" id="owl-chat-history-list"></div>
+      </div>
+
+      <form class="owl-chat-form" id="owl-chat-form" autocomplete="off">
+        <label class="sr-only" for="owl-chat-input">Message the owl</label>
+        <input type="text" id="owl-chat-input" maxlength="500" placeholder="Ask about this field&hellip;" />
+        <button type="submit" class="btn btn-primary btn-sm" id="owl-chat-send">Send</button>
+      </form>
+    </div>
+  </section>
+
+  <div class="modal-overlay" id="preview-overlay" hidden>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+      <div class="modal-header">
+        <h2 id="preview-title">Lesson plan preview</h2>
+        <button type="button" class="modal-close" id="preview-close" aria-label="Close preview">&times;</button>
+      </div>
+      <div class="modal-body" id="preview-body"></div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/generator.js"></script>
+</body>
+</html>

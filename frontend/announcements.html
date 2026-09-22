@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Announcements — AlignED</title>
+  <link rel="icon" href="img/Icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="page-transition" id="page-transition">
+    <img src="img/owl/alan-idle.png" alt="" />
+    <span>Loading&hellip;</span>
+  </div>
+  <div class="dash-shell">
+    <header class="dash-topbar">
+      <div class="brand-block">
+        <img src="img/Icon.png" alt="" />
+        <div>
+          <div class="brand-name">AlignED</div>
+          <div class="brand-sub">TLE-ICT Lesson Plan Maker</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" type="button" title="Notifications" aria-label="Notifications" id="bell-btn">
+          <span class="dot"></span>
+        </button>
+        <div class="avatar-menu">
+          <button class="avatar-btn" id="avatar-btn" type="button">
+            <span class="avatar-chip js-user-initials">&nbsp;</span>
+          </button>
+          <div class="avatar-dropdown" id="avatar-dropdown">
+            <div class="dd-user">
+              <strong class="js-user-name">&nbsp;</strong>
+              <span class="js-user-role">&nbsp;</span>
+            </div>
+            <button class="dd-item" type="button" onclick="window.location.href='settings.html'">Settings</button>
+            <button class="dd-item danger" id="dd-logout-btn" type="button">Log out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="dash-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav" id="sidebar-nav"></nav>
+        <div class="sidebar-footer">
+          <span class="avatar-chip js-user-initials">&nbsp;</span>
+          <div class="who">
+            <strong class="js-user-name">&nbsp;</strong>
+            <span class="js-user-role">&nbsp;</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="dash-main">
+        <div class="page-header">
+          <h1 class="dash-page-title" style="margin-bottom:0;">Announcements</h1>
+          <button class="btn btn-primary" id="new-announcement-btn" hidden>+ New Announcement</button>
+        </div>
+        <p class="text-sm mt-0" style="margin-bottom:18px;" id="page-subtitle">
+          Notices from your school admin and your teachers.
+        </p>
+
+        <div id="error-box" class="alert alert-error" hidden></div>
+
+        <div class="section-card">
+          <div style="overflow-x:auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Type</th>
+                  <th>Audience</th>
+                  <th>Window</th>
+                  <th>Status</th>
+                  <th>Posted by</th>
+                  <th id="actions-col-head" hidden>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="announcements-body">
+                <tr class="table-empty-row"><td colspan="7">Loading&hellip;</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="announcement-overlay" hidden>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="announcement-modal-title" style="max-width:520px;">
+      <div class="modal-header">
+        <h2 id="announcement-modal-title">New announcement</h2>
+        <button type="button" class="modal-close" id="announcement-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="announcement-form">
+          <input type="hidden" id="announcement-id" value="" />
+          <div class="field">
+            <label for="announcement-title">Title</label>
+            <input type="text" id="announcement-title" placeholder="e.g. Quiz moved to Friday" required />
+          </div>
+          <div class="field">
+            <label for="announcement-message">Message</label>
+            <textarea id="announcement-message" rows="4" placeholder="What's happening and what should people expect?" required></textarea>
+          </div>
+          <div class="field">
+            <label for="announcement-audience">Audience</label>
+            <select id="announcement-audience">
+              <option value="all">All (everyone signed in)</option>
+              <option value="section">My section only</option>
+            </select>
+          </div>
+          <div class="field" id="announcement-section-wrap" hidden>
+            <label for="announcement-section">Section</label>
+            <select id="announcement-section"></select>
+          </div>
+          <div class="field">
+            <label for="announcement-type">Type</label>
+            <select id="announcement-type">
+              <option value="info">Info</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          <div style="display:flex; gap:14px;">
+            <div class="field" style="flex:1;">
+              <label for="announcement-starts">Starts (optional)</label>
+              <input type="datetime-local" id="announcement-starts" />
+            </div>
+            <div class="field" style="flex:1;">
+              <label for="announcement-ends">Ends (optional)</label>
+              <input type="datetime-local" id="announcement-ends" />
+            </div>
+          </div>
+          <p class="hint">Leave the window blank to show it immediately until you turn it off.</p>
+          <label class="checkbox-row" style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+            <input type="checkbox" id="announcement-active" checked />
+            <span>Active (visible to your audience)</span>
+          </label>
+          <button type="submit" class="btn btn-primary btn-block" id="announcement-submit-btn">Save announcement</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/announcements.js"></script>
+</body>
+</html>

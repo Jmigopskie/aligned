@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New format — AlignED</title>
+  <link rel="icon" href="img/Icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="page-transition" id="page-transition">
+    <img src="img/owl/alan-idle.png" alt="" />
+    <span>Loading&hellip;</span>
+  </div>
+  <div class="dash-shell">
+    <header class="dash-topbar">
+      <div class="brand-block">
+        <img src="img/Icon.png" alt="" />
+        <div>
+          <div class="brand-name">AlignED</div>
+          <div class="brand-sub">TLE-ICT Lesson Plan Maker</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" type="button" title="Notifications" aria-label="Notifications" id="bell-btn">
+          <span class="dot"></span>
+        </button>
+        <div class="avatar-menu">
+          <button class="avatar-btn" id="avatar-btn" type="button">
+            <span class="avatar-chip js-user-initials">&nbsp;</span>
+          </button>
+          <div class="avatar-dropdown" id="avatar-dropdown">
+            <div class="dd-user">
+              <strong class="js-user-name">&nbsp;</strong>
+              <span class="js-user-role">&nbsp;</span>
+            </div>
+            <button class="dd-item" type="button" onclick="window.location.href='settings.html'">Settings</button>
+            <button class="dd-item danger" id="dd-logout-btn" type="button">Log out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="dash-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav" id="sidebar-nav"></nav>
+        <div class="sidebar-footer">
+          <span class="avatar-chip js-user-initials">&nbsp;</span>
+          <div class="who">
+            <strong class="js-user-name">&nbsp;</strong>
+            <span class="js-user-role">&nbsp;</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="dash-main">
+      <a class="back-link" href="lesson-plan.html">&larr; Back to Lesson Plan</a>
+
+      <div class="page-header form-narrow">
+        <h1 id="page-title">New format</h1>
+      </div>
+
+      <div class="step-indicator form-narrow" id="step-indicator">
+        <div class="step active" id="step-indicator-1">
+          <span class="dot">1</span>
+          <span class="label">Add a reference</span>
+        </div>
+        <div class="divider"></div>
+        <div class="step" id="step-indicator-2">
+          <span class="dot">2</span>
+          <span class="label">Clean up &amp; save</span>
+        </div>
+      </div>
+
+      <div id="error-box" class="alert alert-error form-narrow" hidden></div>
+
+      <section id="step-1" class="panel form-narrow">
+        <p class="text-sm mt-0" style="margin-bottom: 18px;">
+          Have a blank copy of this format? Upload it — you'll get an exact live copy to clean up (fix typos,
+          remove unwanted lines, adjust formatting). AlignED figures out the fillable fields for you
+          automatically once you save, so there's nothing to define by hand. No file? Start from a blank sheet
+          instead.
+        </p>
+
+        <div class="source-choice">
+          <button type="button" class="source-option" id="choose-upload">
+            <div class="icon" data-icon="upload"></div>
+            <h3>Upload a file</h3>
+            <p class="text-sm mt-0">Upload a .docx, .dotx, or .pdf — an exact copy for you to tidy up.</p>
+          </button>
+          <button type="button" class="source-option" id="choose-blank">
+            <div class="icon" data-icon="edit"></div>
+            <h3>Start blank</h3>
+            <p class="text-sm mt-0">Build the field list yourself from an empty sheet.</p>
+          </button>
+        </div>
+
+        <div id="upload-area" class="mt-16" hidden>
+          <div id="dropzone" class="dropzone">
+            <div id="dropzone-empty">
+              Drag a file here or <strong>browse</strong>
+            </div>
+          </div>
+          <input type="file" id="file-input" accept=".docx,.dotx,.pdf" hidden />
+
+          <div id="scan-status" class="scan-status mt-16" hidden>
+            <span class="spinner"></span>
+            <span id="scan-status-text">Reading your format…</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="step-2" class="panel" hidden>
+        <div class="form-narrow">
+          <div class="field">
+            <label for="format-name">Format name</label>
+            <input type="text" id="format-name" placeholder="e.g. SDLP (4A's)" required />
+          </div>
+
+          <div class="checkbox-row" style="margin-bottom: 20px;">
+            <input type="checkbox" id="is-public" />
+            <label for="is-public">Share this format with other teachers</label>
+          </div>
+        </div>
+
+        <!-- Manual editor: used only when there's no reference document (blank-start formats). -->
+        <div id="manual-field-editor" class="form-narrow" hidden>
+          <div id="field-rows"></div>
+          <button type="button" id="add-field-btn" class="btn btn-secondary btn-block">+ Add field</button>
+        </div>
+
+        <!-- Document editor: the real reference file, rendered live, with a
+             formatting toolbar for cleaning up leftover/unwanted content —
+             fix typos, delete a stray line, restyle text. Fields are never
+             defined by hand here: AlignED reads them automatically from
+             whatever is left in the document once you save. -->
+        <div id="doc-field-editor" hidden>
+          <p class="text-sm mt-0">
+            Click into the document, then use the toolbar to format text, restyle headings and
+            lists, or delete a leftover line entirely. Fields are figured out automatically when
+            you save — there's nothing to define here.
+          </p>
+
+          <div id="doc-toolbar" class="doc-toolbar">
+            <div class="doc-toolbar-group">
+              <button type="button" class="doc-tool-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
+              <button type="button" class="doc-tool-btn" data-cmd="italic" title="Italic"><em>I</em></button>
+              <button type="button" class="doc-tool-btn" data-cmd="underline" title="Underline"><span style="text-decoration:underline;">U</span></button>
+            </div>
+            <div class="doc-toolbar-sep"></div>
+            <div class="doc-toolbar-group">
+              <select id="doc-heading-select" class="doc-tool-select" title="Paragraph style">
+                <option value="p">Normal text</option>
+                <option value="h1">Heading 1</option>
+                <option value="h2">Heading 2</option>
+                <option value="h3">Heading 3</option>
+              </select>
+            </div>
+            <div class="doc-toolbar-sep"></div>
+            <div class="doc-toolbar-group">
+              <button type="button" class="doc-tool-btn" data-cmd="justifyLeft" data-icon="alignLeft" title="Align left"></button>
+              <button type="button" class="doc-tool-btn" data-cmd="justifyCenter" data-icon="alignCenter" title="Align center"></button>
+              <button type="button" class="doc-tool-btn" data-cmd="justifyRight" data-icon="alignRight" title="Align right"></button>
+              <button type="button" class="doc-tool-btn" data-cmd="justifyFull" data-icon="alignJustify" title="Justify"></button>
+            </div>
+            <div class="doc-toolbar-sep"></div>
+            <div class="doc-toolbar-group">
+              <button type="button" class="doc-tool-btn" data-list="bullet" data-icon="list" title="Bulleted list"></button>
+              <button type="button" class="doc-tool-btn" data-list="number" title="Numbered list">1.</button>
+            </div>
+            <div class="doc-toolbar-sep"></div>
+            <div class="doc-toolbar-group">
+              <button type="button" id="doc-delete-line-btn" class="doc-tool-btn danger" data-icon="trash" data-icon-label="Delete" title="Delete this line"></button>
+            </div>
+            <div class="doc-toolbar-save">
+              <span class="text-sm" id="doc-content-status"></span>
+              <button type="button" id="doc-save-content-btn" class="btn btn-primary btn-sm" disabled>Save changes to document</button>
+            </div>
+          </div>
+
+          <div class="lp-doc-wrap doc-builder-canvas" id="doc-builder-canvas"></div>
+        </div>
+
+        <hr class="rule" />
+
+        <div class="flex-between">
+          <span class="text-sm" id="field-count-label">0 fields</span>
+          <div class="flex gap-8">
+            <button type="button" id="delete-format-btn" class="btn btn-secondary danger" hidden>Delete format</button>
+            <button type="button" id="back-to-step1-btn" class="btn btn-secondary">&larr; Back</button>
+            <button type="button" id="create-format-btn" class="btn btn-primary">Save format</button>
+          </div>
+        </div>
+      </section>
+      </main>
+    </div>
+  </div>
+
+  <template id="field-row-template">
+    <div class="field-row">
+      <div class="field-row-top">
+        <span class="field-index"></span>
+        <span class="flex gap-8" style="align-items:center;">
+          <button type="button" class="btn btn-ghost btn-sm remove-field-btn">Remove</button>
+        </span>
+      </div>
+
+      <div class="field">
+        <label>Field label</label>
+        <input type="text" class="field-label" placeholder="e.g. Learning Objectives" />
+        <p class="hint">Key: <span class="field-key-preview">—</span></p>
+      </div>
+
+      <div class="field">
+        <label>Field type</label>
+        <select class="field-type">
+          <option value="text">Text (single line)</option>
+          <option value="textarea" selected>Textarea (paragraph)</option>
+          <option value="list">List</option>
+          <option value="table">Table</option>
+        </select>
+      </div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" class="field-required" checked />
+        <label>Required</label>
+      </div>
+    </div>
+  </template>
+
+  <script src="js/api.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/format-builder.js"></script>
+</body>
+</html>

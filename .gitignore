@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.env
+
+# Local database and user content
+*.db
+instance/
+uploads/
+generated/
+backend/aligned.db
+backend/instance/
+backend/uploads/
+backend/generated/

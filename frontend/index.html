@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Log in — AlignED</title>
+  <link rel="icon" href="img/Icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/login-mobile.css" />
+</head>
+<body class="auth-page">
+  <div class="auth-shell">
+    <div class="auth-illustration">
+      <img src="img/Icon.png" alt="AlignED logo" />
+      <div class="wordmark">Align<span>ED</span></div>
+      <p class="tagline">TLE-ICT lesson plans, aligned to your course guide and ready in minutes.</p>
+    </div>
+
+    <div class="auth-panel">
+      <h1>Welcome back!</h1>
+      <p class="auth-subtitle">Sign in to your AlignED account</p>
+
+      <div id="form-error" class="alert alert-error" hidden></div>
+
+      <form id="login-form" novalidate>
+        <div class="field">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email" autocomplete="email" placeholder="juan@gsfe.tupcavite.edu.ph" required />
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Enter your password" required />
+        </div>
+
+        <div class="auth-row-between">
+          <label class="checkbox-row" for="remember-me" style="margin:0;">
+            <input type="checkbox" id="remember-me" />
+            <span>Remember me</span>
+          </label>
+          <a href="#" id="forgot-link">Forgot Password?</a>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn btn-primary btn-block">Sign In</button>
+      </form>
+
+      <div class="auth-divider">OR</div>
+
+      <p class="text-sm text-center mt-0">
+        Don't have an account? <a href="signup.html"><strong>Sign up here</strong></a>
+      </p>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    (async () => {
+      // Already logged in? skip straight to the dashboard.
+      try {
+        await Api.me();
+        window.location.href = "dashboard.html";
+      } catch (err) {
+        // not logged in — stay on this page
+      }
+    })();
+
+    document.getElementById("forgot-link").addEventListener("click", (e) => {
+      e.preventDefault();
+      showToast("Ask your admin to reset your password for now.");
+    });
+
+    const form = document.getElementById("login-form");
+    const errorBox = document.getElementById("form-error");
+    const submitBtn = document.getElementById("submit-btn");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorBox.hidden = true;
+
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      setButtonLoading(submitBtn, true, "Signing in");
+      try {
+        const data = await Api.login({ email, password });
+        cacheUser(data.user);
+        window.location.href = "dashboard.html";
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.hidden = false;
+        setButtonLoading(submitBtn, false);
+      }
+    });
+  </script>
+</body>
+</html>

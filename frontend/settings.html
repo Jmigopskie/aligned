@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings — AlignED</title>
+  <link rel="icon" href="img/Icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="page-transition" id="page-transition">
+    <img src="img/owl/alan-idle.png" alt="" />
+    <span>Loading&hellip;</span>
+  </div>
+  <div class="dash-shell">
+    <header class="dash-topbar">
+      <div class="brand-block">
+        <img src="img/Icon.png" alt="" />
+        <div>
+          <div class="brand-name">AlignED</div>
+          <div class="brand-sub">Lesson Plan Maker</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" type="button" title="Notifications" aria-label="Notifications" id="bell-btn">
+          <span class="dot"></span>
+        </button>
+        <div class="avatar-menu">
+          <button class="avatar-btn" id="avatar-btn" type="button">
+            <span class="avatar-chip js-user-initials">&nbsp;</span>
+          </button>
+          <div class="avatar-dropdown" id="avatar-dropdown">
+            <div class="dd-user">
+              <strong class="js-user-name">&nbsp;</strong>
+              <span class="js-user-role">&nbsp;</span>
+            </div>
+            <button class="dd-item" type="button" onclick="window.location.href='settings.html'">Settings</button>
+            <button class="dd-item danger" id="dd-logout-btn" type="button">Log out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="dash-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav" id="sidebar-nav"></nav>
+        <div class="sidebar-footer">
+          <span class="avatar-chip js-user-initials">&nbsp;</span>
+          <div class="who">
+            <strong class="js-user-name">&nbsp;</strong>
+            <span class="js-user-role">&nbsp;</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="dash-main" style="max-width:640px;">
+        <h1 class="dash-page-title">Settings</h1>
+
+        <div id="settings-error" class="alert alert-error" hidden></div>
+
+        <div class="panel" style="margin-bottom:20px;">
+          <div class="settings-panel-head">
+            <span class="avatar-chip js-user-initials settings-avatar">&nbsp;</span>
+            <div>
+              <h3 class="js-user-name" style="margin:0; font-size:16px;">&nbsp;</h3>
+              <span class="badge" id="profile-role-badge">&nbsp;</span>
+              <span class="text-sm" id="profile-member-since"></span>
+            </div>
+          </div>
+          <div class="flex gap-8 mt-16">
+            <button type="button" class="btn btn-secondary btn-sm" id="avatar-upload-btn">Change photo</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="avatar-remove-btn" hidden>Remove photo</button>
+            <input type="file" id="avatar-file-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+          </div>
+          <p class="hint" style="margin-top:8px;">PNG, JPG, WEBP, or GIF. It'll be cropped to a square.</p>
+        </div>
+
+        <div class="panel js-role-action" data-role="teacher" style="margin-bottom:20px;" hidden>
+          <h3 style="font-size:15px; margin-bottom:12px;">Dashboard banner</h3>
+          <img id="banner-preview" src="" alt="" style="width:100%; max-height:140px; object-fit:cover; border-radius:10px; display:none; margin-bottom:12px;" />
+          <div class="flex gap-8">
+            <button type="button" class="btn btn-secondary btn-sm" id="banner-upload-btn">Change banner</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="banner-remove-btn" hidden>Remove banner</button>
+            <input type="file" id="banner-file-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+          </div>
+          <p class="hint" style="margin-top:8px;">Shown on your dashboard, and on the dashboard of every student in your sections.</p>
+        </div>
+
+        <form id="profile-form" class="panel" style="margin-bottom:20px;">
+          <h3 style="font-size:15px; margin-bottom:16px;">Profile</h3>
+          <div class="field">
+            <label for="profile-name">Full name</label>
+            <input type="text" id="profile-name" required />
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="profile-email">Email</label>
+            <input type="email" id="profile-email" required />
+          </div>
+          <div class="flex-between mt-16">
+            <span class="text-sm" id="profile-status"></span>
+            <button class="btn btn-primary" id="profile-save-btn" type="submit">Save profile</button>
+          </div>
+        </form>
+
+        <form id="password-form" class="panel" style="margin-bottom:20px;">
+          <h3 style="font-size:15px; margin-bottom:6px;">Change password</h3>
+          <p class="text-sm mt-0" style="margin-bottom:16px;">Use at least 8 characters.</p>
+          <div class="field">
+            <label for="current-password">Current password</label>
+            <input type="password" id="current-password" autocomplete="current-password" required />
+          </div>
+          <div class="field">
+            <label for="new-password">New password</label>
+            <input type="password" id="new-password" autocomplete="new-password" minlength="8" required />
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="confirm-password">Confirm new password</label>
+            <input type="password" id="confirm-password" autocomplete="new-password" minlength="8" required />
+          </div>
+          <div class="flex-between mt-16">
+            <span class="text-sm" id="password-status"></span>
+            <button class="btn btn-primary" id="password-save-btn" type="submit">Update password</button>
+          </div>
+        </form>
+
+        <div class="panel">
+          <h3 style="font-size:15px; margin-bottom:6px;">Session</h3>
+          <p class="text-sm mt-0" style="margin-bottom:16px;">Log out of AlignED on this device.</p>
+          <button class="btn btn-danger" id="logout-btn2" type="button">Log out</button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/settings.js"></script>
+</body>
+</html>

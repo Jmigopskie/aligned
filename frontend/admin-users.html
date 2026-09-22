@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Users — AlignED</title>
+  <link rel="icon" href="img/Icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="page-transition" id="page-transition">
+    <img src="img/owl/alan-idle.png" alt="" />
+    <span>Loading&hellip;</span>
+  </div>
+  <div class="dash-shell">
+    <header class="dash-topbar">
+      <div class="brand-block">
+        <img src="img/Icon.png" alt="" />
+        <div>
+          <div class="brand-name">AlignED</div>
+          <div class="brand-sub">Admin Console</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="avatar-menu">
+          <button class="avatar-btn" id="avatar-btn" type="button">
+            <span class="avatar-chip js-user-initials">&nbsp;</span>
+          </button>
+          <div class="avatar-dropdown" id="avatar-dropdown">
+            <div class="dd-user">
+              <strong class="js-user-name">&nbsp;</strong>
+              <span class="js-user-role">&nbsp;</span>
+            </div>
+            <button class="dd-item" type="button" onclick="window.location.href='settings.html'">Settings</button>
+            <button class="dd-item danger" id="dd-logout-btn" type="button">Log out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="dash-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav" id="sidebar-nav"></nav>
+        <div class="sidebar-footer">
+          <span class="avatar-chip js-user-initials">&nbsp;</span>
+          <div class="who">
+            <strong class="js-user-name">&nbsp;</strong>
+            <span class="js-user-role">&nbsp;</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="dash-main">
+        <div class="page-header">
+          <h1 class="dash-page-title" style="margin-bottom:0;" id="page-title">Manage Users</h1>
+          <button class="btn btn-primary" id="new-user-btn">+ Add Account</button>
+        </div>
+        <p class="text-sm mt-0" style="margin-bottom:18px;" id="page-intro">Create teacher and student accounts here — public sign-up only creates student accounts.</p>
+
+        <div id="error-box" class="alert alert-error" hidden></div>
+
+        <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:18px;">
+          <div class="field" style="max-width:240px; margin-bottom:0;">
+            <label for="role-filter">Role</label>
+            <select id="role-filter" name="role">
+              <option value="">All roles</option>
+              <option value="admin">Admin</option>
+              <option value="teacher">Teacher</option>
+              <option value="student">Student</option>
+            </select>
+          </div>
+          <div class="field" style="max-width:240px; margin-bottom:0;">
+            <label for="status-filter">Status</label>
+            <select id="status-filter" name="active">
+              <option value="">Active and archived</option>
+              <option value="1">Active only</option>
+              <option value="0">Archived only</option>
+            </select>
+          </div>
+          <div class="field" style="flex:1; min-width:220px; margin-bottom:0;">
+            <label for="search-input">Search</label>
+            <input type="search" id="search-input" name="q" autocomplete="off" spellcheck="false"
+                   placeholder="Search by name or email…" />
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div style="overflow-x:auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-body">
+                <tr class="table-empty-row"><td colspan="6">Loading&hellip;</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="user-overlay" hidden>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="user-modal-title" style="max-width:480px;">
+      <div class="modal-header">
+        <h2 id="user-modal-title">Add account</h2>
+        <button type="button" class="modal-close" id="user-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="user-form">
+          <input type="hidden" id="user-id" value="" />
+          <div class="field">
+            <label for="user-name">Full name</label>
+            <input type="text" id="user-name" name="full_name" autocomplete="name" required />
+          </div>
+          <div class="field">
+            <label for="user-email">Email</label>
+            <input type="email" id="user-email" name="email" autocomplete="email"
+                   inputmode="email" spellcheck="false" autocapitalize="none" required />
+          </div>
+          <div class="field">
+            <label for="user-role">Role</label>
+            <select id="user-role" name="role">
+              <option value="teacher">Teacher</option>
+              <option value="student">Student</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="user-password" id="user-password-label">Password</label>
+            <input type="password" id="user-password" name="password" autocomplete="new-password"
+                   placeholder="At least 8 characters" aria-describedby="user-password-hint" />
+            <p class="hint" id="user-password-hint">Leave blank to keep the current password.</p>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="user-submit-btn">Save account</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/admin-users.js"></script>
+</body>
+</html>
