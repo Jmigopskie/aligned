@@ -22,6 +22,12 @@ class Section(db.Model):
     subject = db.Column(db.String(120))
     grade_level = db.Column(db.String(50))
     join_code = db.Column(db.String(10), nullable=False, unique=True)
+    # Archiving a section is stored the same way as archiving an account
+    # (User.is_active): the row and every submission linked to it are kept,
+    # the section simply stops appearing in active lists and stops accepting
+    # new joins. One flag rather than a separate archived_at column, so the
+    # two can never drift apart.
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     teacher = db.relationship("User", backref="sections_taught")
@@ -39,6 +45,7 @@ class Section(db.Model):
             "subject": self.subject,
             "grade_level": self.grade_level,
             "join_code": self.join_code,
+            "is_active": bool(self.is_active),
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
         if include_counts:

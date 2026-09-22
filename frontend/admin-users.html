@@ -88,10 +88,22 @@
         </div>
 
         <div class="section-card">
+          <div class="bulk-bar" id="bulk-bar" hidden>
+            <span class="bulk-bar-count" id="bulk-count">0 items selected</span>
+            <div class="bulk-bar-actions">
+              <button type="button" class="btn btn-ghost btn-sm" id="bulk-clear-btn">Clear</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="bulk-restore-btn">Restore</button>
+              <button type="button" class="btn btn-primary btn-sm" id="bulk-archive-btn">Archive</button>
+            </div>
+          </div>
           <div style="overflow-x:auto;">
             <table class="data-table">
               <thead>
                 <tr>
+                  <th class="bulk-cell">
+                    <input type="checkbox" class="bulk-select-all" id="bulk-select-all"
+                           aria-label="Select every account shown" />
+                  </th>
                   <th>Name</th>
                   <th>Email</th>
                   <th>Role</th>
@@ -101,7 +113,7 @@
                 </tr>
               </thead>
               <tbody id="users-body">
-                <tr class="table-empty-row"><td colspan="6">Loading&hellip;</td></tr>
+                <tr class="table-empty-row"><td colspan="7">Loading&hellip;</td></tr>
               </tbody>
             </table>
           </div>
@@ -150,6 +162,7 @@
 
   <script src="js/api.js"></script>
   <script src="js/icons.js"></script>
+  <script src="js/bulk-select.js"></script>
   <script src="js/admin-users.js"></script>
 </body>
 </html>

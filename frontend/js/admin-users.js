@@ -26,6 +26,10 @@ const userModalClose = document.getElementById("user-modal-close");
 
 let currentUser = null;
 let searchTimer = null;
+// Assigned further down, once the table body it wires into exists. Declared
+// here because renderUsers() guards on it and would otherwise hit the
+// temporal dead zone of a later declaration instead of seeing undefined.
+let bulk = null;
 
 function fmtDate(iso) {
   if (!iso) return "\u2013";
@@ -38,9 +42,10 @@ function roleLabel(role) {
 
 function renderUsers(users) {
   if (!users.length) {
-    usersBody.innerHTML = `<tr class="table-empty-row"><td colspan="6">${
+    usersBody.innerHTML = `<tr class="table-empty-row"><td colspan="7">${
       statusFilter.value === "0" ? "No archived accounts." : "No accounts match."
     }</td></tr>`;
+    if (bulk) bulk.sync();
     return;
   }
 
@@ -48,6 +53,7 @@ function renderUsers(users) {
     .map(
       (u) => `
       <tr>
+        ${bulkCheckboxCell(u.id, u.full_name)}
         <td>${escapeHtml(u.full_name)}</td>
         <td>${escapeHtml(u.email)}</td>
         <td><span class="badge">${roleLabel(u.role)}</span></td>
@@ -67,12 +73,29 @@ function renderUsers(users) {
   usersBody.querySelectorAll("[data-action]").forEach((btn) => {
     btn.addEventListener("click", () => handleAction(btn));
   });
+
+  // Rows were just replaced, so re-apply whatever is still selected.
+  if (bulk) bulk.sync();
 }
 
 let allUsers = [];
 
+// Ticking rows and archiving them as a batch. Declared up here because
+// renderUsers() calls bulk.sync() after every render, including the first.
+bulk = initBulkSelect({
+  kind: "users",
+  tbody: usersBody,
+  selectAllEl: document.getElementById("bulk-select-all"),
+  barEl: document.getElementById("bulk-bar"),
+  countEl: document.getElementById("bulk-count"),
+  archiveBtn: document.getElementById("bulk-archive-btn"),
+  restoreBtn: document.getElementById("bulk-restore-btn"),
+  clearBtn: document.getElementById("bulk-clear-btn"),
+  onApplied: () => loadUsers(),
+});
+
 async function loadUsers() {
-  usersBody.innerHTML = `<tr class="table-empty-row"><td colspan="6">Loading&hellip;</td></tr>`;
+  usersBody.innerHTML = `<tr class="table-empty-row"><td colspan="7">Loading&hellip;</td></tr>`;
   try {
     const params = {};
     if (roleFilter.value) params.role = roleFilter.value;
@@ -90,7 +113,7 @@ async function loadUsers() {
     allUsers = data.users || [];
     renderUsers(allUsers);
   } catch (err) {
-    usersBody.innerHTML = `<tr class="table-empty-row"><td colspan="6">Couldn't load accounts.</td></tr>`;
+    usersBody.innerHTML = `<tr class="table-empty-row"><td colspan="7">Couldn't load accounts.</td></tr>`;
     errorBox.textContent = err.message;
     errorBox.hidden = false;
   }

@@ -229,7 +229,18 @@ const Api = {
     apiFetch(`/api/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(payload) }),
   adminDeleteUser: (userId) =>
     apiFetch(`/api/admin/users/${userId}`, { method: "DELETE" }),
-  adminListSections: () => apiFetch("/api/admin/sections"),
+  adminListSections: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return apiFetch(`/api/admin/sections${qs ? `?${qs}` : ""}`);
+  },
+  // kind is "users" or "sections". Resolves to
+  // { updated, updated_count, skipped: [{id, reason}] } — a batch can partly
+  // apply, so callers must report `skipped` rather than assume all went through.
+  adminBulkArchive: (kind, ids, isActive) =>
+    apiFetch("/api/admin/bulk-archive", {
+      method: "POST",
+      body: JSON.stringify({ kind, ids, is_active: isActive }),
+    }),
   adminListLessonPlans: (status) =>
     apiFetch(`/api/admin/lesson-plans${status ? `?status=${status}` : ""}`),
   adminListCourseGuides: (subject) =>

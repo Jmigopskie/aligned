@@ -57,9 +57,12 @@ def create_section():
 def list_sections():
     user = current_user()
 
+    # A section the admin archived drops out of both lists: the teacher stops
+    # seeing it among their classes and the student stops seeing it among
+    # theirs. Nothing is deleted, so restoring it brings both views back.
     if user.role == "teacher":
         sections = (
-            Section.query.filter_by(teacher_id=user.id)
+            Section.query.filter_by(teacher_id=user.id, is_active=True)
             .order_by(Section.created_at.desc())
             .all()
         )
@@ -68,6 +71,7 @@ def list_sections():
     memberships = (
         SectionMembership.query.filter_by(student_id=user.id)
         .join(Section)
+        .filter(Section.is_active.is_(True))
         .order_by(Section.created_at.desc())
         .all()
     )
@@ -193,6 +197,10 @@ def join_section():
 
     section = Section.query.filter_by(join_code=code).first()
     if not section:
+        return jsonify({"status": "error", "message": "No class found with that code."}), 404
+    if not section.is_active:
+        # Deliberately the same wording as a code that matches nothing, so the
+        # code of an archived class can't be probed for existence.
         return jsonify({"status": "error", "message": "No class found with that code."}), 404
 
     existing = SectionMembership.query.filter_by(section_id=section.id, student_id=user.id).first()

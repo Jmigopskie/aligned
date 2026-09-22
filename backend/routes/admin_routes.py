@@ -150,8 +150,149 @@ def delete_user(user_id):
 @admin_bp.get("/admin/sections")
 @admin_required
 def list_all_sections():
-    sections = Section.query.order_by(Section.created_at.desc()).all()
+    """Every section across all teachers. Mirrors the filters on
+    /admin/users so the archive view is the same list narrowed by
+    is_active rather than a separate screen with its own query."""
+    active = request.args.get("active")
+    q = (request.args.get("q") or "").strip().lower()
+
+    query = Section.query
+    if active in ("0", "1"):
+        query = query.filter_by(is_active=(active == "1"))
+    if q:
+        like = f"%{q}%"
+        query = query.join(User, Section.teacher_id == User.id).filter(
+            db.or_(
+                Section.name.ilike(like),
+                Section.subject.ilike(like),
+                Section.grade_level.ilike(like),
+                User.full_name.ilike(like),
+            )
+        )
+
+    sections = query.order_by(Section.created_at.desc()).all()
     return jsonify({"status": "ok", "sections": [s.to_dict() for s in sections]})
+
+
+# ---- Bulk archive / restore ----
+
+# One request can only ever touch this many rows. Keeps a runaway or
+# hand-edited request from rewriting the whole table in one go.
+BULK_LIMIT = 500
+
+
+def _bulk_archive_users(ids, is_active, acting_admin):
+    """Archive or restore accounts, refusing the two cases that would lock
+    everyone out: an admin archiving themselves, and archiving the last
+    active admin. Refusals are reported per id instead of failing the whole
+    batch, so one bad pick doesn't discard a valid selection."""
+    users = User.query.filter(User.id.in_(ids)).all()
+    found = {u.id for u in users}
+    skipped = [{"id": i, "reason": "That account no longer exists."} for i in ids if i not in found]
+
+    # Counted once up front, then decremented as admins in this batch are
+    # archived, so archiving several admins at once can't slip past the check
+    # by each one individually seeing the others as still active.
+    active_admins = User.query.filter_by(role="admin", is_active=True).count()
+
+    updated = []
+    for user in users:
+        if user.is_active == is_active:
+            continue  # already in the requested state; nothing to do
+        if not is_active:
+            if user.id == acting_admin.id:
+                skipped.append({"id": user.id, "reason": "You can't archive your own account."})
+                continue
+            if user.role == "admin" and active_admins <= 1:
+                skipped.append({"id": user.id, "reason": "You can't archive the last active admin."})
+                continue
+            if user.role == "admin":
+                active_admins -= 1
+        elif user.role == "admin":
+            active_admins += 1
+        user.is_active = is_active
+        updated.append(user.id)
+
+    return updated, skipped
+
+
+def _bulk_archive_sections(ids, is_active):
+    """Archive or restore sections. A section keeps its students, lesson
+    plans and submissions either way — archiving only takes it out of the
+    active lists and stops new students joining by code."""
+    sections = Section.query.filter(Section.id.in_(ids)).all()
+    found = {sec.id for sec in sections}
+    skipped = [{"id": i, "reason": "That section no longer exists."} for i in ids if i not in found]
+
+    updated = []
+    for section in sections:
+        if section.is_active == is_active:
+            continue
+        section.is_active = is_active
+        updated.append(section.id)
+
+    return updated, skipped
+
+
+@admin_bp.post("/admin/bulk-archive")
+@admin_required
+def bulk_archive():
+    """Archive or restore many accounts or sections in one request, so the
+    admin can tick a batch instead of clicking through them one at a time.
+
+    Body: {"kind": "users"|"sections", "ids": [int, ...], "is_active": bool}
+    Returns the ids actually changed plus a per-id reason for any the guards
+    refused, so a partly-valid selection still applies and says what it left
+    alone rather than silently dropping it."""
+    acting_admin = current_user()
+    data = request.get_json(silent=True) or {}
+
+    kind = (data.get("kind") or "").strip().lower()
+    if kind not in ("users", "sections"):
+        return jsonify({"status": "error", "message": "Choose either accounts or sections."}), 400
+
+    if "is_active" not in data:
+        return jsonify({"status": "error", "message": "Say whether to archive or restore."}), 400
+    is_active = bool(data.get("is_active"))
+
+    raw_ids = data.get("ids")
+    if not isinstance(raw_ids, list) or not raw_ids:
+        return jsonify({"status": "error", "message": "Select at least one item first."}), 400
+    if len(raw_ids) > BULK_LIMIT:
+        return jsonify({
+            "status": "error",
+            "message": f"You can only archive {BULK_LIMIT} items at a time.",
+        }), 400
+
+    # Deduplicated so a repeated id can't be counted twice, and validated
+    # here rather than trusted, since these go straight into an IN clause.
+    ids, seen = [], set()
+    for raw in raw_ids:
+        if isinstance(raw, bool):
+            return jsonify({"status": "error", "message": "Every id must be a whole number."}), 400
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return jsonify({"status": "error", "message": "Every id must be a whole number."}), 400
+        if value not in seen:
+            seen.add(value)
+            ids.append(value)
+
+    if kind == "users":
+        updated, skipped = _bulk_archive_users(ids, is_active, acting_admin)
+    else:
+        updated, skipped = _bulk_archive_sections(ids, is_active)
+
+    db.session.commit()
+
+    return jsonify({
+        "status": "ok",
+        "kind": kind,
+        "is_active": is_active,
+        "updated": updated,
+        "updated_count": len(updated),
+        "skipped": skipped,
+    })
 
 
 @admin_bp.get("/admin/lesson-plans")

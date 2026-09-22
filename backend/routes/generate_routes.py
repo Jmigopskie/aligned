@@ -247,6 +247,15 @@ def submit_lesson_plan(plan_id):
     if not membership:
         return jsonify({"status": "error", "message": "You haven't joined that class."}), 403
 
+    # An archived class stops accepting work. Checked here as well as in the
+    # section listing, because a stale page could still hold its id.
+    target_section = Section.query.get(section_id)
+    if target_section and not target_section.is_active:
+        return jsonify({
+            "status": "error",
+            "message": "That class has been archived, so it's no longer accepting submissions.",
+        }), 409
+
     plan.section_id = section_id
     plan.status = "submitted"
     plan.submitted_at = datetime.utcnow()

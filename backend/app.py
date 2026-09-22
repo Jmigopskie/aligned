@@ -122,6 +122,22 @@ def _migrate_format_field_columns():
             conn.execute(text("ALTER TABLE format_fields ADD COLUMN anchor_index INTEGER"))
 
 
+def _migrate_section_columns():
+    """Add the is_active column (a section the admin has archived) to databases
+    created before bulk archiving existed. Existing sections default to active
+    so archiving is opt-in and nothing disappears on upgrade."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    if "sections" not in inspector.get_table_names():
+        return
+
+    existing_cols = {col["name"] for col in inspector.get_columns("sections")}
+    if "is_active" not in existing_cols:
+        with db.engine.begin() as conn:
+            conn.execute(text("ALTER TABLE sections ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
+
+
 def _migrate_announcement_columns():
     """Add the section_id column (lets a teacher scope an announcement to
     one of their own sections instead of everyone) to databases created
@@ -210,6 +226,7 @@ def create_app():
         _migrate_format_columns()
         _migrate_format_field_columns()
         _migrate_announcement_columns()
+        _migrate_section_columns()
         _ensure_default_admin(app)
 
     @app.get("/api/health")

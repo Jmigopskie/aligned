@@ -4167,3 +4167,69 @@ body.auth-page::after {
     max-height: 70vh;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Bulk selection (admin accounts + sections tables)
+   --------------------------------------------------------------------------- */
+
+.bulk-cell {
+  width: 34px;
+  padding-right: 0 !important;
+}
+
+.bulk-cell input[type="checkbox"],
+.bulk-select-all {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  margin: 0;
+  vertical-align: middle;
+}
+
+.bulk-select-all:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.data-table tr.is-selected td {
+  background: var(--primary-tint);
+}
+
+/* Sits above the table and only appears once something is ticked, so the
+   table reads normally until there is actually a batch to act on. A complete
+   border on all four sides — the selected-count text carries the state, not a
+   coloured edge. */
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: var(--primary-tint);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.bulk-bar-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.bulk-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .bulk-bar-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+}
