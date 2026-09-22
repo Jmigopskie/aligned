@@ -6,17 +6,45 @@ from config import Config
 from extensions import db, bcrypt, cors
 
 
+def _add_column(table: str, column: str, ddl_type: str):
+    """ALTER TABLE ... ADD COLUMN, tolerating the column already being there.
+
+    The inspect()-then-ALTER pattern below is a race under gunicorn: all three
+    workers boot at once, each inspects the table before any of them has
+    altered it, so all three decide the column is missing and two then fail
+    with "Duplicate column name" — which kills those workers and takes the
+    service down with them. Checking first still avoids the pointless ALTER in
+    the common case; swallowing a duplicate-column error makes the outcome the
+    same whichever order the workers happen to run in.
+
+    Only the duplicate-column error is swallowed. Any other failure is a real
+    schema problem and is re-raised.
+    """
+    from sqlalchemy import inspect, text
+    from sqlalchemy.exc import DatabaseError
+
+    inspector = inspect(db.engine)
+    if table not in inspector.get_table_names():
+        return
+    if column in {col["name"] for col in inspector.get_columns(table)}:
+        return
+
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}"))
+    except DatabaseError as exc:
+        message = str(exc).lower()
+        # MySQL: (1060, "Duplicate column name 'x'"). SQLite: "duplicate column
+        # name: x". Either means another worker won the race, which is fine.
+        if "duplicate column" in message:
+            return
+        raise
+
+
 def _migrate_lesson_plan_columns():
     """db.create_all() only creates brand-new tables, it never alters existing
     ones. Older sqlite databases created before the section/submission
     feature won't have these columns yet, so add them if they're missing."""
-    from sqlalchemy import inspect, text
-
-    inspector = inspect(db.engine)
-    if "lesson_plans" not in inspector.get_table_names():
-        return
-
-    existing_cols = {col["name"] for col in inspector.get_columns("lesson_plans")}
     new_columns = {
         "section_id": "INTEGER",
         "status": "TEXT NOT NULL DEFAULT 'draft'",
@@ -34,32 +62,17 @@ def _migrate_lesson_plan_columns():
         "is_public": "BOOLEAN NOT NULL DEFAULT 0",
     }
 
-    with db.engine.begin() as conn:
-        for col_name, col_type in new_columns.items():
-            if col_name not in existing_cols:
-                conn.execute(text(f"ALTER TABLE lesson_plans ADD COLUMN {col_name} {col_type}"))
+    for col_name, col_type in new_columns.items():
+        _add_column("lesson_plans", col_name, col_type)
 
 
 def _migrate_user_columns():
     """Add columns needed for admin-managed accounts (is_active), a
     user-uploaded profile picture (avatar_path), and a teacher's dashboard
     banner (banner_path) to databases created before those features existed."""
-    from sqlalchemy import inspect, text
-
-    inspector = inspect(db.engine)
-    if "users" not in inspector.get_table_names():
-        return
-
-    existing_cols = {col["name"] for col in inspector.get_columns("users")}
-    if "is_active" not in existing_cols:
-        with db.engine.begin() as conn:
-            conn.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
-    if "avatar_path" not in existing_cols:
-        with db.engine.begin() as conn:
-            conn.execute(text("ALTER TABLE users ADD COLUMN avatar_path VARCHAR(255)"))
-    if "banner_path" not in existing_cols:
-        with db.engine.begin() as conn:
-            conn.execute(text("ALTER TABLE users ADD COLUMN banner_path VARCHAR(255)"))
+    _add_column("users", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
+    _add_column("users", "avatar_path", "VARCHAR(255)")
+    _add_column("users", "banner_path", "VARCHAR(255)")
 
 
 def _migrate_course_guide_columns():
@@ -68,16 +81,12 @@ def _migrate_course_guide_columns():
     whose file is still on disk."""
     import hashlib
 
-    from sqlalchemy import inspect, text
+    from sqlalchemy import inspect
 
-    inspector = inspect(db.engine)
-    if "course_guides" not in inspector.get_table_names():
+    if "course_guides" not in inspect(db.engine).get_table_names():
         return
 
-    existing_cols = {col["name"] for col in inspector.get_columns("course_guides")}
-    if "file_hash" not in existing_cols:
-        with db.engine.begin() as conn:
-            conn.execute(text("ALTER TABLE course_guides ADD COLUMN file_hash VARCHAR(64)"))
+    _add_column("course_guides", "file_hash", "VARCHAR(64)")
 
     from models.course_guide import CourseGuide
 
@@ -94,64 +103,28 @@ def _migrate_format_columns():
     """Add the template_docx_path column (the auto-converted, fillable copy
     of a PDF-sourced reference format) to databases created before this
     feature existed."""
-    from sqlalchemy import inspect, text
-
-    inspector = inspect(db.engine)
-    if "lesson_plan_formats" not in inspector.get_table_names():
-        return
-
-    existing_cols = {col["name"] for col in inspector.get_columns("lesson_plan_formats")}
-    if "template_docx_path" not in existing_cols:
-        with db.engine.begin() as conn:
-            conn.execute(text("ALTER TABLE lesson_plan_formats ADD COLUMN template_docx_path VARCHAR(255)"))
+    _add_column("lesson_plan_formats", "template_docx_path", "VARCHAR(255)")
 
 
 def _migrate_format_field_columns():
     """Add the anchor_index column (a field's exact position in its
     reference file, set by clicking it in the format builder's document
     editor) to databases created before this feature existed."""
-    from sqlalchemy import inspect, text
-
-    inspector = inspect(db.engine)
-    if "format_fields" not in inspector.get_table_names():
-        return
-
-    existing_cols = {col["name"] for col in inspector.get_columns("format_fields")}
-    if "anchor_index" not in existing_cols:
-        with db.engine.begin() as conn:
-            conn.execute(text("ALTER TABLE format_fields ADD COLUMN anchor_index INTEGER"))
+    _add_column("format_fields", "anchor_index", "INTEGER")
 
 
 def _migrate_section_columns():
     """Add the is_active column (a section the admin has archived) to databases
     created before bulk archiving existed. Existing sections default to active
     so archiving is opt-in and nothing disappears on upgrade."""
-    from sqlalchemy import inspect, text
-
-    inspector = inspect(db.engine)
-    if "sections" not in inspector.get_table_names():
-        return
-
-    existing_cols = {col["name"] for col in inspector.get_columns("sections")}
-    if "is_active" not in existing_cols:
-        with db.engine.begin() as conn:
-            conn.execute(text("ALTER TABLE sections ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
+    _add_column("sections", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
 
 
 def _migrate_announcement_columns():
     """Add the section_id column (lets a teacher scope an announcement to
     one of their own sections instead of everyone) to databases created
     before this feature existed."""
-    from sqlalchemy import inspect, text
-
-    inspector = inspect(db.engine)
-    if "announcements" not in inspector.get_table_names():
-        return
-
-    existing_cols = {col["name"] for col in inspector.get_columns("announcements")}
-    if "section_id" not in existing_cols:
-        with db.engine.begin() as conn:
-            conn.execute(text("ALTER TABLE announcements ADD COLUMN section_id INTEGER"))
+    _add_column("announcements", "section_id", "INTEGER")
 
 
 def _ensure_default_admin(app):
