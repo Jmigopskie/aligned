@@ -21,6 +21,7 @@ import time
 import requests
 
 from config import Config
+from services import ai_limits
 
 _log = logging.getLogger(__name__)
 
@@ -32,6 +33,15 @@ if PROVIDER == "gemini" and not Config.GEMINI_API_KEY:
 
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 _gemini_client = None
+
+# Ceilings on what one field may contain. Stated in the prompt AND enforced on
+# the reply in _enforce_limits(), because asking a model for brevity is a
+# request, not a guarantee: the trim is what actually holds the line when it
+# writes four sentences anyway.
+_MAX_LIST_ITEMS = 5
+_MAX_ITEM_WORDS = 15
+_MAX_PROSE_SENTENCES = 3
+_MAX_PROSE_WORDS = 60
 
 _SYSTEM_INSTRUCTION = (
     "You are helping a K-12 ICT/TLE teacher in the Philippines write a lesson plan. "
@@ -45,7 +55,24 @@ _SYSTEM_INSTRUCTION = (
     "topic itself is physical — make it about the subject matter.\n"
     "- Never reuse the same stock activity across different lessons or sections; if a "
     "course guide or references are provided, pull concrete details (terms, examples, "
-    "page/unit names) from them rather than inventing generic ones."
+    "page/unit names) from them rather than inventing generic ones.\n\n"
+    "Length rules (follow strictly. A teacher is copying this into a form, not "
+    "reading an essay):\n"
+    f"- A list field: at most {_MAX_LIST_ITEMS} items, one per line, each a single "
+    f"line of at most {_MAX_ITEM_WORDS} words. No item may be a paragraph.\n"
+    f"- A prose field: at most {_MAX_PROSE_SENTENCES} sentences.\n"
+    "- Never restate the field's own label, never open with filler such as 'In this "
+    "lesson' or 'The teacher will', and never explain your reasoning or comment on "
+    "the plan. Write the content only: no preamble, no closing sentence, no "
+    "meta-text.\n\n"
+    "Answer every field you are asked for with real content. Never return an empty "
+    "string, a placeholder such as 'N/A' or 'To be determined', or a restatement "
+    "of the label. If a field is hard to ground in the topic or guide, still answer "
+    "it with the most specific content the topic supports.\n\n"
+    "Formatting: plain text only, except that a step-by-step procedure may number "
+    "its steps ('1. ', '2. ') and a list may put one item per line. Never use "
+    "markdown syntax (no **bold**, no ## headings, no - bullets); the app applies "
+    "its own formatting."
 )
 
 _ANCHOR_SYSTEM_INSTRUCTION = (
@@ -353,13 +380,60 @@ Return strict JSON: {{"fields": [...]}} where each item is:
 # Writing a lesson plan (Building Proficiency)
 # ---------------------------------------------------------------------------
 
+def _trim(values, fields):
+    """Every value the model returns goes through here before it leaves this
+    module, so the length ceilings hold regardless of which call produced it."""
+    return ai_limits.enforce_limits(
+        values, fields,
+        max_items=_MAX_LIST_ITEMS,
+        max_item_words=_MAX_ITEM_WORDS,
+        max_sentences=_MAX_PROSE_SENTENCES,
+        max_prose_words=_MAX_PROSE_WORDS,
+    )
+
+
+def _fill_gaps(lesson: str, fields, all_values: dict, label: str) -> dict:
+    """One more attempt at the fields that came back blank or as a placeholder.
+
+    A model asked for twelve fields at once will occasionally skip one or answer
+    it with "N/A". Re-asking for just those, naming them, recovers most of them
+    on the second try. Only one extra pass: if a field is still empty after
+    being asked on its own, the caller reports it as unanswered rather than
+    looping and spending a teacher's time.
+    """
+    gaps = ai_limits.missing_keys(all_values, fields)
+    if not gaps:
+        return {}
+
+    gap_fields = [f for f in fields if f.field_key in set(gaps)]
+    task = f"""
+These fields of the lesson plan came back empty or unanswered. Answer each one
+now with real, specific content grounded in the lesson details above. Return
+strict JSON with field_key as keys and nothing else:
+{_schema_block(gap_fields)}
+"""
+    try:
+        recovered = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], f"{label} (filling gaps)"), gap_fields)
+    except Exception:
+        # The gap pass is best-effort: a failure here must not lose the fields
+        # that were generated successfully.
+        _log.warning("[%s] gap-fill pass failed; reporting the blanks instead", label, exc_info=True)
+        return {}
+
+    # Only real answers are taken: a second empty reply must not overwrite
+    # anything, nor make the field look answered.
+    return {k: v for k, v in recovered.items() if ai_limits.is_answered(v)}
+
+
 def generate_full(context: dict, fields, course_guide_text: str = "") -> dict:
     lesson = _lesson_block(context, guide_excerpt(course_guide_text, context))
     task = f"""
 Fill ONLY the following fields and return strict JSON with field_key as keys:
 {_schema_block(fields)}
 """
-    return _call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency")
+    values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency"), fields)
+    values.update(_fill_gaps(lesson, fields, values, "Building Proficiency"))
+    return values
 
 
 _STREAM_CHUNK_SIZE = 4
@@ -393,11 +467,35 @@ Already written fields (for consistency, do not repeat):
 Now fill ONLY the following fields. Return strict JSON with field_key as keys:
 {_schema_block(chunk)}
 """
-        values = _call(_SYSTEM_INSTRUCTION, [lesson, task], f"Building Proficiency {i}/{len(chunks)}")
+        values = _trim(
+            _call(_SYSTEM_INSTRUCTION, [lesson, task], f"Building Proficiency {i}/{len(chunks)}"),
+            chunk,
+        )
         all_values.update(values)
         yield {"type": "section_done", "section": name, "index": i, "total": len(chunks), "values": values}
 
-    yield {"type": "complete", "values": all_values}
+    # Anything still blank or answered with a placeholder gets one more,
+    # targeted attempt before this reports back. Without it the page announced
+    # a finished plan over fields the model had quietly skipped.
+    gaps = ai_limits.missing_keys(all_values, fields)
+    if gaps:
+        yield {"type": "filling_gaps", "count": len(gaps)}
+        recovered = _fill_gaps(lesson, fields, all_values, "Building Proficiency")
+        if recovered:
+            all_values.update(recovered)
+            yield {"type": "section_done", "section": "Filled-in gaps",
+                   "index": len(chunks), "total": len(chunks), "values": recovered}
+
+    # `missing` is the honest answer to "is this plan finished": the field keys
+    # with no real content even after the retry. The page reports these instead
+    # of celebrating.
+    missing = ai_limits.missing_keys(all_values, fields)
+    yield {
+        "type": "complete",
+        "values": all_values,
+        "missing": missing,
+        "missing_labels": [f.label for f in fields if f.field_key in set(missing)],
+    }
 
 
 # ---------------------------------------------------------------------------

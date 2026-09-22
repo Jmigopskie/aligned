@@ -4315,3 +4315,23 @@ body.auth-page::after {
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+
+/* ---------------------------------------------------------------------------
+   Fields the AI could not fill
+   --------------------------------------------------------------------------- */
+
+/* Marks the fields named in the "couldn't be generated" message so they can be
+   found without hunting. A complete border on all four sides plus a tinted
+   fill; the state is never carried by colour alone, since the same fields are
+   listed by name in the message above. */
+.field-needs-answer {
+  border: 1px solid var(--warning-text) !important;
+  background: var(--warning-bg) !important;
+  border-radius: var(--radius-sm);
+}
+
+/* In the live document the slot is a contenteditable span rather than a form
+   control, so it needs the padding to show the tint at all. */
+.lp-doc .field-needs-answer {
+  padding: 1px 4px;
+}

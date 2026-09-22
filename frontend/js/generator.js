@@ -936,6 +936,15 @@ function formatGeneratedValue(raw) {
   }
 
   if (items.length <= 1) return items[0] || "";
+
+  // A numbered answer is an ordered procedure and keeps its numbering: turning
+  // "1. 2. 3." into bullets would throw away the one thing the numbers carry,
+  // which is that the steps happen in that order. The server already re-numbers
+  // these cleanly, so they arrive as "1. ", "2. ", and so on.
+  if (items.filter((item) => /^\(?\d{1,2}[.)]\s/.test(item)).length >= 2) {
+    return items.join("\n");
+  }
+
   return items.map((item) => `• ${stripExistingBullet(item)}`).join("\n");
 }
 
@@ -951,7 +960,11 @@ function formatGeneratedValues(values) {
 }
 
 function isBulletedValue(value) {
-  return typeof value === "string" && /(^|\n)•\s/.test(value);
+  // Either list shape the app produces: bulleted, or a numbered procedure
+  // whose numbering the server preserved.
+  return typeof value === "string"
+    && (/(^|\n)•\s/.test(value)
+      || /(^|\n)\(?\d{1,2}[.)]\s/.test(value));
 }
 
 function fieldInputMarkup(field) {
@@ -1523,15 +1536,22 @@ generateFullBtn.addEventListener("click", async () => {
   renderProgress(progressRows);
 
   try {
-    await Api.generateFullStream(baseGenerationPayload(), (event) => {
+    const finalEvent = await Api.generateFullStream(baseGenerationPayload(), (event) => {
       if (event.type === "section_start") {
         progressRows.push({ name: event.section, status: "active" });
         renderProgress(progressRows);
         setOwlState("thinking", `Writing "${event.section}"...`);
+      } else if (event.type === "filling_gaps") {
+        // The server found fields the model skipped and is re-asking for just
+        // those, so the progress list says so rather than appearing stalled.
+        progressRows.push({ name: "Filling in what was missed", status: "active" });
+        renderProgress(progressRows);
+        setOwlState("thinking", "A few fields came back empty. Filling those in...");
       } else if (event.type === "section_done") {
         const formatted = formatGeneratedValues(event.values);
         Object.assign(fieldValues, formatted);
-        const row = progressRows.find((r) => r.name === event.section);
+        const row = progressRows.find((r) => r.name === event.section)
+          || progressRows.find((r) => r.name === "Filling in what was missed");
         if (row) row.status = "done";
         renderProgress(progressRows);
         markDirty();
@@ -1543,14 +1563,90 @@ generateFullBtn.addEventListener("click", async () => {
       }
     });
     generateFullBtn.dataset.originalLabel = "Regenerate full plan";
-    setOwlState("celebrate", "All done! Review what I wrote below, then save when you're happy with it.");
+    reportGenerationOutcome(finalEvent);
   } catch (err) {
     showError(err.message);
   } finally {
     setButtonLoading(generateFullBtn, false);
     generationProgressEl.hidden = true;
+    startGenerateCooldown();
   }
 });
+
+// What the owl says once generation stops. The server reports which fields it
+// could not fill even after retrying them, so a plan with blanks in it is
+// never announced as finished: that mismatch is exactly what made "All done!"
+// untrustworthy.
+function reportGenerationOutcome(finalEvent) {
+  const missingLabels = (finalEvent && finalEvent.missing_labels) || [];
+
+  if (!missingLabels.length) {
+    setOwlState("celebrate", "All done! Review what I wrote below, then save when you're happy with it.");
+    return;
+  }
+
+  // Named outright up to a few, counted beyond that, so the message stays
+  // readable on a long format.
+  const shown = missingLabels.slice(0, 3).join(", ");
+  const extra = missingLabels.length - 3;
+  const list = extra > 0 ? `${shown}, and ${extra} more` : shown;
+
+  setOwlState(
+    "guide",
+    `I filled in everything except ${list}. Write ${missingLabels.length === 1 ? "that one" : "those"} in yourself, or ask me about ${missingLabels.length === 1 ? "it" : "them"} in the chat.`
+  );
+  showError(
+    `${missingLabels.length} field${missingLabels.length === 1 ? "" : "s"} couldn't be generated and ${
+      missingLabels.length === 1 ? "is" : "are"
+    } still empty: ${missingLabels.join(", ")}.`
+  );
+
+  // Draw attention to the actual empty fields rather than only naming them.
+  highlightEmptyFields(finalEvent.missing || []);
+}
+
+// Marks the still-empty fields in whichever editor this format uses, so the
+// teacher can see where the gaps are instead of hunting for them.
+function highlightEmptyFields(keys) {
+  document.querySelectorAll(".field-needs-answer").forEach((el) => {
+    el.classList.remove("field-needs-answer");
+  });
+  keys.forEach((key) => {
+    document
+      .querySelectorAll(`[data-field-key="${CSS.escape(key)}"]`)
+      .forEach((el) => el.classList.add("field-needs-answer"));
+  });
+}
+
+// ---- Generate button buffer -----------------------------------------------
+// setButtonLoading() already disables the button for the length of the run, so
+// a second click mid-generation was never possible. This adds the part that
+// was missing: a short cooldown afterwards, so the button can't be hammered
+// into firing run after run, each one a real cost and a full rewrite of the
+// teacher's fields.
+
+const GENERATE_COOLDOWN_MS = 5000;
+let cooldownTimer = null;
+
+function startGenerateCooldown() {
+  clearInterval(cooldownTimer);
+  const label = generateFullBtn.dataset.originalLabel || generateFullBtn.innerHTML;
+  let remaining = Math.ceil(GENERATE_COOLDOWN_MS / 1000);
+
+  generateFullBtn.disabled = true;
+  generateFullBtn.innerHTML = `${label} (${remaining})`;
+
+  cooldownTimer = setInterval(() => {
+    remaining -= 1;
+    if (remaining > 0) {
+      generateFullBtn.innerHTML = `${label} (${remaining})`;
+      return;
+    }
+    clearInterval(cooldownTimer);
+    generateFullBtn.disabled = false;
+    generateFullBtn.innerHTML = label;
+  }, 1000);
+}
 
 stepContinueBtn.addEventListener("click", () => {
   syncActiveStepValue();
