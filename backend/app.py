@@ -1,9 +1,17 @@
 import logging
 import os
+import time
 from flask import Flask
 
 from config import Config
 from extensions import db, bcrypt, cors
+
+
+# How hard to try when another gunicorn worker is mid-ALTER. Three short waits
+# comfortably covers adding a nullable column, which MySQL does without
+# rewriting the table.
+_DDL_RETRIES = 3
+_DDL_RETRY_DELAY_SECONDS = 0.5
 
 
 def _add_column(table: str, column: str, ddl_type: str):
@@ -29,16 +37,40 @@ def _add_column(table: str, column: str, ddl_type: str):
     if column in {col["name"] for col in inspector.get_columns(table)}:
         return
 
-    try:
-        with db.engine.begin() as conn:
-            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}"))
-    except DatabaseError as exc:
-        message = str(exc).lower()
-        # MySQL: (1060, "Duplicate column name 'x'"). SQLite: "duplicate column
-        # name: x". Either means another worker won the race, which is fine.
-        if "duplicate column" in message:
+    # Two distinct symptoms of the same race, both benign, and both observed in
+    # production on this app:
+    #
+    #   "duplicate column" (MySQL 1060 / SQLite) - another worker already added
+    #   it, so there is nothing left to do.
+    #
+    #   MySQL 1684, "was skipped since its definition is being modified by
+    #   concurrent DDL statement" - another worker is mid-ALTER right now and
+    #   this one cannot even read the table definition. Unlike a duplicate that
+    #   is final, this one is transient: wait and look again, because the column
+    #   is about to exist.
+    for attempt in range(_DDL_RETRIES):
+        try:
+            with db.engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}"))
             return
-        raise
+        except DatabaseError as exc:
+            message = str(exc).lower()
+            if "duplicate column" in message:
+                return
+            if "concurrent ddl" not in message:
+                raise
+            # Give the worker holding the DDL a moment, then re-check: if it
+            # finished the job, this worker has nothing to do either.
+            time.sleep(_DDL_RETRY_DELAY_SECONDS)
+            if column in {col["name"] for col in inspect(db.engine).get_columns(table)}:
+                return
+    # Every attempt hit concurrent DDL and the column still is not there. That
+    # is not a race any more, so it must surface rather than boot a worker
+    # against a schema it expects columns from.
+    raise RuntimeError(
+        f"Could not add {table}.{column}: still blocked by concurrent DDL after "
+        f"{_DDL_RETRIES} attempts."
+    )
 
 
 def _migrate_lesson_plan_columns():

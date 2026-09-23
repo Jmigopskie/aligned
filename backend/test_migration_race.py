@@ -27,6 +27,7 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_db_path}"
 from app import _add_column, create_app
 from extensions import db
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import OperationalError
 
 
 def check_concurrent_add_column():
@@ -70,6 +71,96 @@ def check_idempotent():
         cols = [c["name"] for c in inspect(db.engine).get_columns("sections")]
         assert cols.count("twice_col") == 1, cols
     print("  idempotent OK")
+
+
+def check_concurrent_ddl_is_retried():
+    """MySQL 1684 must be waited out, not raised.
+
+    This is the second symptom of the same race, seen in production: worker A is
+    mid-ALTER and worker B cannot even read the table definition, so it gets
+    "was skipped since its definition is being modified by concurrent DDL
+    statement" instead of a duplicate-column error. Unlike a duplicate, which is
+    final, that one is transient, and killing the worker over it is wrong.
+
+    sqlite has no such error, so it is simulated: the first ALTER attempt raises
+    1684 and, in the same moment, the column appears from "another worker" -
+    exactly the state a worker losing this race wakes up to. The re-check after
+    the wait must then find it and return quietly.
+    """
+    app = create_app()
+    calls = {"n": 0}
+
+    with app.app_context():
+        real_begin = db.engine.begin
+
+        class _Boom:
+            """Fails like MySQL 1684 on the first attempt, and has the other
+            worker finish the job while this one is failing."""
+
+            def __enter__(self):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    with real_begin() as conn:
+                        conn.execute(text("ALTER TABLE sections ADD COLUMN ddl_col VARCHAR(8)"))
+                raise OperationalError(
+                    "ALTER TABLE sections ADD COLUMN ddl_col VARCHAR(8)",
+                    {},
+                    Exception(
+                        "(1684, \"Table 'aligned'.'sections' was skipped since its "
+                        "definition is being modified by concurrent DDL statement\")"
+                    ),
+                )
+
+            def __exit__(self, *a):
+                return False
+
+        db.engine.begin = lambda: _Boom()
+        try:
+            # Must return quietly: the column exists by the time it looks again.
+            _add_column("sections", "ddl_col", "VARCHAR(8)")
+        finally:
+            db.engine.begin = real_begin
+
+        assert calls["n"] == 1, f"should have stopped after the first retry, attempted {calls['n']}"
+        cols = {c["name"] for c in inspect(db.engine).get_columns("sections")}
+        assert "ddl_col" in cols, cols
+    print("  concurrent DDL retried OK")
+
+
+def check_concurrent_ddl_gives_up_eventually():
+    """If the column never appears, concurrent DDL must not be swallowed forever.
+
+    Retrying without end would boot a worker against a schema missing a column
+    the code expects, which is worse than a loud failure.
+    """
+    app = create_app()
+
+    with app.app_context():
+        real_begin = db.engine.begin
+
+        class _AlwaysBoom:
+            def __enter__(self):
+                raise OperationalError(
+                    "ALTER TABLE sections ADD COLUMN never_col VARCHAR(8)",
+                    {},
+                    Exception("(1684, \"skipped since its definition is being modified by "
+                              "concurrent DDL statement\")"),
+                )
+
+            def __exit__(self, *a):
+                return False
+
+        db.engine.begin = lambda: _AlwaysBoom()
+        raised = False
+        try:
+            _add_column("sections", "never_col", "VARCHAR(8)")
+        except Exception:
+            raised = True
+        finally:
+            db.engine.begin = real_begin
+
+        assert raised, "endless concurrent DDL must eventually surface"
+    print("  concurrent DDL gives up OK")
 
 
 def check_real_error_still_raises():
@@ -121,6 +212,8 @@ def check_boot_is_concurrent_safe():
 
 check_concurrent_add_column()
 check_idempotent()
+check_concurrent_ddl_is_retried()
+check_concurrent_ddl_gives_up_eventually()
 check_real_error_still_raises()
 check_missing_table_is_skipped()
 check_boot_is_concurrent_safe()
