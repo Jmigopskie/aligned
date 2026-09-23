@@ -60,6 +60,8 @@ def _migrate_lesson_plan_columns():
         # Lets any author share their own plan publicly, independent of the
         # submission workflow above.
         "is_public": "BOOLEAN NOT NULL DEFAULT 0",
+        # The inactive generation mode's values; see LessonPlan.mode_values.
+        "mode_values": "TEXT",
     }
 
     for col_name, col_type in new_columns.items():
@@ -111,6 +113,7 @@ def _migrate_format_field_columns():
     reference file, set by clicking it in the format builder's document
     editor) to databases created before this feature existed."""
     _add_column("format_fields", "anchor_index", "INTEGER")
+    _add_column("format_fields", "role", "VARCHAR(10)")
 
 
 def _migrate_section_columns():

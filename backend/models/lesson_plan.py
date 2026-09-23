@@ -35,6 +35,14 @@ class LessonPlan(db.Model):
     # it shows up for everyone in the "Public plans" list.
     is_public = db.Column(db.Boolean, nullable=False, default=False)
 
+    # The mode the teacher is NOT currently in. field_values/rich_field_values
+    # always hold the active mode's content, which is what export, submission and
+    # every plan saved before this column existed rely on; this carries the other
+    # mode's copy so Guided and Building Proficiency can be two drafts of the same
+    # plan instead of overwriting each other. Shape:
+    # {"field_values": {...}, "rich_field_values": {...}, "step_index": int}
+    mode_values = db.Column(db.Text)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -49,6 +57,22 @@ class LessonPlan(db.Model):
 
     def set_rich_values(self, values: dict):
         self.rich_field_values = json.dumps(values or {})
+
+    def get_mode_values(self):
+        """The inactive mode's slot, or {} when there isn't one.
+
+        Returns {} rather than None for a plan saved before this column existed,
+        and also for unparseable content, so callers never need a null check and a
+        corrupted value degrades to "no other mode" instead of an error.
+        """
+        try:
+            value = json.loads(self.mode_values or "{}")
+        except ValueError:
+            return {}
+        return value if isinstance(value, dict) else {}
+
+    def set_mode_values(self, values: dict):
+        self.mode_values = json.dumps(values or {})
 
     def to_dict(self):
         return {
@@ -73,6 +97,7 @@ class LessonPlan(db.Model):
             "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
             "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
             "is_public": bool(self.is_public),
+            "mode_values": self.get_mode_values(),
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }

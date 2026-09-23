@@ -425,14 +425,31 @@ strict JSON with field_key as keys and nothing else:
     return {k: v for k, v in recovered.items() if ai_limits.is_answered(v)}
 
 
-def generate_full(context: dict, fields, course_guide_text: str = "") -> dict:
+def select_fields(fields, include_keys):
+    """The fields to generate, in document order.
+
+    include_keys is None for "generate everything", which is what a page that
+    predates the checklist sends. An empty list genuinely means generate nothing.
+    Order comes from `fields`, not from include_keys, because the chunking below
+    relies on document order for coherent output.
+    """
+    if include_keys is None:
+        return list(fields)
+    wanted = set(include_keys)
+    return [f for f in fields if f.field_key in wanted]
+
+
+def generate_full(context: dict, fields, course_guide_text: str = "", include_keys=None) -> dict:
+    targets = select_fields(fields, include_keys)
+    if not targets:
+        return {}
     lesson = _lesson_block(context, guide_excerpt(course_guide_text, context))
     task = f"""
 Fill ONLY the following fields and return strict JSON with field_key as keys:
-{_schema_block(fields)}
+{_schema_block(targets)}
 """
-    values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency"), fields)
-    values.update(_fill_gaps(lesson, fields, values, "Building Proficiency"))
+    values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency"), targets)
+    values.update(_fill_gaps(lesson, targets, values, "Building Proficiency"))
     return values
 
 
@@ -443,14 +460,19 @@ def _chunk_label(chunk):
     return chunk[0].label if len(chunk) == 1 else f"{chunk[0].label} – {chunk[-1].label}"
 
 
-def generate_full_streaming(context: dict, fields, course_guide_text: str = ""):
+def generate_full_streaming(context: dict, fields, course_guide_text: str = "", include_keys=None):
     """Fields have no meaningful grouping anymore (section_group isn't
     collected — see the format builder), so this batches them in fixed-size
     groups by document order instead: enough fields per AI call to stay fast
     and coherent, small enough that the caller (the generator's live
     document view) gets real, separate network responses to reveal
     progressively rather than one big call that arrives all at once."""
-    fields = list(fields)
+    # Only the requested fields are generated, and only they are held to account
+    # in the completeness report at the end.
+    fields = select_fields(fields, include_keys)
+    if not fields:
+        yield {"type": "complete", "values": {}, "missing": [], "missing_labels": []}
+        return
     chunks = [fields[i:i + _STREAM_CHUNK_SIZE] for i in range(0, len(fields), _STREAM_CHUNK_SIZE)]
     # Built once per plan: every chunk shares this exact prefix.
     lesson = _lesson_block(context, guide_excerpt(course_guide_text, context))
@@ -486,9 +508,11 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
             yield {"type": "section_done", "section": "Filled-in gaps",
                    "index": len(chunks), "total": len(chunks), "values": recovered}
 
-    # `missing` is the honest answer to "is this plan finished": the field keys
-    # with no real content even after the retry. The page reports these instead
-    # of celebrating.
+    # `missing` answers "did everything I was asked to write come back": the
+    # requested field keys with no real content even after the retry. It says
+    # nothing about fields outside include_keys, so the page must combine this
+    # with its own check of any fields the teacher chose to write themselves
+    # before it can claim the plan is finished.
     missing = ai_limits.missing_keys(all_values, fields)
     yield {
         "type": "complete",

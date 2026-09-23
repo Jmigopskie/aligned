@@ -139,6 +139,82 @@ def main():
         # A plan that doesn't exist is a 404, not a 500.
         assert client.patch("/api/lesson-plans/99999", json={"title": "Nope"}).status_code == 404
 
+        # --- Per-mode progress -------------------------------------------------
+        # field_values keeps holding whatever the active mode shows, so export and
+        # submission are untouched; the other mode's work rides along in
+        # mode_values. This is what lets Guided and Building Proficiency be two
+        # drafts of the plan rather than one shared one.
+        login(student_id)
+        res = client.post("/api/lesson-plans", json={
+            "format_id": format_id,
+            "title": "Two modes",
+            "generation_mode": "full",
+            "field_values": {"flow": "written by Building Proficiency"},
+            "mode_values": {
+                "field_values": {"flow": "written in Guided"},
+                "rich_field_values": {"flow": "<b>written in Guided</b>"},
+                "step_index": 2,
+            },
+        })
+        assert res.status_code == 201, res.status_code
+        two = res.get_json()["lesson_plan"]
+        two_id = two["id"]
+        assert two["field_values"]["flow"] == "written by Building Proficiency"
+        assert two["mode_values"]["field_values"]["flow"] == "written in Guided", two["mode_values"]
+        assert two["mode_values"]["step_index"] == 2
+
+        # Switching mode swaps the two slots, which is one ordinary PATCH.
+        res = client.patch(f"/api/lesson-plans/{two_id}", json={
+            "generation_mode": "step",
+            "field_values": {"flow": "written in Guided"},
+            "rich_field_values": {"flow": "<b>written in Guided</b>"},
+            "mode_values": {"field_values": {"flow": "written by Building Proficiency"},
+                            "rich_field_values": {}, "step_index": 0},
+        })
+        assert res.status_code == 200, res.status_code
+        swapped = res.get_json()["lesson_plan"]
+        assert swapped["generation_mode"] == "step"
+        assert swapped["field_values"]["flow"] == "written in Guided"
+        assert swapped["mode_values"]["field_values"]["flow"] == "written by Building Proficiency"
+
+        # A PATCH that omits mode_values leaves the stored slot alone, so an
+        # autosave carrying only the active mode cannot wipe the other one.
+        res = client.patch(f"/api/lesson-plans/{two_id}", json={"title": "Renamed"})
+        kept = res.get_json()["lesson_plan"]
+        assert kept["title"] == "Renamed"
+        assert kept["mode_values"]["field_values"]["flow"] == "written by Building Proficiency", kept["mode_values"]
+
+        # The guard must be `if "mode_values" in data:` not `if data.get("mode_values"):`.
+        # The latter would silently drop intentional clears (key present, value falsy),
+        # so a PATCH sending {"mode_values": {}} would lose data. This check pins the
+        # distinction: an explicit empty dict must be written, not skipped.
+        res = client.patch(f"/api/lesson-plans/{two_id}", json={"mode_values": {}})
+        cleared = res.get_json()["lesson_plan"]
+        assert cleared["mode_values"] == {}, f"Expected empty dict, got {cleared['mode_values']}"
+        # The next PATCH omits the key entirely, so it must not repopulate the slot;
+        # the cleared value must persist. This pins the other side of the guard.
+        res = client.patch(f"/api/lesson-plans/{two_id}", json={"title": "Double-check"})
+        still_clear = res.get_json()["lesson_plan"]
+        assert still_clear["mode_values"] == {}, "Omitting mode_values must not restore a cleared slot"
+
+        # A plan saved before this existed reads as an empty slot rather than
+        # None, so the page can use it without a null check.
+        plain = LessonPlan(user_id=student_id, format_id=format_id, title="Old plan")
+        plain.set_values({"flow": "legacy"})
+        db.session.add(plain)
+        db.session.commit()
+        assert plain.to_dict()["mode_values"] == {}, plain.to_dict()["mode_values"]
+
+        # Junk in the column does not crash a read.
+        plain.mode_values = "not json"
+        db.session.commit()
+        assert plain.to_dict()["mode_values"] == {}
+
+        # Valid JSON that is not an object (e.g., an array) degrades to {}.
+        plain.mode_values = "[1, 2, 3]"
+        db.session.commit()
+        assert plain.to_dict()["mode_values"] == {}
+
     print("lesson plan drafts OK")
 
 

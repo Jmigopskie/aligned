@@ -4422,27 +4422,6 @@ body.auth-page::after {
   margin-bottom: calc((var(--doc-zoom) - 1) * 100%);
 }
 
-/* Native fullscreen: the wrapper becomes the whole screen, so it supplies its
-   own page background and scrolling. */
-.lp-doc-wrap:fullscreen {
-  overflow: auto;
-  padding: 24px;
-  background: var(--bg);
-}
-
-/* The fallback for browsers that refuse the fullscreen request. Fixed to the
-   viewport rather than the page, so it covers the sidebar and topbar too. */
-.lp-doc-wrap.is-pseudo-fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  overflow: auto;
-  padding: 24px;
-  margin: 0;
-  background: var(--bg);
-  border-radius: 0;
-}
-
 /* --- The fixed formatting vocabulary ---
    Every one of these class names is preserved by the field sanitizer and turned
    into a real Word run property on export, so nothing a teacher applies here is
@@ -4477,3 +4456,203 @@ body.auth-page::after {
 .doc-builder-canvas .hl-green { background: #BBF7D0; }
 .lp-doc .hl-cyan,
 .doc-builder-canvas .hl-cyan { background: #A5F3FC; }
+
+/* ---------------------------------------------------------------------------
+   Document stage: toolbar plus canvas, and the unit that goes fullscreen
+   --------------------------------------------------------------------------- */
+
+.doc-stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 16px;
+}
+
+/* Sticky rather than fixed, so the toolbar stays reachable while the document
+   scrolls under it both on the page and in fullscreen. */
+.doc-stage .doc-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin-top: 0;
+  background: var(--surface);
+}
+
+/* In fullscreen the stage IS the screen, so it supplies the page ground and
+   owns the scrolling; the canvas inside it scrolls, the toolbar does not. */
+.doc-stage:fullscreen {
+  padding: 0;
+  background: var(--bg);
+}
+
+/* The base .lp-doc-wrap rule caps the canvas at 55vh and gives it a grey
+   card background/radius so it doesn't dominate the normal page. Fullscreen
+   is exactly the case where that cap must not apply, so every property the
+   base rule sets that would otherwise clamp or frame the canvas has to be
+   reset here explicitly — flex/overflow/padding alone cannot override a
+   sibling property like max-height. */
+.doc-stage:fullscreen .lp-doc-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  margin: 0;
+  max-height: none;
+  background: var(--bg);
+  border-radius: 0;
+}
+
+.doc-stage.is-pseudo-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  margin: 0;
+  background: var(--bg);
+}
+
+.doc-stage.is-pseudo-fullscreen .lp-doc-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  margin: 0;
+  max-height: none;
+  background: var(--bg);
+  border-radius: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Building Proficiency: what to generate
+   --------------------------------------------------------------------------- */
+
+.generate-scope {
+  /* Warm paper (--bg) instead of --surface: the panel sits directly on the
+     white .generate-panel, so it needs its own tone to read as a distinct
+     group rather than a second, redundant white-on-white frame. */
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.generate-scope-auto {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--text-body);
+}
+
+.generate-scope-list {
+  padding: 0;
+  margin: 0;
+  border: none;
+  /* Fieldsets get an implicit min-inline-size: min-content in Firefox, which
+     can force the grid below wider than its container at narrow widths. */
+  min-width: 0;
+}
+
+.generate-scope-list legend {
+  padding: 0;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+#generate-scope-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px 10px;
+}
+
+.generate-scope-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--text-heading);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.generate-scope-option:hover {
+  border-color: var(--primary);
+}
+
+/* Ticked options get their own tint and border so the checklist reads at a
+   glance, on top of (never instead of) the checkbox's own checked mark. */
+.generate-scope-option:has(input:checked) {
+  background: var(--primary-tint);
+  border-color: var(--primary);
+}
+
+.generate-scope-option input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.generate-scope-option input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Format builder: which mode writes each field
+   --------------------------------------------------------------------------- */
+
+.field-roles-panel {
+  padding: 16px;
+  margin-top: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.field-roles-title {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.field-role-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.field-role-row:last-child {
+  border-bottom: none;
+}
+
+.field-role-label {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.field-role-select {
+  flex: 0 0 auto;
+  max-width: 240px;
+}
+
+@media (max-width: 560px) {
+  .field-role-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+  }
+
+  .field-role-select {
+    max-width: none;
+  }
+}

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=2026-09-23" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -216,6 +216,13 @@
               </div>
 
               <section id="full-controls" class="mt-24">
+                <div id="generate-scope" class="generate-scope" hidden>
+                  <p class="generate-scope-auto" id="generate-scope-auto"></p>
+                  <fieldset class="generate-scope-list">
+                    <legend>Also write these for me?</legend>
+                    <div id="generate-scope-options"></div>
+                  </fieldset>
+                </div>
                 <div class="generator-actions">
                   <button type="button" id="generate-full-btn" class="btn btn-primary">Generate full plan</button>
                 </div>
@@ -224,8 +231,9 @@
 
               <section id="step-controls" class="mt-24" hidden>
                 <p class="text-sm mt-0" style="margin-bottom:12px;">
-                  Write each field yourself. The next one unlocks once the current one is filled in.
-                  Need help? Ask the owl in the chat, and tap a suggestion to add it to the field.
+                  Walk through the fields that need real thinking, one at a time. Ask the owl in the chat
+                  for help, and tap a suggestion to add it to the field. The rest are quick fields you can
+                  fill in directly, in any order, whenever you like.
                 </p>
                 <div class="step-nav-row">
                   <span class="text-sm" id="step-progress-label">Field 1 of 1</span>
@@ -233,6 +241,7 @@
                 </div>
                 <div class="generator-actions">
                   <button type="button" id="step-continue-btn" class="btn btn-primary">Submit &amp; continue</button>
+                  <button type="button" id="step-clear-btn" class="btn btn-secondary">Clear &amp; ask again</button>
                 </div>
               </section>
 
@@ -241,8 +250,13 @@
                 or click into any spot to edit and style it directly.
               </div>
 
-              <div id="live-doc-toolbar" class="doc-toolbar mt-16" hidden></div>
-              <div id="live-doc-wrap" class="lp-doc-wrap" hidden></div>
+              <!-- Toolbar and canvas share one stage because the stage is what
+                   goes fullscreen: fullscreening the canvas alone left the
+                   toolbar outside the fullscreened subtree and so invisible. -->
+              <div id="live-doc-stage" class="doc-stage" hidden>
+                <div id="live-doc-toolbar" class="doc-toolbar"></div>
+                <div id="live-doc-wrap" class="lp-doc-wrap"></div>
+              </div>
 
               <div id="results" class="mt-24"></div>
 
@@ -314,9 +328,9 @@
     </div>
   </div>
 
-  <script src="js/api.js"></script>
-  <script src="js/icons.js"></script>
-  <script src="js/doc-toolbar.js"></script>
-  <script src="js/generator.js"></script>
+  <script src="js/api.js?v=2026-09-23"></script>
+  <script src="js/icons.js?v=2026-09-23"></script>
+  <script src="js/doc-toolbar.js?v=2026-09-23"></script>
+  <script src="js/generator.js?v=2026-09-23"></script>
 </body>
 </html>

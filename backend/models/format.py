@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from extensions import db
+from services import field_roles
 
 class LessonPlanFormat(db.Model):
     __tablename__ = "lesson_plan_formats"
@@ -62,6 +63,11 @@ class FormatField(db.Model):
     # label. Null for fields on a format with no reference file, or fields
     # saved before this existed (those still fall back to keyword matching).
     anchor_index = db.Column(db.Integer)
+    # Overrides the keyword-based guess in services/field_roles: "heavy" means
+    # Guided walks the teacher through this field and Building Proficiency only
+    # writes it when asked, "easy" means the reverse. NULL (the default for
+    # every field) leaves the decision to the keywords.
+    role = db.Column(db.String(10))
 
     def to_dict(self):
         return {
@@ -75,4 +81,11 @@ class FormatField(db.Model):
             "is_required": self.is_required,
             "ai_hint": self.ai_hint,
             "anchor_index": self.anchor_index,
+            # The resolved role, not the raw override, so the browser reads one
+            # value and never needs the keyword list.
+            "role": field_roles.role_for(self),
+            # The raw override, for the format builder's own select. The page
+            # needs to tell "decide automatically" apart from an explicit choice
+            # that happens to match what the keywords would have picked.
+            "role_override": self.role,
         }

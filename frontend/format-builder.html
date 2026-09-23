@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=2026-09-23" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -144,8 +144,25 @@
             you save — there's nothing to define here.
           </p>
 
-          <div id="doc-toolbar" class="doc-toolbar"></div>
-          <div class="lp-doc-wrap doc-builder-canvas" id="doc-builder-canvas"></div>
+          <div id="doc-stage" class="doc-stage">
+            <div id="doc-toolbar" class="doc-toolbar"></div>
+            <div class="lp-doc-wrap doc-builder-canvas" id="doc-builder-canvas"></div>
+          </div>
+
+          <section id="field-roles-panel" class="field-roles-panel" hidden>
+            <h3 class="field-roles-title">Which mode writes each field</h3>
+            <p class="text-sm mt-0">
+              Guided walks you through the fields that need real thinking. The rest are filled in
+              automatically when you generate a plan. Adjust any field whose wording we read wrongly.
+            </p>
+            <div id="field-roles-list"></div>
+            <div class="flex gap-8 mt-16" style="align-items:center;">
+              <span class="text-sm" id="field-roles-status"></span>
+              <button type="button" id="field-roles-save-btn" class="btn btn-secondary btn-sm" disabled>
+                Save field roles
+              </button>
+            </div>
+          </section>
         </div>
 
         <hr class="rule" />
@@ -188,6 +205,15 @@
         </select>
       </div>
 
+      <div class="field">
+        <label>Which mode writes this</label>
+        <select class="field-role">
+          <option value="">Decide automatically</option>
+          <option value="heavy">Guided walks me through it</option>
+          <option value="easy">Filled in automatically</option>
+        </select>
+      </div>
+
       <div class="checkbox-row">
         <input type="checkbox" class="field-required" checked />
         <label>Required</label>
@@ -195,9 +221,9 @@
     </div>
   </template>
 
-  <script src="js/api.js"></script>
-  <script src="js/icons.js"></script>
-  <script src="js/doc-toolbar.js"></script>
-  <script src="js/format-builder.js"></script>
+  <script src="js/api.js?v=2026-09-23"></script>
+  <script src="js/icons.js?v=2026-09-23"></script>
+  <script src="js/doc-toolbar.js?v=2026-09-23"></script>
+  <script src="js/format-builder.js?v=2026-09-23"></script>
 </body>
 </html>

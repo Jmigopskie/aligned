@@ -10,10 +10,78 @@ let fieldRichValues = {};
 let planId = null;
 let dirty = false;
 
+// True for the duration of a Building Proficiency generation stream. Guards
+// the mode-switch buttons: section_done handlers keep assigning into
+// fieldValues as chunks arrive, so switching mode mid-stream would bank a
+// partial generation into the outgoing slot and then let the still-running
+// stream write the rest into what is now the OTHER mode's slot, splitting
+// the plan across both and overwriting whatever the teacher had typed there.
+let generating = false;
+
 // Guided mode: the flat, ordered list of every field on this format
 // (document order via sort_order) and which one is currently unlocked.
 let stepFieldKeys = [];
 let stepIndex = 0;
+
+// One slot per mode. The two modes have different purposes, so work in one is
+// not work in the other: Building Proficiency's draft and Guided's walkthrough
+// are two drafts of the same plan. fieldValues/fieldRichValues always hold the
+// ACTIVE mode; the other mode's copy waits here and in the plan's mode_values.
+let modeSlots = {
+  full: { fieldValues: {}, fieldRichValues: {} },
+  step: { fieldValues: {}, fieldRichValues: {}, stepIndex: 0 },
+};
+
+// Writes whatever is on screen into the active mode's slot.
+function captureModeSlot() {
+  modeSlots[mode] = {
+    fieldValues: JSON.parse(JSON.stringify(fieldValues || {})),
+    fieldRichValues: JSON.parse(JSON.stringify(fieldRichValues || {})),
+    stepIndex: mode === "step" ? stepIndex : undefined,
+  };
+}
+
+// Loads a mode's slot into the live values and repaints the editor.
+function loadModeSlot(name) {
+  const slot = modeSlots[name] || {};
+  fieldValues = JSON.parse(JSON.stringify(slot.fieldValues || {}));
+  fieldRichValues = JSON.parse(JSON.stringify(slot.fieldRichValues || {}));
+  if (name === "step" && typeof slot.stepIndex === "number") stepIndex = slot.stepIndex;
+
+  // Repainting fires the same input handlers a teacher typing would, which
+  // would otherwise mark the page dirty and autosave the mode just left.
+  // Restore the previous value rather than hardcoding false, in case this
+  // ever runs nested inside a larger restore that is still in progress.
+  const wasRestoring = restoringDraft;
+  restoringDraft = true;
+  try {
+    // blankMissing=true: unlike a page restore, a mode switch must also clear
+    // fields the incoming mode has nothing for, or the outgoing mode's text
+    // stays on screen.
+    paintRestoredValues(true);
+  } finally {
+    restoringDraft = wasRestoring;
+  }
+}
+
+// The slot to persist alongside the active mode's values.
+function inactiveModeSlot() {
+  const other = mode === "full" ? "step" : "full";
+  const slot = modeSlots[other] || {};
+  return {
+    field_values: slot.fieldValues || {},
+    rich_field_values: slot.fieldRichValues || {},
+    step_index: typeof slot.stepIndex === "number" ? slot.stepIndex : 0,
+  };
+}
+
+// Whether the mode NOT currently on screen has anything written in it, so a
+// switch can say so instead of just going blank — nothing is actually lost,
+// but an empty editor with no explanation reads as a vanished lesson plan.
+function inactiveModeHasWork() {
+  const values = inactiveModeSlot().field_values || {};
+  return Object.values(values).some((v) => (Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim())));
+}
 
 let selectedCourseGuide = null;
 let cgTab = "search";
@@ -34,12 +102,17 @@ const stepControls = document.getElementById("step-controls");
 const sectionNav = document.getElementById("section-nav");
 const stepProgressLabel = document.getElementById("step-progress-label");
 const generateFullBtn = document.getElementById("generate-full-btn");
+const generateScope = document.getElementById("generate-scope");
+const generateScopeAuto = document.getElementById("generate-scope-auto");
+const generateScopeOptions = document.getElementById("generate-scope-options");
 const generationProgressEl = document.getElementById("generation-progress");
 const stepContinueBtn = document.getElementById("step-continue-btn");
+const stepClearBtn = document.getElementById("step-clear-btn");
 const resultsEl = document.getElementById("results");
 const liveDocHint = document.getElementById("live-doc-hint");
 const liveDocToolbar = document.getElementById("live-doc-toolbar");
 const liveDocWrap = document.getElementById("live-doc-wrap");
+const liveDocStage = document.getElementById("live-doc-stage");
 const footer = document.getElementById("footer");
 const saveStatus = document.getElementById("save-status");
 const previewBtn = document.getElementById("preview-btn");
@@ -798,13 +871,129 @@ function buildSections(fields) {
 // clicking its pill (which re-locks anything after it), but an upcoming
 // field can't be skipped to. ----
 
+// Which fields each mode is for. The role is resolved server-side and arrives on
+// the field, so the keyword list lives in exactly one place (see
+// backend/services/field_roles.py).
+function fieldsInDocumentOrder() {
+  return (fmt.fields || []).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+}
+
+function heavyFieldKeys() {
+  return fieldsInDocumentOrder().filter((f) => f.role === "heavy").map((f) => f.field_key);
+}
+
+function easyFieldKeys() {
+  return fieldsInDocumentOrder().filter((f) => f.role !== "heavy").map((f) => f.field_key);
+}
+
 function fieldByKey(key) {
   return (fmt.fields || []).find((f) => f.field_key === key);
+}
+
+// Which thinking-heavy fields the teacher wants written for them. Remembered per
+// format, because a teacher who always writes their own Flow should only have to
+// say so once. Ticked by default so a teacher who never opens this panel gets
+// what they got before the panel existed.
+const SCOPE_PREFIX = "alignedGenScope:v1:";
+
+function scopeStorageKey() {
+  return `${SCOPE_PREFIX}${fmt.id}`;
+}
+
+function readScopeChoice() {
+  try {
+    const raw = localStorage.getItem(scopeStorageKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function writeScopeChoice(excluded) {
+  try {
+    localStorage.setItem(scopeStorageKey(), JSON.stringify(excluded));
+  } catch (err) {
+    /* private mode or quota: the choice just won't persist */
+  }
+}
+
+function renderGenerateScope() {
+  const heavy = heavyFieldKeys();
+  const easy = easyFieldKeys();
+
+  // Nothing to choose between: no heavy fields means the old all-or-nothing
+  // behaviour, so the panel stays out of the way.
+  if (!heavy.length) {
+    generateScope.hidden = true;
+    return;
+  }
+
+  generateScope.hidden = false;
+  generateScopeAuto.textContent = easy.length
+    ? `${easy.length} straightforward ${easy.length === 1 ? "field" : "fields"} will be filled in automatically.`
+    : "";
+
+  // Previously excluded keys stay excluded; anything new to this format starts
+  // ticked.
+  const excluded = new Set(readScopeChoice() || []);
+
+  generateScopeOptions.innerHTML = heavy
+    .map((key) => {
+      const field = fieldByKey(key);
+      return `
+        <label class="generate-scope-option">
+          <input type="checkbox" data-scope-key="${escapeHtml(key)}" ${excluded.has(key) ? "" : "checked"} />
+          <span>${escapeHtml(field ? field.label : key)}</span>
+        </label>`;
+    })
+    .join("");
+
+  generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((box) => {
+    box.addEventListener("change", () => {
+      const next = [];
+      generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((b) => {
+        if (!b.checked) next.push(b.dataset.scopeKey);
+      });
+      writeScopeChoice(next);
+    });
+  });
+}
+
+// The keys to generate: every quick field, plus the heavy ones still ticked.
+// The page sends the full list rather than letting the server add the easy
+// fields, so "generate exactly what was asked for" is the only rule in play.
+function selectedGenerateKeys() {
+  const ticked = [];
+  generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((box) => {
+    if (box.checked) ticked.push(box.dataset.scopeKey);
+  });
+  return easyFieldKeys().concat(ticked);
 }
 
 function isFieldComplete(key) {
   const v = fieldValues[key];
   return Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim());
+}
+
+// stepFieldKeys is heavy-only, so finishing the walkthrough does not mean the
+// plan is done - the easy fields outside it can still be blank. Any message
+// that announces "done" or "complete" off the guided check alone is a
+// false-completeness claim, the same bug the field-role split was meant to
+// fix. Every place that needs to say so calls this one check, so the messages
+// can't drift apart and start disagreeing about what "done" means.
+function incompleteEasyFieldKeys() {
+  return easyFieldKeys().filter((k) => !isFieldComplete(k));
+}
+
+// The guided side of the same problem: Task 7 left already-stepped-past
+// fields editable, and the Clear button acts on whatever field the caret is
+// in regardless of stepIndex, so a field the walkthrough already passed can
+// go blank again after the fact. Position (stepIndex) is no longer proof a
+// guided field is answered, so anything claiming the walkthrough is "done"
+// has to re-check every guided field, not just trust that reaching the last
+// step means all the earlier ones are still filled in.
+function incompleteGuidedFieldKeys() {
+  return stepFieldKeys.filter((k) => !isFieldComplete(k));
 }
 
 function goToStep(i) {
@@ -824,7 +1013,20 @@ function renderStepFieldNav() {
     const label = field ? field.label : key;
     const opt = document.createElement("option");
     opt.value = String(i);
-    opt.textContent = i < stepIndex ? `✓ ${label}` : i === stepIndex ? `▸ ${label} (current)` : `🔒 ${label}`;
+    // The checkmark is a completeness claim, not a position marker, so it has
+    // to ask isFieldComplete rather than just "did we step past this one" -
+    // the Clear button can empty a field the teacher already stepped past.
+    // Disabled (locked) still goes purely by position: staying reachable and
+    // unlocked when it's before the cursor is what lets the teacher go back
+    // and fix it, whether or not it's currently complete.
+    opt.textContent =
+      i === stepIndex
+        ? `▸ ${label} (current)`
+        : i > stepIndex
+        ? `🔒 ${label}`
+        : isFieldComplete(key)
+        ? `✓ ${label}`
+        : `○ ${label}`;
     opt.disabled = i > stepIndex;
     sectionNav.appendChild(opt);
   });
@@ -845,6 +1047,8 @@ function applyStepLocks() {
     const canvas = liveDocWrap.querySelector(".lp-doc");
     if (canvas) {
       let activeEl = null;
+      // Only the walkthrough's own fields are locked or unlocked here. Anything
+      // outside it keeps the editability the document was rendered with.
       stepFieldKeys.forEach((key, i) => {
         const el = canvas.querySelector(`[data-field-key="${key}"]`);
         if (!el) return;
@@ -857,7 +1061,11 @@ function applyStepLocks() {
           el.contentEditable = "false";
           el.classList.add("step-locked");
         } else {
-          el.contentEditable = "false";
+          // A field the teacher has already answered stays theirs to correct.
+          // It used to be set read-only with no lock styling at all, so it
+          // looked perfectly editable and silently swallowed typing, which is
+          // what "I can't edit the fields" was.
+          el.contentEditable = "true";
         }
       });
       if (activeEl) {
@@ -869,6 +1077,8 @@ function applyStepLocks() {
     if (resultsEl.hidden || !resultsEl.querySelector("[data-field-key]")) renderResults();
     resultsEl.querySelectorAll("[data-field-key]").forEach((el) => {
       const i = stepFieldKeys.indexOf(el.dataset.fieldKey);
+      // A field that is not part of the walkthrough at all (indexOf -> -1) stays
+      // enabled, which is exactly right: the quick fields are always editable.
       el.disabled = i > stepIndex;
       el.classList.toggle("step-locked", i > stepIndex);
       el.classList.toggle("step-active", i === stepIndex);
@@ -1031,9 +1241,8 @@ async function initLiveDocView() {
   }
 
   liveDocWrap.innerHTML = docTemplateData.html;
-  liveDocWrap.hidden = false;
+  liveDocStage.hidden = false;
   liveDocHint.hidden = false;
-  liveDocToolbar.hidden = false;
   resultsEl.hidden = true;
   footer.hidden = false;
   wireLiveDocEditing();
@@ -1092,6 +1301,28 @@ function syncFieldFromEl(el) {
   fieldValues[el.dataset.fieldKey] = el.textContent;
   fieldRichValues[el.dataset.fieldKey] = sanitizeRichValueHtml(el);
   el.classList.toggle("lp-filled", !!el.textContent.trim());
+}
+
+// The value-map half of clearing a field: shared by clearField() below and by
+// the Guided fallback field-list branch (an input/textarea, not a DOM slot,
+// so it can't go through clearField() itself). Also re-renders the step nav,
+// since its checkmark now reflects real completeness rather than position,
+// and clearing a field the teacher already stepped past has to un-tick it.
+function clearFieldState(key) {
+  fieldValues[key] = "";
+  delete fieldRichValues[key];
+  markDirty();
+  if (mode === "step") renderStepFieldNav();
+}
+
+// Empties one field so the teacher can write their own answer or ask for a
+// different suggestion. Clears the rich value as well as the plain text,
+// otherwise the old styled HTML would come back on the next render.
+function clearField(el) {
+  const key = el.dataset.fieldKey;
+  el.innerHTML = "";
+  el.classList.remove("lp-filled", "field-needs-answer");
+  clearFieldState(key);
 }
 
 function wireLiveDocEditing() {
@@ -1226,6 +1457,19 @@ function wireLiveDocToolbar() {
     });
   });
 
+  const clearFieldBtn = liveDocToolbar.querySelector("[data-clear-field]");
+  if (clearFieldBtn) {
+    clearFieldBtn.addEventListener("click", () => {
+      const el = activeFieldEl();
+      if (!el) {
+        showToast("Click into the field you want to clear first.", true);
+        return;
+      }
+      clearField(el);
+      el.focus();
+    });
+  }
+
   liveDocToolbar.querySelectorAll(".doc-tool-btn[data-list]").forEach((btn) => {
     btn.addEventListener("click", () => {
       withActiveField("Click into a field first, then choose a list style.", () => {
@@ -1282,6 +1526,7 @@ function wireLiveDocToolbar() {
   initDocViewControls({
     toolbarEl: liveDocToolbar,
     wrapEl: liveDocWrap,
+    stageEl: liveDocStage,
     storageKey: "alignedDocZoom:generator",
   });
 
@@ -1347,6 +1592,9 @@ let serverSaveInFlight = false;
 let serverSaveLocked = false;
 
 function planPayload() {
+  // The active slot must be current before it (or the inactive one below) is
+  // read, or a save right after typing could ship a stale mode_values.
+  captureModeSlot();
   return {
     format_id: fmt.id,
     title: planTitle(),
@@ -1354,6 +1602,7 @@ function planPayload() {
     grade_level: getClassLabel(),
     field_values: fieldValues,
     rich_field_values: fieldRichValues,
+    mode_values: inactiveModeSlot(),
     generation_mode: mode,
     is_public: visibilityCheckbox.checked,
   };
@@ -1464,6 +1713,11 @@ function saveDraft() {
   // Never write while the restore is still populating the page, or a
   // half-applied draft would overwrite the complete one.
   if (restoringDraft) return;
+  // The brief only has planPayload() do this, but saveDraft() also persists
+  // modeSlots and runs far more often (every keystroke, debounced) — without
+  // this, a draft written between mode switches would carry a stale inactive
+  // slot instead of what is actually on screen right now.
+  captureModeSlot();
   clearTimeout(draftTimer);
   draftTimer = setTimeout(() => {
     try {
@@ -1474,6 +1728,7 @@ function saveDraft() {
         stepIndex,
         fieldValues,
         fieldRichValues,
+        modeSlots,
         courseGuide: selectedCourseGuide,
         setup: {
           teacher: teacherNameInput.value,
@@ -1509,8 +1764,12 @@ function clearDraft() {
   }
 }
 
-// Paint restored values into whichever editor this format uses.
-function paintRestoredValues() {
+// Paint restored values into whichever editor this format uses. blankMissing
+// clears fields that have nothing in fieldValues/fieldRichValues instead of
+// leaving them untouched — a page restore has nothing there to begin with, so
+// it defaults off, but a mode switch does (loadModeSlot passes true), since
+// the field may still show the outgoing mode's text.
+function paintRestoredValues(blankMissing = false) {
   const canvas = liveDocWrap.querySelector(".lp-doc");
   if (canvas) {
     canvas.querySelectorAll("[data-field-key]").forEach((el) => {
@@ -1524,9 +1783,16 @@ function paintRestoredValues() {
       } else if (text.trim()) {
         el.textContent = text;
         el.classList.add("lp-filled");
+      } else if (blankMissing) {
+        el.textContent = "";
+        el.classList.remove("lp-filled");
+        // Otherwise a highlight from the mode just left (this field was
+        // reported missing/kept-back there) survives onto a field that, in
+        // the mode being entered, has never even been asked about yet.
+        el.classList.remove("field-needs-answer");
       }
     });
-  } else if (hasAnyValue()) {
+  } else if (blankMissing || hasAnyValue()) {
     renderResults();
   }
 }
@@ -1541,6 +1807,16 @@ function applyOpenedPlan(plan) {
     planId = plan.id;
     fieldValues = plan.field_values || {};
     fieldRichValues = plan.rich_field_values || {};
+    // The active mode's values are in field_values; the other mode's ride in
+    // mode_values. An older plan has none, which leaves that slot empty.
+    const other = (plan.generation_mode === "step" ? "full" : "step");
+    const stored = plan.mode_values || {};
+    modeSlots[other] = {
+      fieldValues: stored.field_values || {},
+      fieldRichValues: stored.rich_field_values || {},
+      stepIndex: stored.step_index || 0,
+    };
+    if (plan.generation_mode) mode = plan.generation_mode;
     if (plan.subject) subjectInput.value = plan.subject;
     if (plan.is_public) visibilityCheckbox.checked = true;
 
@@ -1566,6 +1842,16 @@ function applyOpenedPlan(plan) {
     }
 
     paintRestoredValues();
+    // Make the visible mode (buttons, controls, owl chat, step locks) match
+    // the mode this plan actually opened into — without this, a plan last
+    // saved in Guided would show Building Proficiency's controls while
+    // `mode` was internally "step", and any subsequent capture/switch would
+    // then read/write the wrong slot. Safe inside this function's
+    // restoringDraft=true window: syncModeUI() never touches
+    // fieldValues/modeSlots itself, and the one thing it calls that does
+    // write out (applyStepLocks() -> saveDraft()) already no-ops under the
+    // same restoringDraft guard restoreDraft() relies on for the same reason.
+    syncModeUI();
     enableExport();
   } finally {
     restoringDraft = false;
@@ -1595,6 +1881,8 @@ function restoreDraft() {
 
     fieldValues = draft.fieldValues || {};
     fieldRichValues = draft.fieldRichValues || {};
+    // Both modes' work comes back, not just the one that happened to be active.
+    if (draft.modeSlots) modeSlots = draft.modeSlots;
     planId = draft.planId || null;
     stepIndex = draft.stepIndex || 0;
 
@@ -1622,28 +1910,92 @@ function restoreDraft() {
   return hasAnyValue() || !!draft.courseGuide;
 }
 
+// Makes the visible page (active mode button, controls, owl chat, step
+// locks/message) match the `mode` variable. UI only: it never reads or
+// writes fieldValues/fieldRichValues/modeSlots, so it is structurally safe to
+// call after fieldValues has already been set directly by something else
+// (applyOpenedPlan) as well as from the live mode-switch click below — there
+// is no capture/load code path in here for a guard to have to remember to skip.
+//
+// When entering Guided, stepIndex is recomputed to the first incomplete
+// field rather than trusted from wherever it happened to be, because that is
+// the only position this function can know: there is no persisted step
+// position for the ACTIVE mode (mode_values only carries one for the
+// INACTIVE mode, and a plan row has no top-level step_index column at all).
+// A live mode-switch click and an opened plan are therefore both "start
+// Guided at the first thing left to do" rather than "resume exactly where
+// last seen" — restoreDraft() is the one path that can do better, and it
+// re-applies its own saved stepIndex right after calling this.
+function syncModeUI() {
+  modeSwitchBtns.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+  fullControls.hidden = mode !== "full";
+  stepControls.hidden = mode !== "step";
+  showOwlChat(mode === "step");
+
+  // Named once so both branches below can append the same reassurance without
+  // repeating the lookup.
+  const otherModeLabel = mode === "step" ? "Building Proficiency" : "Guided";
+  const otherHasWork = inactiveModeHasWork();
+  const otherNote = otherHasWork ? ` Your ${otherModeLabel} work is still there if you switch back.` : "";
+
+  if (mode === "step") {
+    // Shares incompleteGuidedFieldKeys() with the Finish branch below, so
+    // the two places that decide whether the walkthrough is actually done
+    // can't quietly start disagreeing about what "done" means.
+    const incompleteGuided = incompleteGuidedFieldKeys();
+    stepIndex = incompleteGuided.length === 0
+      ? stepFieldKeys.length - 1
+      : stepFieldKeys.indexOf(incompleteGuided[0]);
+    applyStepLocks();
+    let guideMessage;
+    if (incompleteGuided.length === 0) {
+      const outsideIncomplete = incompleteEasyFieldKeys();
+      if (outsideIncomplete.length === 0) {
+        guideMessage = "Every field already has an answer. Review them below, or click a pill to revise one.";
+      } else {
+        const n = outsideIncomplete.length;
+        guideMessage = `The guided fields are done. ${n} quick field${n === 1 ? "" : "s"} outside the walkthrough ${n === 1 ? "is" : "are"} still blank. Fill ${n === 1 ? "it" : "them"} in directly below.`;
+      }
+    } else {
+      guideMessage = `Let's start with "${fieldByKey(stepFieldKeys[stepIndex]).label}." Type your answer, then Submit & continue.`;
+    }
+    setOwlState("guide", guideMessage + otherNote);
+  } else {
+    clearStepLocks();
+    maybeRenderResults();
+    // Building Proficiency has no chat panel of its own, so this is the only
+    // place left to say it: the guide owl bubble, same as generation status.
+    if (otherHasWork) setOwlState("guide", `Switched to Building Proficiency.${otherNote}`);
+  }
+}
+
 modeSwitchBtns.forEach((btn) => {
   btn.addEventListener("click", () => {
-    mode = btn.dataset.mode;
-    saveDraft();
-    modeSwitchBtns.forEach((b) => b.classList.toggle("active", b === btn));
-    fullControls.hidden = mode !== "full";
-    stepControls.hidden = mode !== "step";
-    showOwlChat(mode === "step");
-    if (mode === "step") {
-      const firstIncomplete = stepFieldKeys.findIndex((k) => !isFieldComplete(k));
-      stepIndex = firstIncomplete === -1 ? stepFieldKeys.length - 1 : firstIncomplete;
-      applyStepLocks();
-      setOwlState(
-        "guide",
-        firstIncomplete === -1
-          ? "Every field already has an answer — review them below, or click a pill to revise one."
-          : `Let's start with "${fieldByKey(stepFieldKeys[stepIndex]).label}." Type your answer, then Submit & continue.`
-      );
-    } else {
-      clearStepLocks();
-      maybeRenderResults();
+    if (btn.dataset.mode === mode) return;   // already here, nothing to swap
+    if (generating) {
+      // The generate button is disabled while a stream runs, but the mode
+      // buttons aren't; switching here would bank a partial generation into
+      // the outgoing slot while the stream keeps writing into the incoming
+      // one. Block the switch rather than gate section_done on mode, which
+      // would just silently drop output the teacher already paid for.
+      showToast("Wait for the plan to finish generating first.", true);
+      return;
     }
+    // restoreDraft() clicks this button purely to trigger syncModeUI() below,
+    // after it has already set fieldValues/modeSlots itself for the mode
+    // being resumed into. Capturing here would run before `mode` has caught
+    // up to what's on screen and stamp that mode's data over a slot that
+    // restoreDraft already got right, so skip capture/load in that case.
+    if (!restoringDraft) {
+      // Put the current mode's work away before picking up the other's.
+      captureModeSlot();
+      mode = btn.dataset.mode;
+      loadModeSlot(mode);
+    } else {
+      mode = btn.dataset.mode;
+    }
+    saveDraft();
+    syncModeUI();
   });
 });
 
@@ -1654,6 +2006,7 @@ function baseGenerationPayload() {
     subject: subjectInput.value.trim(),
     course_guide_id: selectedCourseGuide ? selectedCourseGuide.id : null,
     context: getAdvancedContext(),
+    include_keys: selectedGenerateKeys(),
   };
 }
 
@@ -1678,9 +2031,15 @@ generateFullBtn.addEventListener("click", async () => {
     return;
   }
 
+  if (!selectedGenerateKeys().length) {
+    showError("Tick at least one field for me to write, or fill the plan in yourself.");
+    return;
+  }
+
   errorBox.hidden = true;
   setButtonLoading(generateFullBtn, true, "Generating");
   setOwlState("thinking", "Thinking hard about your lesson...");
+  generating = true;
 
   // Built up live from the stream's own chunk names as they arrive — the
   // Building Proficiency mode batches fields for pacing/streaming purposes,
@@ -1689,8 +2048,14 @@ generateFullBtn.addEventListener("click", async () => {
   const progressRows = [];
   renderProgress(progressRows);
 
+  // Captured once so the outcome report checks exactly what was sent, not a
+  // fresh read of the checklist that could have drifted (it can't change
+  // mid-stream since the panel is part of the same disabled controls, but
+  // recomputing it separately would be one more place for the two to disagree).
+  const payload = baseGenerationPayload();
+
   try {
-    const finalEvent = await Api.generateFullStream(baseGenerationPayload(), (event) => {
+    const finalEvent = await Api.generateFullStream(payload, (event) => {
       if (event.type === "section_start") {
         progressRows.push({ name: event.section, status: "active" });
         renderProgress(progressRows);
@@ -1717,46 +2082,75 @@ generateFullBtn.addEventListener("click", async () => {
       }
     });
     generateFullBtn.dataset.originalLabel = "Regenerate full plan";
-    reportGenerationOutcome(finalEvent);
+    reportGenerationOutcome(finalEvent, payload.include_keys);
   } catch (err) {
     showError(err.message);
   } finally {
+    generating = false;
     setButtonLoading(generateFullBtn, false);
     generationProgressEl.hidden = true;
     startGenerateCooldown();
   }
 });
 
-// What the owl says once generation stops. The server reports which fields it
-// could not fill even after retrying them, so a plan with blanks in it is
-// never announced as finished: that mismatch is exactly what made "All done!"
-// untrustworthy.
-function reportGenerationOutcome(finalEvent) {
+// What the owl says once generation stops. The server only reports on the
+// fields it was asked for (`missing`/`missing_labels`), so an empty
+// `missing_labels` no longer means the plan is finished by itself: fields the
+// teacher unticked in the checklist are still blank and this is the one place
+// that has to know it. The two buckets are kept apart in the wording because
+// they mean different things — one is the AI failing at something, the other
+// is the teacher choosing not to delegate it — but both leave a blank field,
+// so both have to be said and both have to be highlighted.
+function reportGenerationOutcome(finalEvent, requestedKeys) {
   const missingLabels = (finalEvent && finalEvent.missing_labels) || [];
+  const missingKeys = (finalEvent && finalEvent.missing) || [];
+  const asked = new Set(requestedKeys || []);
+  // Fields the teacher deliberately unticked: not a generation failure, so
+  // they get their own wording rather than being folded into "couldn't
+  // generate" and implying the AI tried and failed at them.
+  const yoursFields = (fmt.fields || [])
+    .filter((f) => !asked.has(f.field_key) && !isFieldComplete(f.field_key));
+  const yoursKeys = yoursFields.map((f) => f.field_key);
 
-  if (!missingLabels.length) {
+  if (!missingLabels.length && !yoursKeys.length) {
     setOwlState("celebrate", "All done! Review what I wrote below, then save when you're happy with it.");
+    highlightEmptyFields([]);
     return;
   }
 
-  // Named outright up to a few, counted beyond that, so the message stays
-  // readable on a long format.
-  const shown = missingLabels.slice(0, 3).join(", ");
-  const extra = missingLabels.length - 3;
-  const list = extra > 0 ? `${shown}, and ${extra} more` : shown;
+  const messages = [];
 
-  setOwlState(
-    "guide",
-    `I filled in everything except ${list}. Write ${missingLabels.length === 1 ? "that one" : "those"} in yourself, or ask me about ${missingLabels.length === 1 ? "it" : "them"} in the chat.`
-  );
-  showError(
-    `${missingLabels.length} field${missingLabels.length === 1 ? "" : "s"} couldn't be generated and ${
-      missingLabels.length === 1 ? "is" : "are"
-    } still empty: ${missingLabels.join(", ")}.`
-  );
+  if (missingLabels.length) {
+    // Named outright up to a few, counted beyond that, so the message stays
+    // readable on a long format.
+    const shown = missingLabels.slice(0, 3).join(", ");
+    const extra = missingLabels.length - 3;
+    const list = extra > 0 ? `${shown}, and ${extra} more` : shown;
+    messages.push(
+      `I filled in everything else, but couldn't generate ${list}. Write ${missingLabels.length === 1 ? "that one" : "those"} in yourself, or ask me about ${missingLabels.length === 1 ? "it" : "them"} in the chat.`
+    );
+    showError(
+      `${missingLabels.length} field${missingLabels.length === 1 ? "" : "s"} couldn't be generated and ${
+        missingLabels.length === 1 ? "is" : "are"
+      } still empty: ${missingLabels.join(", ")}.`
+    );
+  }
 
-  // Draw attention to the actual empty fields rather than only naming them.
-  highlightEmptyFields(finalEvent.missing || []);
+  if (yoursKeys.length) {
+    const yoursLabels = yoursFields.map((f) => f.label || f.field_key);
+    const shown = yoursLabels.slice(0, 3).join(", ");
+    const extra = yoursLabels.length - 3;
+    const list = extra > 0 ? `${shown}, and ${extra} more` : shown;
+    messages.push(
+      `${list} ${yoursLabels.length === 1 ? "is" : "are"} still blank because you kept ${yoursLabels.length === 1 ? "it" : "them"} off my list. Fill ${yoursLabels.length === 1 ? "it" : "them"} in whenever you are ready.`
+    );
+  }
+
+  setOwlState("guide", messages.join(" "));
+
+  // Draw attention to the actual empty fields rather than only naming them,
+  // whichever bucket (or both) they came from.
+  highlightEmptyFields([...missingKeys, ...yoursKeys]);
 }
 
 // Marks the still-empty fields in whichever editor this format uses, so the
@@ -1806,7 +2200,7 @@ stepContinueBtn.addEventListener("click", () => {
   syncActiveStepValue();
   const key = stepFieldKeys[stepIndex];
   if (!isFieldComplete(key)) {
-    showError(`Fill in "${fieldByKey(key).label}" before continuing — every field is required in Guided mode.`);
+    showError(`Fill in "${fieldByKey(key).label}" before continuing. Every guided field is required.`);
     return;
   }
   errorBox.hidden = true;
@@ -1818,8 +2212,64 @@ stepContinueBtn.addEventListener("click", () => {
     setOwlState("guide", `Nice! Next up: "${fieldByKey(stepFieldKeys[stepIndex]).label}."`);
   } else {
     applyStepLocks();
-    setOwlState("celebrate", "All fields done — review everything, then save when you're happy.");
+    // Finishing used to only check the field just submitted, which was
+    // enough when reaching the last step proved every earlier one was still
+    // filled in. Task 7 left earlier guided fields editable and the Clear
+    // button can empty any of them regardless of stepIndex, so a field the
+    // nav already ticked can be blank again by now. Guided fields have to be
+    // re-checked here too, not just the easy ones, or "All fields done"
+    // would be the exact false-completeness lie the field-role split exists
+    // to prevent.
+    const incompleteGuided = incompleteGuidedFieldKeys();
+    const outsideIncomplete = incompleteEasyFieldKeys();
+    if (incompleteGuided.length > 0) {
+      // Name the field rather than just counting: it was almost certainly
+      // just cleared, so the label is what the teacher needs to act on it.
+      const label = fieldByKey(incompleteGuided[0]).label;
+      const rest = incompleteGuided.length - 1;
+      setOwlState(
+        "guide",
+        `"${label}" is still blank${rest > 0 ? ` (and ${rest} more guided field${rest === 1 ? "" : "s"})` : ""}. Go back and answer it before finishing.`
+      );
+    } else if (outsideIncomplete.length === 0) {
+      setOwlState("celebrate", "All fields done. Review everything, then save when you're happy.");
+    } else {
+      const n = outsideIncomplete.length;
+      setOwlState(
+        "guide",
+        `The guided fields are done. ${n} quick field${n === 1 ? "" : "s"} outside the walkthrough ${n === 1 ? "is" : "are"} still blank. Fill ${n === 1 ? "it" : "them"} in directly below.`
+      );
+    }
   }
+});
+
+// The owl's suggestion for this field was wrong: wipe it and ask again, rather
+// than making the teacher select the text and delete it by hand.
+stepClearBtn.addEventListener("click", () => {
+  const key = stepFieldKeys[stepIndex];
+  if (!key) return;
+
+  const canvas = liveDocWrap.querySelector(".lp-doc");
+  const el = canvas && canvas.querySelector(`[data-field-key="${CSS.escape(key)}"]`);
+  if (el) {
+    clearField(el);
+  } else {
+    // Fallback field list: the control is an input/textarea, not a slot.
+    const input = resultsEl.querySelector(`[data-field-key="${CSS.escape(key)}"]`);
+    if (input) {
+      input.value = "";
+      clearFieldState(key);
+    }
+  }
+
+  const field = fieldByKey(key);
+  setOwlState("guide", `Cleared "${field ? field.label : key}". Ask me for a different suggestion, or write your own.`);
+
+  // introduceFieldInChat() returns early when chat.fieldKey already matches, so
+  // clearing chat.fieldKey is what makes it re-open the field instead of doing
+  // nothing. Reusing it keeps one path for "the owl is now on this field".
+  chat.fieldKey = null;
+  introduceFieldInChat();
 });
 
 // Cache of { html, matched_fields, unmatched_fields } per format id (or null
@@ -2123,8 +2573,16 @@ async function init() {
     document.title = `${fmt.name} — AlignED`;
     document.getElementById("format-name").textContent = fmt.name;
 
-    stepFieldKeys = fmt.fields.slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map((f) => f.field_key);
+    // Guided walks the fields that need real thinking. The quick ones are left
+    // out of the walkthrough entirely: a teacher does not need to be guided
+    // through their own name, and locking those behind a step was most of why
+    // fields felt uneditable.
+    const heavy = heavyFieldKeys();
+    // A format with no heavy fields would leave Guided with nothing to do, so it
+    // falls back to walking everything.
+    stepFieldKeys = heavy.length ? heavy : fieldsInDocumentOrder().map((f) => f.field_key);
     stepIndex = 0;
+    renderGenerateScope();
 
     await initLiveDocView();
 
