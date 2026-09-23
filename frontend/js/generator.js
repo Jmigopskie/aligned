@@ -15,6 +15,58 @@ let dirty = false;
 let stepFieldKeys = [];
 let stepIndex = 0;
 
+// One slot per mode. The two modes have different purposes, so work in one is
+// not work in the other: Building Proficiency's draft and Guided's walkthrough
+// are two drafts of the same plan. fieldValues/fieldRichValues always hold the
+// ACTIVE mode; the other mode's copy waits here and in the plan's mode_values.
+let modeSlots = {
+  full: { fieldValues: {}, fieldRichValues: {} },
+  step: { fieldValues: {}, fieldRichValues: {}, stepIndex: 0 },
+};
+
+// Writes whatever is on screen into the active mode's slot.
+function captureModeSlot() {
+  modeSlots[mode] = {
+    fieldValues: JSON.parse(JSON.stringify(fieldValues || {})),
+    fieldRichValues: JSON.parse(JSON.stringify(fieldRichValues || {})),
+    stepIndex: mode === "step" ? stepIndex : undefined,
+  };
+}
+
+// Loads a mode's slot into the live values and repaints the editor.
+function loadModeSlot(name) {
+  const slot = modeSlots[name] || {};
+  fieldValues = JSON.parse(JSON.stringify(slot.fieldValues || {}));
+  fieldRichValues = JSON.parse(JSON.stringify(slot.fieldRichValues || {}));
+  if (name === "step" && typeof slot.stepIndex === "number") stepIndex = slot.stepIndex;
+
+  // Repainting fires the same input handlers a teacher typing would, which
+  // would otherwise mark the page dirty and autosave the mode just left.
+  // Restore the previous value rather than hardcoding false, in case this
+  // ever runs nested inside a larger restore that is still in progress.
+  const wasRestoring = restoringDraft;
+  restoringDraft = true;
+  try {
+    // blankMissing=true: unlike a page restore, a mode switch must also clear
+    // fields the incoming mode has nothing for, or the outgoing mode's text
+    // stays on screen.
+    paintRestoredValues(true);
+  } finally {
+    restoringDraft = wasRestoring;
+  }
+}
+
+// The slot to persist alongside the active mode's values.
+function inactiveModeSlot() {
+  const other = mode === "full" ? "step" : "full";
+  const slot = modeSlots[other] || {};
+  return {
+    field_values: slot.fieldValues || {},
+    rich_field_values: slot.fieldRichValues || {},
+    step_index: typeof slot.stepIndex === "number" ? slot.stepIndex : 0,
+  };
+}
+
 let selectedCourseGuide = null;
 let cgTab = "search";
 let currentUser = null;
@@ -1524,6 +1576,9 @@ let serverSaveInFlight = false;
 let serverSaveLocked = false;
 
 function planPayload() {
+  // The active slot must be current before it (or the inactive one below) is
+  // read, or a save right after typing could ship a stale mode_values.
+  captureModeSlot();
   return {
     format_id: fmt.id,
     title: planTitle(),
@@ -1531,6 +1586,7 @@ function planPayload() {
     grade_level: getClassLabel(),
     field_values: fieldValues,
     rich_field_values: fieldRichValues,
+    mode_values: inactiveModeSlot(),
     generation_mode: mode,
     is_public: visibilityCheckbox.checked,
   };
@@ -1641,6 +1697,11 @@ function saveDraft() {
   // Never write while the restore is still populating the page, or a
   // half-applied draft would overwrite the complete one.
   if (restoringDraft) return;
+  // The brief only has planPayload() do this, but saveDraft() also persists
+  // modeSlots and runs far more often (every keystroke, debounced) — without
+  // this, a draft written between mode switches would carry a stale inactive
+  // slot instead of what is actually on screen right now.
+  captureModeSlot();
   clearTimeout(draftTimer);
   draftTimer = setTimeout(() => {
     try {
@@ -1651,6 +1712,7 @@ function saveDraft() {
         stepIndex,
         fieldValues,
         fieldRichValues,
+        modeSlots,
         courseGuide: selectedCourseGuide,
         setup: {
           teacher: teacherNameInput.value,
@@ -1686,8 +1748,12 @@ function clearDraft() {
   }
 }
 
-// Paint restored values into whichever editor this format uses.
-function paintRestoredValues() {
+// Paint restored values into whichever editor this format uses. blankMissing
+// clears fields that have nothing in fieldValues/fieldRichValues instead of
+// leaving them untouched — a page restore has nothing there to begin with, so
+// it defaults off, but a mode switch does (loadModeSlot passes true), since
+// the field may still show the outgoing mode's text.
+function paintRestoredValues(blankMissing = false) {
   const canvas = liveDocWrap.querySelector(".lp-doc");
   if (canvas) {
     canvas.querySelectorAll("[data-field-key]").forEach((el) => {
@@ -1701,9 +1767,12 @@ function paintRestoredValues() {
       } else if (text.trim()) {
         el.textContent = text;
         el.classList.add("lp-filled");
+      } else if (blankMissing) {
+        el.textContent = "";
+        el.classList.remove("lp-filled");
       }
     });
-  } else if (hasAnyValue()) {
+  } else if (blankMissing || hasAnyValue()) {
     renderResults();
   }
 }
@@ -1718,6 +1787,16 @@ function applyOpenedPlan(plan) {
     planId = plan.id;
     fieldValues = plan.field_values || {};
     fieldRichValues = plan.rich_field_values || {};
+    // The active mode's values are in field_values; the other mode's ride in
+    // mode_values. An older plan has none, which leaves that slot empty.
+    const other = (plan.generation_mode === "step" ? "full" : "step");
+    const stored = plan.mode_values || {};
+    modeSlots[other] = {
+      fieldValues: stored.field_values || {},
+      fieldRichValues: stored.rich_field_values || {},
+      stepIndex: stored.step_index || 0,
+    };
+    if (plan.generation_mode) mode = plan.generation_mode;
     if (plan.subject) subjectInput.value = plan.subject;
     if (plan.is_public) visibilityCheckbox.checked = true;
 
@@ -1772,6 +1851,8 @@ function restoreDraft() {
 
     fieldValues = draft.fieldValues || {};
     fieldRichValues = draft.fieldRichValues || {};
+    // Both modes' work comes back, not just the one that happened to be active.
+    if (draft.modeSlots) modeSlots = draft.modeSlots;
     planId = draft.planId || null;
     stepIndex = draft.stepIndex || 0;
 
@@ -1801,7 +1882,20 @@ function restoreDraft() {
 
 modeSwitchBtns.forEach((btn) => {
   btn.addEventListener("click", () => {
-    mode = btn.dataset.mode;
+    if (btn.dataset.mode === mode) return;   // already here, nothing to swap
+    // restoreDraft() clicks this button purely to trigger the UI refresh
+    // below, after it has already set fieldValues/modeSlots itself for the
+    // mode being resumed into. Capturing here would run before `mode` has
+    // caught up to what's on screen and stamp that mode's data over a slot
+    // that restoreDraft already got right, so skip capture/load in that case.
+    if (!restoringDraft) {
+      // Put the current mode's work away before picking up the other's.
+      captureModeSlot();
+      mode = btn.dataset.mode;
+      loadModeSlot(mode);
+    } else {
+      mode = btn.dataset.mode;
+    }
     saveDraft();
     modeSwitchBtns.forEach((b) => b.classList.toggle("active", b === btn));
     fullControls.hidden = mode !== "full";
