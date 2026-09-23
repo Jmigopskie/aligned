@@ -911,10 +911,21 @@ function isFieldComplete(key) {
 // plan is done - the easy fields outside it can still be blank. Any message
 // that announces "done" or "complete" off the guided check alone is a
 // false-completeness claim, the same bug the field-role split was meant to
-// fix. Both places that need to say so call this one check, so the two
-// messages can't drift apart and start disagreeing about what "done" means.
+// fix. Every place that needs to say so calls this one check, so the messages
+// can't drift apart and start disagreeing about what "done" means.
 function incompleteEasyFieldKeys() {
   return easyFieldKeys().filter((k) => !isFieldComplete(k));
+}
+
+// The guided side of the same problem: Task 7 left already-stepped-past
+// fields editable, and the Clear button acts on whatever field the caret is
+// in regardless of stepIndex, so a field the walkthrough already passed can
+// go blank again after the fact. Position (stepIndex) is no longer proof a
+// guided field is answered, so anything claiming the walkthrough is "done"
+// has to re-check every guided field, not just trust that reaching the last
+// step means all the earlier ones are still filled in.
+function incompleteGuidedFieldKeys() {
+  return stepFieldKeys.filter((k) => !isFieldComplete(k));
 }
 
 function goToStep(i) {
@@ -934,7 +945,20 @@ function renderStepFieldNav() {
     const label = field ? field.label : key;
     const opt = document.createElement("option");
     opt.value = String(i);
-    opt.textContent = i < stepIndex ? `✓ ${label}` : i === stepIndex ? `▸ ${label} (current)` : `🔒 ${label}`;
+    // The checkmark is a completeness claim, not a position marker, so it has
+    // to ask isFieldComplete rather than just "did we step past this one" -
+    // the Clear button can empty a field the teacher already stepped past.
+    // Disabled (locked) still goes purely by position: staying reachable and
+    // unlocked when it's before the cursor is what lets the teacher go back
+    // and fix it, whether or not it's currently complete.
+    opt.textContent =
+      i === stepIndex
+        ? `▸ ${label} (current)`
+        : i > stepIndex
+        ? `🔒 ${label}`
+        : isFieldComplete(key)
+        ? `✓ ${label}`
+        : `○ ${label}`;
     opt.disabled = i > stepIndex;
     sectionNav.appendChild(opt);
   });
@@ -1211,6 +1235,18 @@ function syncFieldFromEl(el) {
   el.classList.toggle("lp-filled", !!el.textContent.trim());
 }
 
+// The value-map half of clearing a field: shared by clearField() below and by
+// the Guided fallback field-list branch (an input/textarea, not a DOM slot,
+// so it can't go through clearField() itself). Also re-renders the step nav,
+// since its checkmark now reflects real completeness rather than position,
+// and clearing a field the teacher already stepped past has to un-tick it.
+function clearFieldState(key) {
+  fieldValues[key] = "";
+  delete fieldRichValues[key];
+  markDirty();
+  if (mode === "step") renderStepFieldNav();
+}
+
 // Empties one field so the teacher can write their own answer or ask for a
 // different suggestion. Clears the rich value as well as the plain text,
 // otherwise the old styled HTML would come back on the next render.
@@ -1218,10 +1254,7 @@ function clearField(el) {
   const key = el.dataset.fieldKey;
   el.innerHTML = "";
   el.classList.remove("lp-filled", "field-needs-answer");
-  fieldValues[key] = "";
-  delete fieldRichValues[key];
-  markDirty();
-  if (mode === "step") renderStepFieldNav();
+  clearFieldState(key);
 }
 
 function wireLiveDocEditing() {
@@ -1775,11 +1808,16 @@ modeSwitchBtns.forEach((btn) => {
     stepControls.hidden = mode !== "step";
     showOwlChat(mode === "step");
     if (mode === "step") {
-      const firstIncomplete = stepFieldKeys.findIndex((k) => !isFieldComplete(k));
-      stepIndex = firstIncomplete === -1 ? stepFieldKeys.length - 1 : firstIncomplete;
+      // Shares incompleteGuidedFieldKeys() with the Finish branch below, so
+      // the two places that decide whether the walkthrough is actually done
+      // can't quietly start disagreeing about what "done" means.
+      const incompleteGuided = incompleteGuidedFieldKeys();
+      stepIndex = incompleteGuided.length === 0
+        ? stepFieldKeys.length - 1
+        : stepFieldKeys.indexOf(incompleteGuided[0]);
       applyStepLocks();
       let guideMessage;
-      if (firstIncomplete === -1) {
+      if (incompleteGuided.length === 0) {
         const outsideIncomplete = incompleteEasyFieldKeys();
         if (outsideIncomplete.length === 0) {
           guideMessage = "Every field already has an answer. Review them below, or click a pill to revise one.";
@@ -1975,12 +2013,26 @@ stepContinueBtn.addEventListener("click", () => {
     setOwlState("guide", `Nice! Next up: "${fieldByKey(stepFieldKeys[stepIndex]).label}."`);
   } else {
     applyStepLocks();
-    // Finishing the walkthrough only means the heavy fields are answered.
-    // Celebrating (and saying "all fields") when easy fields are still blank
-    // is the same false-completeness lie as the mode-switch message above,
-    // just reached by the more common path, so it gets the same check.
+    // Finishing used to only check the field just submitted, which was
+    // enough when reaching the last step proved every earlier one was still
+    // filled in. Task 7 left earlier guided fields editable and the Clear
+    // button can empty any of them regardless of stepIndex, so a field the
+    // nav already ticked can be blank again by now. Guided fields have to be
+    // re-checked here too, not just the easy ones, or "All fields done"
+    // would be the exact false-completeness lie the field-role split exists
+    // to prevent.
+    const incompleteGuided = incompleteGuidedFieldKeys();
     const outsideIncomplete = incompleteEasyFieldKeys();
-    if (outsideIncomplete.length === 0) {
+    if (incompleteGuided.length > 0) {
+      // Name the field rather than just counting: it was almost certainly
+      // just cleared, so the label is what the teacher needs to act on it.
+      const label = fieldByKey(incompleteGuided[0]).label;
+      const rest = incompleteGuided.length - 1;
+      setOwlState(
+        "guide",
+        `"${label}" is still blank${rest > 0 ? ` (and ${rest} more guided field${rest === 1 ? "" : "s"})` : ""}. Go back and answer it before finishing.`
+      );
+    } else if (outsideIncomplete.length === 0) {
       setOwlState("celebrate", "All fields done. Review everything, then save when you're happy.");
     } else {
       const n = outsideIncomplete.length;
@@ -2007,9 +2059,7 @@ stepClearBtn.addEventListener("click", () => {
     const input = resultsEl.querySelector(`[data-field-key="${CSS.escape(key)}"]`);
     if (input) {
       input.value = "";
-      fieldValues[key] = "";
-      delete fieldRichValues[key];
-      markDirty();
+      clearFieldState(key);
     }
   }
 
