@@ -53,6 +53,21 @@ def _build_context(data, guide):
         context["course_guide_title"] = guide.title
     return context
 
+def _include_keys(data, fmt):
+    """The field_keys this request wants generated, or None for all of them.
+
+    Validated against the format so an unknown key is dropped rather than
+    reaching the prompt. An empty list is preserved as an empty list: it means
+    "generate nothing", which is different from "generate everything".
+    """
+    raw = data.get("include_keys")
+    if raw is None:
+        return None
+    if not isinstance(raw, list):
+        return None
+    valid = {f.field_key for f in fmt.fields}
+    return [str(k) for k in raw if str(k) in valid]
+
 @generate_bp.post("/generate/full")
 @login_required
 def generate_full():
@@ -66,7 +81,10 @@ def generate_full():
     context = _build_context(data, guide)
     course_guide_text = guide.extracted_text if guide else ""
 
-    field_values = ai_service.generate_full(context, fmt.fields, course_guide_text=course_guide_text)
+    field_values = ai_service.generate_full(
+        context, fmt.fields, course_guide_text=course_guide_text,
+        include_keys=_include_keys(data, fmt),
+    )
     return jsonify({"status": "ok", "field_values": field_values})
 
 @generate_bp.post("/generate/full-stream")
@@ -82,10 +100,15 @@ def generate_full_stream():
     context = _build_context(data, guide)
     course_guide_text = guide.extracted_text if guide else ""
     fields = fmt.fields
+    # Read here, not inside _stream(): the generator runs after the request
+    # context is gone, so `request`/`data` can't be touched from inside it.
+    include_keys = _include_keys(data, fmt)
 
     def _stream():
         try:
-            for event in ai_service.generate_full_streaming(context, fields, course_guide_text=course_guide_text):
+            for event in ai_service.generate_full_streaming(
+                context, fields, course_guide_text=course_guide_text, include_keys=include_keys,
+            ):
                 yield json.dumps(event) + "\n"
         except Exception as exc:
             current_app.logger.exception("Streamed generation failed")
