@@ -98,6 +98,7 @@ function renderDocToolbar({ variant }) {
         ${docColorMenu("highlight", DOC_HIGHLIGHTS)}
       </div>
       <button type="button" class="doc-tool-btn" data-cmd="removeFormat" data-icon="clearFormat" title="Clear formatting"></button>
+      <button type="button" class="doc-tool-btn" data-clear-field="1" data-icon="eraser" title="Clear this field's content"></button>
     </div>
     <div class="doc-toolbar-sep"></div>
     <div class="doc-toolbar-group">

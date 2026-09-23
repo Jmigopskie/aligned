@@ -35,6 +35,11 @@ const docToolbar = document.getElementById("doc-toolbar");
 if (docToolbar) {
   docToolbar.innerHTML = renderDocToolbar({ variant: "builder" });
   paintDocToolbarIcons(docToolbar);
+
+  // Generator-only: this screen edits the blank template, which has no field
+  // content to clear.
+  const clearFieldBtn = docToolbar.querySelector("[data-clear-field]");
+  if (clearFieldBtn) clearFieldBtn.remove();
 }
 
 const docHeadingSelect = document.getElementById("doc-heading-select");

@@ -39,6 +39,7 @@ const generateScopeAuto = document.getElementById("generate-scope-auto");
 const generateScopeOptions = document.getElementById("generate-scope-options");
 const generationProgressEl = document.getElementById("generation-progress");
 const stepContinueBtn = document.getElementById("step-continue-btn");
+const stepClearBtn = document.getElementById("step-clear-btn");
 const resultsEl = document.getElementById("results");
 const liveDocHint = document.getElementById("live-doc-hint");
 const liveDocToolbar = document.getElementById("live-doc-toolbar");
@@ -1210,6 +1211,19 @@ function syncFieldFromEl(el) {
   el.classList.toggle("lp-filled", !!el.textContent.trim());
 }
 
+// Empties one field so the teacher can write their own answer or ask for a
+// different suggestion. Clears the rich value as well as the plain text,
+// otherwise the old styled HTML would come back on the next render.
+function clearField(el) {
+  const key = el.dataset.fieldKey;
+  el.innerHTML = "";
+  el.classList.remove("lp-filled", "field-needs-answer");
+  fieldValues[key] = "";
+  delete fieldRichValues[key];
+  markDirty();
+  if (mode === "step") renderStepFieldNav();
+}
+
 function wireLiveDocEditing() {
   const canvas = liveDocWrap.querySelector(".lp-doc");
   if (!canvas) return;
@@ -1341,6 +1355,19 @@ function wireLiveDocToolbar() {
       });
     });
   });
+
+  const clearFieldBtn = liveDocToolbar.querySelector("[data-clear-field]");
+  if (clearFieldBtn) {
+    clearFieldBtn.addEventListener("click", () => {
+      const el = activeFieldEl();
+      if (!el) {
+        showToast("Click into the field you want to clear first.", true);
+        return;
+      }
+      clearField(el);
+      el.focus();
+    });
+  }
 
   liveDocToolbar.querySelectorAll(".doc-tool-btn[data-list]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1963,6 +1990,37 @@ stepContinueBtn.addEventListener("click", () => {
       );
     }
   }
+});
+
+// The owl's suggestion for this field was wrong: wipe it and ask again, rather
+// than making the teacher select the text and delete it by hand.
+stepClearBtn.addEventListener("click", () => {
+  const key = stepFieldKeys[stepIndex];
+  if (!key) return;
+
+  const canvas = liveDocWrap.querySelector(".lp-doc");
+  const el = canvas && canvas.querySelector(`[data-field-key="${CSS.escape(key)}"]`);
+  if (el) {
+    clearField(el);
+  } else {
+    // Fallback field list: the control is an input/textarea, not a slot.
+    const input = resultsEl.querySelector(`[data-field-key="${CSS.escape(key)}"]`);
+    if (input) {
+      input.value = "";
+      fieldValues[key] = "";
+      delete fieldRichValues[key];
+      markDirty();
+    }
+  }
+
+  const field = fieldByKey(key);
+  setOwlState("guide", `Cleared "${field ? field.label : key}". Ask me for a different suggestion, or write your own.`);
+
+  // introduceFieldInChat() returns early when chat.fieldKey already matches, so
+  // clearing chat.fieldKey is what makes it re-open the field instead of doing
+  // nothing. Reusing it keeps one path for "the owl is now on this field".
+  chat.fieldKey = null;
+  introduceFieldInChat();
 });
 
 // Cache of { html, matched_fields, unmatched_fields } per format id (or null
