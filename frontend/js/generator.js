@@ -823,6 +823,16 @@ function isFieldComplete(key) {
   return Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim());
 }
 
+// stepFieldKeys is heavy-only, so finishing the walkthrough does not mean the
+// plan is done - the easy fields outside it can still be blank. Any message
+// that announces "done" or "complete" off the guided check alone is a
+// false-completeness claim, the same bug the field-role split was meant to
+// fix. Both places that need to say so call this one check, so the two
+// messages can't drift apart and start disagreeing about what "done" means.
+function incompleteEasyFieldKeys() {
+  return easyFieldKeys().filter((k) => !isFieldComplete(k));
+}
+
 function goToStep(i) {
   stepIndex = Math.max(0, Math.min(i, stepFieldKeys.length - 1));
   applyStepLocks();
@@ -1660,12 +1670,7 @@ modeSwitchBtns.forEach((btn) => {
       applyStepLocks();
       let guideMessage;
       if (firstIncomplete === -1) {
-        // stepFieldKeys is heavy-only, so finishing it does not mean the plan
-        // is done - the easy fields outside the walkthrough can still be
-        // blank. Claiming "every field" off the guided check alone is the
-        // exact false-completeness bug this feature exists to prevent, so
-        // check the easy set too before saying nothing is left.
-        const outsideIncomplete = easyFieldKeys().filter((k) => !isFieldComplete(k));
+        const outsideIncomplete = incompleteEasyFieldKeys();
         if (outsideIncomplete.length === 0) {
           guideMessage = "Every field already has an answer. Review them below, or click a pill to revise one.";
         } else {
@@ -1854,7 +1859,20 @@ stepContinueBtn.addEventListener("click", () => {
     setOwlState("guide", `Nice! Next up: "${fieldByKey(stepFieldKeys[stepIndex]).label}."`);
   } else {
     applyStepLocks();
-    setOwlState("celebrate", "All fields done — review everything, then save when you're happy.");
+    // Finishing the walkthrough only means the heavy fields are answered.
+    // Celebrating (and saying "all fields") when easy fields are still blank
+    // is the same false-completeness lie as the mode-switch message above,
+    // just reached by the more common path, so it gets the same check.
+    const outsideIncomplete = incompleteEasyFieldKeys();
+    if (outsideIncomplete.length === 0) {
+      setOwlState("celebrate", "All fields done. Review everything, then save when you're happy.");
+    } else {
+      const n = outsideIncomplete.length;
+      setOwlState(
+        "guide",
+        `The guided fields are done. ${n} quick field${n === 1 ? "" : "s"} outside the walkthrough ${n === 1 ? "is" : "are"} still blank. Fill ${n === 1 ? "it" : "them"} in directly below.`
+      );
+    }
   }
 });
 
