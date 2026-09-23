@@ -4485,11 +4485,20 @@ body.auth-page::after {
   background: var(--bg);
 }
 
+/* The base .lp-doc-wrap rule caps the canvas at 55vh and gives it a grey
+   card background/radius so it doesn't dominate the normal page. Fullscreen
+   is exactly the case where that cap must not apply, so every property the
+   base rule sets that would otherwise clamp or frame the canvas has to be
+   reset here explicitly — flex/overflow/padding alone cannot override a
+   sibling property like max-height. */
 .doc-stage:fullscreen .lp-doc-wrap {
   flex: 1;
   overflow: auto;
   padding: 24px;
   margin: 0;
+  max-height: none;
+  background: var(--bg);
+  border-radius: 0;
 }
 
 .doc-stage.is-pseudo-fullscreen {
@@ -4505,4 +4514,7 @@ body.auth-page::after {
   overflow: auto;
   padding: 24px;
   margin: 0;
+  max-height: none;
+  background: var(--bg);
+  border-radius: 0;
 }
