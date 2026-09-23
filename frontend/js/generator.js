@@ -799,6 +799,21 @@ function buildSections(fields) {
 // clicking its pill (which re-locks anything after it), but an upcoming
 // field can't be skipped to. ----
 
+// Which fields each mode is for. The role is resolved server-side and arrives on
+// the field, so the keyword list lives in exactly one place (see
+// backend/services/field_roles.py).
+function fieldsInDocumentOrder() {
+  return (fmt.fields || []).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+}
+
+function heavyFieldKeys() {
+  return fieldsInDocumentOrder().filter((f) => f.role === "heavy").map((f) => f.field_key);
+}
+
+function easyFieldKeys() {
+  return fieldsInDocumentOrder().filter((f) => f.role !== "heavy").map((f) => f.field_key);
+}
+
 function fieldByKey(key) {
   return (fmt.fields || []).find((f) => f.field_key === key);
 }
@@ -846,6 +861,8 @@ function applyStepLocks() {
     const canvas = liveDocWrap.querySelector(".lp-doc");
     if (canvas) {
       let activeEl = null;
+      // Only the walkthrough's own fields are locked or unlocked here. Anything
+      // outside it keeps the editability the document was rendered with.
       stepFieldKeys.forEach((key, i) => {
         const el = canvas.querySelector(`[data-field-key="${key}"]`);
         if (!el) return;
@@ -858,7 +875,11 @@ function applyStepLocks() {
           el.contentEditable = "false";
           el.classList.add("step-locked");
         } else {
-          el.contentEditable = "false";
+          // A field the teacher has already answered stays theirs to correct.
+          // It used to be set read-only with no lock styling at all, so it
+          // looked perfectly editable and silently swallowed typing, which is
+          // what "I can't edit the fields" was.
+          el.contentEditable = "true";
         }
       });
       if (activeEl) {
@@ -870,6 +891,8 @@ function applyStepLocks() {
     if (resultsEl.hidden || !resultsEl.querySelector("[data-field-key]")) renderResults();
     resultsEl.querySelectorAll("[data-field-key]").forEach((el) => {
       const i = stepFieldKeys.indexOf(el.dataset.fieldKey);
+      // A field that is not part of the walkthrough at all (indexOf -> -1) stays
+      // enabled, which is exactly right: the quick fields are always editable.
       el.disabled = i > stepIndex;
       el.classList.toggle("step-locked", i > stepIndex);
       el.classList.toggle("step-active", i === stepIndex);
@@ -2124,7 +2147,14 @@ async function init() {
     document.title = `${fmt.name} — AlignED`;
     document.getElementById("format-name").textContent = fmt.name;
 
-    stepFieldKeys = fmt.fields.slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map((f) => f.field_key);
+    // Guided walks the fields that need real thinking. The quick ones are left
+    // out of the walkthrough entirely: a teacher does not need to be guided
+    // through their own name, and locking those behind a step was most of why
+    // fields felt uneditable.
+    const heavy = heavyFieldKeys();
+    // A format with no heavy fields would leave Guided with nothing to do, so it
+    // falls back to walking everything.
+    stepFieldKeys = heavy.length ? heavy : fieldsInDocumentOrder().map((f) => f.field_key);
     stepIndex = 0;
 
     await initLiveDocView();
