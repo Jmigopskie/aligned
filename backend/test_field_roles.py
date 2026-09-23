@@ -208,6 +208,21 @@ def check_role_endpoint():
         by_key = {f["field_key"]: f["role"] for f in res.get_json()["fields"]}
         assert by_key == {"flow": "heavy", "no_of_sessions": "easy"}, by_key
 
+        # Junk values must not overwrite valid stored roles: set flow to easy,
+        # then send junk for flow alongside a valid change for no_of_sessions.
+        # flow must stay easy (junk ignored) while no_of_sessions must change.
+        res = client.patch(url, json={"roles": {"flow": "easy"}})
+        assert res.status_code == 200
+        by_key = {f["field_key"]: f["role"] for f in res.get_json()["fields"]}
+        assert by_key["flow"] == "easy", by_key
+        res = client.patch(url, json={"roles": {"flow": "banana", "no_of_sessions": "heavy"}})
+        assert res.status_code == 200
+        by_key = {f["field_key"]: f["role"] for f in res.get_json()["fields"]}
+        assert by_key == {"flow": "easy", "no_of_sessions": "heavy"}, by_key
+
+        # Clear flow back to None before the next assertions.
+        client.patch(url, json={"roles": {"flow": None}})
+
         # Junk values and unknown keys are ignored rather than stored or fatal.
         assert client.patch(url, json={"roles": {"flow": "banana"}}).status_code == 200
         assert FormatField.query.filter_by(format_id=fmt_id, field_key="flow").first().role is None

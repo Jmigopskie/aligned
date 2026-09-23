@@ -485,7 +485,10 @@ def set_field_roles(format_id):
             field.role = None
             continue
         normalised = str(value).strip().lower()
-        field.role = normalised if normalised in ("heavy", "easy") else None
+        # Ignore junk values entirely; they must not overwrite a valid stored role,
+        # since one stale entry from a long-open page must not lose other choices.
+        if normalised in ("heavy", "easy"):
+            field.role = normalised
 
     db.session.commit()
     return jsonify({"status": "ok", "fields": [f.to_dict() for f in fmt.fields]})
