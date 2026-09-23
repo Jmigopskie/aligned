@@ -153,6 +153,69 @@ def check_to_dict_resolves():
     print("  to_dict resolves OK")
 
 
+def check_role_endpoint():
+    """The override is saved by field_key, owner-only, and validated against the
+    two real roles so a hand-edited request cannot store nonsense."""
+    os.environ["DATABASE_URL"] = "sqlite://"
+    from app import create_app
+    from extensions import db
+    from models.format import FormatField, LessonPlanFormat
+    from models.user import User
+
+    app = create_app()
+    app.config.update(TESTING=True)
+    with app.app_context():
+        owner = User(full_name="Owner", email="roles.owner@example.test", role="teacher")
+        owner.set_password("password123")
+        other = User(full_name="Other", email="roles.other@example.test", role="teacher")
+        other.set_password("password123")
+        db.session.add_all([owner, other])
+        db.session.commit()
+        owner_id, other_id = owner.id, other.id
+
+        fmt = LessonPlanFormat(owner_id=owner_id, name="Roles")
+        db.session.add(fmt)
+        db.session.commit()
+        fmt_id = fmt.id
+        db.session.add_all([
+            FormatField(format_id=fmt_id, field_key="flow", label="Flow", sort_order=0),
+            FormatField(format_id=fmt_id, field_key="no_of_sessions", label="No. of Sessions", sort_order=1),
+        ])
+        db.session.commit()
+
+        client = app.test_client()
+
+        def login(uid):
+            with client.session_transaction() as sess:
+                sess["user_id"] = uid
+
+        url = f"/api/formats/{fmt_id}/field-roles"
+
+        # Someone else's format is off limits.
+        login(other_id)
+        assert client.patch(url, json={"roles": {"flow": "easy"}}).status_code == 403
+
+        login(owner_id)
+
+        # Flip both directions.
+        res = client.patch(url, json={"roles": {"flow": "easy", "no_of_sessions": "heavy"}})
+        assert res.status_code == 200, res.status_code
+        by_key = {f["field_key"]: f["role"] for f in res.get_json()["fields"]}
+        assert by_key == {"flow": "easy", "no_of_sessions": "heavy"}, by_key
+
+        # null clears the override, so the keywords decide again.
+        res = client.patch(url, json={"roles": {"flow": None, "no_of_sessions": None}})
+        by_key = {f["field_key"]: f["role"] for f in res.get_json()["fields"]}
+        assert by_key == {"flow": "heavy", "no_of_sessions": "easy"}, by_key
+
+        # Junk values and unknown keys are ignored rather than stored or fatal.
+        assert client.patch(url, json={"roles": {"flow": "banana"}}).status_code == 200
+        assert FormatField.query.filter_by(format_id=fmt_id, field_key="flow").first().role is None
+        assert client.patch(url, json={"roles": {"nope": "heavy"}}).status_code == 200
+        assert client.patch(url, json={}).status_code == 400
+    print("  role endpoint OK")
+
+
 check_named_six()
 check_real_format()
 check_easy_default()
@@ -160,4 +223,5 @@ check_override_wins()
 check_key_and_label_both_read()
 check_missing_attributes()
 check_to_dict_resolves()
+check_role_endpoint()
 print("field roles OK")

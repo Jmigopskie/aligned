@@ -47,6 +47,12 @@ def _build_format_fields(format_id, fields_payload):
         except (TypeError, ValueError):
             anchor_index = None
 
+        # Normalize role override: only "heavy" and "easy" are valid; anything else
+        # or an empty string falls back to keyword-based classification.
+        role = (f.get("role") or "").strip().lower()
+        if role not in ("heavy", "easy"):
+            role = None
+
         rows.append(FormatField(
             format_id=format_id,
             field_key=final_key,
@@ -57,6 +63,7 @@ def _build_format_fields(format_id, fields_payload):
             is_required=bool(f.get("is_required", True)),
             ai_hint=f.get("ai_hint"),
             anchor_index=anchor_index,
+            role=role,
         ))
     return rows
 
@@ -444,6 +451,44 @@ def edit_format_content(format_id):
 
     db.session.commit()
     return jsonify({"status": "ok", "applied": applied, "format": fmt.to_dict(include_fields=True)})
+
+@format_bp.patch("/formats/<int:format_id>/field-roles")
+@login_required
+def set_field_roles(format_id):
+    """Override which fields Guided walks the teacher through.
+
+    Keyed by field_key rather than field id because a document-based format
+    re-detects its fields whenever the reference file is edited, which gives them
+    new ids; the key survives that.
+
+    A null value clears the override and hands the decision back to the keywords
+    in services/field_roles. An unrecognised value or unknown key is ignored
+    rather than rejected, so one stale entry from an open page cannot lose the
+    rest of the teacher's choices.
+    """
+    user = current_user()
+    fmt = LessonPlanFormat.query.get_or_404(format_id)
+    if fmt.owner_id != user.id:
+        return jsonify({"status": "error", "message": "You don't have access to this format."}), 403
+
+    data = request.get_json(silent=True) or {}
+    roles = data.get("roles")
+    if not isinstance(roles, dict) or not roles:
+        return jsonify({"status": "error", "message": "Send at least one field role."}), 400
+
+    by_key = {f.field_key: f for f in fmt.fields}
+    for key, value in roles.items():
+        field = by_key.get(key)
+        if field is None:
+            continue
+        if value is None:
+            field.role = None
+            continue
+        normalised = str(value).strip().lower()
+        field.role = normalised if normalised in ("heavy", "easy") else None
+
+    db.session.commit()
+    return jsonify({"status": "ok", "fields": [f.to_dict() for f in fmt.fields]})
 
 def _resolve_temp_renderable_path(token):
     """The same file scan_format() rendered for this token: the pre-converted
