@@ -1658,12 +1658,24 @@ modeSwitchBtns.forEach((btn) => {
       const firstIncomplete = stepFieldKeys.findIndex((k) => !isFieldComplete(k));
       stepIndex = firstIncomplete === -1 ? stepFieldKeys.length - 1 : firstIncomplete;
       applyStepLocks();
-      setOwlState(
-        "guide",
-        firstIncomplete === -1
-          ? "Every field already has an answer — review them below, or click a pill to revise one."
-          : `Let's start with "${fieldByKey(stepFieldKeys[stepIndex]).label}." Type your answer, then Submit & continue.`
-      );
+      let guideMessage;
+      if (firstIncomplete === -1) {
+        // stepFieldKeys is heavy-only, so finishing it does not mean the plan
+        // is done - the easy fields outside the walkthrough can still be
+        // blank. Claiming "every field" off the guided check alone is the
+        // exact false-completeness bug this feature exists to prevent, so
+        // check the easy set too before saying nothing is left.
+        const outsideIncomplete = easyFieldKeys().filter((k) => !isFieldComplete(k));
+        if (outsideIncomplete.length === 0) {
+          guideMessage = "Every field already has an answer. Review them below, or click a pill to revise one.";
+        } else {
+          const n = outsideIncomplete.length;
+          guideMessage = `The guided fields are done. ${n} quick field${n === 1 ? "" : "s"} outside the walkthrough ${n === 1 ? "is" : "are"} still blank. Fill ${n === 1 ? "it" : "them"} in directly below.`;
+        }
+      } else {
+        guideMessage = `Let's start with "${fieldByKey(stepFieldKeys[stepIndex]).label}." Type your answer, then Submit & continue.`;
+      }
+      setOwlState("guide", guideMessage);
     } else {
       clearStepLocks();
       maybeRenderResults();
