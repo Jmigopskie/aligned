@@ -4518,3 +4518,85 @@ body.auth-page::after {
   background: var(--bg);
   border-radius: 0;
 }
+
+/* ---------------------------------------------------------------------------
+   Building Proficiency: what to generate
+   --------------------------------------------------------------------------- */
+
+.generate-scope {
+  /* Warm paper (--bg) instead of --surface: the panel sits directly on the
+     white .generate-panel, so it needs its own tone to read as a distinct
+     group rather than a second, redundant white-on-white frame. */
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.generate-scope-auto {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--text-body);
+}
+
+.generate-scope-list {
+  padding: 0;
+  margin: 0;
+  border: none;
+  /* Fieldsets get an implicit min-inline-size: min-content in Firefox, which
+     can force the grid below wider than its container at narrow widths. */
+  min-width: 0;
+}
+
+.generate-scope-list legend {
+  padding: 0;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+#generate-scope-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px 10px;
+}
+
+.generate-scope-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--text-heading);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.generate-scope-option:hover {
+  border-color: var(--primary);
+}
+
+/* Ticked options get their own tint and border so the checklist reads at a
+   glance, on top of (never instead of) the checkbox's own checked mark. */
+.generate-scope-option:has(input:checked) {
+  background: var(--primary-tint);
+  border-color: var(--primary);
+}
+
+.generate-scope-option input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.generate-scope-option input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

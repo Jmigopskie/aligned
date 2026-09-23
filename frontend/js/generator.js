@@ -34,6 +34,9 @@ const stepControls = document.getElementById("step-controls");
 const sectionNav = document.getElementById("section-nav");
 const stepProgressLabel = document.getElementById("step-progress-label");
 const generateFullBtn = document.getElementById("generate-full-btn");
+const generateScope = document.getElementById("generate-scope");
+const generateScopeAuto = document.getElementById("generate-scope-auto");
+const generateScopeOptions = document.getElementById("generate-scope-options");
 const generationProgressEl = document.getElementById("generation-progress");
 const stepContinueBtn = document.getElementById("step-continue-btn");
 const resultsEl = document.getElementById("results");
@@ -816,6 +819,86 @@ function easyFieldKeys() {
 
 function fieldByKey(key) {
   return (fmt.fields || []).find((f) => f.field_key === key);
+}
+
+// Which thinking-heavy fields the teacher wants written for them. Remembered per
+// format, because a teacher who always writes their own Flow should only have to
+// say so once. Ticked by default so a teacher who never opens this panel gets
+// what they got before the panel existed.
+const SCOPE_PREFIX = "alignedGenScope:v1:";
+
+function scopeStorageKey() {
+  return `${SCOPE_PREFIX}${fmt.id}`;
+}
+
+function readScopeChoice() {
+  try {
+    const raw = localStorage.getItem(scopeStorageKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function writeScopeChoice(excluded) {
+  try {
+    localStorage.setItem(scopeStorageKey(), JSON.stringify(excluded));
+  } catch (err) {
+    /* private mode or quota: the choice just won't persist */
+  }
+}
+
+function renderGenerateScope() {
+  const heavy = heavyFieldKeys();
+  const easy = easyFieldKeys();
+
+  // Nothing to choose between: no heavy fields means the old all-or-nothing
+  // behaviour, so the panel stays out of the way.
+  if (!heavy.length) {
+    generateScope.hidden = true;
+    return;
+  }
+
+  generateScope.hidden = false;
+  generateScopeAuto.textContent = easy.length
+    ? `${easy.length} straightforward ${easy.length === 1 ? "field" : "fields"} will be filled in automatically.`
+    : "";
+
+  // Previously excluded keys stay excluded; anything new to this format starts
+  // ticked.
+  const excluded = new Set(readScopeChoice() || []);
+
+  generateScopeOptions.innerHTML = heavy
+    .map((key) => {
+      const field = fieldByKey(key);
+      return `
+        <label class="generate-scope-option">
+          <input type="checkbox" data-scope-key="${escapeHtml(key)}" ${excluded.has(key) ? "" : "checked"} />
+          <span>${escapeHtml(field ? field.label : key)}</span>
+        </label>`;
+    })
+    .join("");
+
+  generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((box) => {
+    box.addEventListener("change", () => {
+      const next = [];
+      generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((b) => {
+        if (!b.checked) next.push(b.dataset.scopeKey);
+      });
+      writeScopeChoice(next);
+    });
+  });
+}
+
+// The keys to generate: every quick field, plus the heavy ones still ticked.
+// The page sends the full list rather than letting the server add the easy
+// fields, so "generate exactly what was asked for" is the only rule in play.
+function selectedGenerateKeys() {
+  const ticked = [];
+  generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((box) => {
+    if (box.checked) ticked.push(box.dataset.scopeKey);
+  });
+  return easyFieldKeys().concat(ticked);
 }
 
 function isFieldComplete(key) {
@@ -1695,6 +1778,7 @@ function baseGenerationPayload() {
     subject: subjectInput.value.trim(),
     course_guide_id: selectedCourseGuide ? selectedCourseGuide.id : null,
     context: getAdvancedContext(),
+    include_keys: selectedGenerateKeys(),
   };
 }
 
@@ -1716,6 +1800,11 @@ function renderProgress(sectionStates) {
 generateFullBtn.addEventListener("click", async () => {
   if (!updateGate()) {
     showError("Fill in the cooperating teacher, subject, and course guide first.");
+    return;
+  }
+
+  if (!selectedGenerateKeys().length) {
+    showError("Tick at least one field for me to write, or fill the plan in yourself.");
     return;
   }
 
@@ -2186,6 +2275,7 @@ async function init() {
     // falls back to walking everything.
     stepFieldKeys = heavy.length ? heavy : fieldsInDocumentOrder().map((f) => f.field_key);
     stepIndex = 0;
+    renderGenerateScope();
 
     await initLiveDocView();
 
