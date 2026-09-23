@@ -1822,6 +1822,16 @@ function applyOpenedPlan(plan) {
     }
 
     paintRestoredValues();
+    // Make the visible mode (buttons, controls, owl chat, step locks) match
+    // the mode this plan actually opened into — without this, a plan last
+    // saved in Guided would show Building Proficiency's controls while
+    // `mode` was internally "step", and any subsequent capture/switch would
+    // then read/write the wrong slot. Safe inside this function's
+    // restoringDraft=true window: syncModeUI() never touches
+    // fieldValues/modeSlots itself, and the one thing it calls that does
+    // write out (applyStepLocks() -> saveDraft()) already no-ops under the
+    // same restoringDraft guard restoreDraft() relies on for the same reason.
+    syncModeUI();
     enableExport();
   } finally {
     restoringDraft = false;
@@ -1880,14 +1890,63 @@ function restoreDraft() {
   return hasAnyValue() || !!draft.courseGuide;
 }
 
+// Makes the visible page (active mode button, controls, owl chat, step
+// locks/message) match the `mode` variable. UI only: it never reads or
+// writes fieldValues/fieldRichValues/modeSlots, so it is structurally safe to
+// call after fieldValues has already been set directly by something else
+// (applyOpenedPlan) as well as from the live mode-switch click below — there
+// is no capture/load code path in here for a guard to have to remember to skip.
+//
+// When entering Guided, stepIndex is recomputed to the first incomplete
+// field rather than trusted from wherever it happened to be, because that is
+// the only position this function can know: there is no persisted step
+// position for the ACTIVE mode (mode_values only carries one for the
+// INACTIVE mode, and a plan row has no top-level step_index column at all).
+// A live mode-switch click and an opened plan are therefore both "start
+// Guided at the first thing left to do" rather than "resume exactly where
+// last seen" — restoreDraft() is the one path that can do better, and it
+// re-applies its own saved stepIndex right after calling this.
+function syncModeUI() {
+  modeSwitchBtns.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+  fullControls.hidden = mode !== "full";
+  stepControls.hidden = mode !== "step";
+  showOwlChat(mode === "step");
+  if (mode === "step") {
+    // Shares incompleteGuidedFieldKeys() with the Finish branch below, so
+    // the two places that decide whether the walkthrough is actually done
+    // can't quietly start disagreeing about what "done" means.
+    const incompleteGuided = incompleteGuidedFieldKeys();
+    stepIndex = incompleteGuided.length === 0
+      ? stepFieldKeys.length - 1
+      : stepFieldKeys.indexOf(incompleteGuided[0]);
+    applyStepLocks();
+    let guideMessage;
+    if (incompleteGuided.length === 0) {
+      const outsideIncomplete = incompleteEasyFieldKeys();
+      if (outsideIncomplete.length === 0) {
+        guideMessage = "Every field already has an answer. Review them below, or click a pill to revise one.";
+      } else {
+        const n = outsideIncomplete.length;
+        guideMessage = `The guided fields are done. ${n} quick field${n === 1 ? "" : "s"} outside the walkthrough ${n === 1 ? "is" : "are"} still blank. Fill ${n === 1 ? "it" : "them"} in directly below.`;
+      }
+    } else {
+      guideMessage = `Let's start with "${fieldByKey(stepFieldKeys[stepIndex]).label}." Type your answer, then Submit & continue.`;
+    }
+    setOwlState("guide", guideMessage);
+  } else {
+    clearStepLocks();
+    maybeRenderResults();
+  }
+}
+
 modeSwitchBtns.forEach((btn) => {
   btn.addEventListener("click", () => {
     if (btn.dataset.mode === mode) return;   // already here, nothing to swap
-    // restoreDraft() clicks this button purely to trigger the UI refresh
-    // below, after it has already set fieldValues/modeSlots itself for the
-    // mode being resumed into. Capturing here would run before `mode` has
-    // caught up to what's on screen and stamp that mode's data over a slot
-    // that restoreDraft already got right, so skip capture/load in that case.
+    // restoreDraft() clicks this button purely to trigger syncModeUI() below,
+    // after it has already set fieldValues/modeSlots itself for the mode
+    // being resumed into. Capturing here would run before `mode` has caught
+    // up to what's on screen and stamp that mode's data over a slot that
+    // restoreDraft already got right, so skip capture/load in that case.
     if (!restoringDraft) {
       // Put the current mode's work away before picking up the other's.
       captureModeSlot();
@@ -1897,36 +1956,7 @@ modeSwitchBtns.forEach((btn) => {
       mode = btn.dataset.mode;
     }
     saveDraft();
-    modeSwitchBtns.forEach((b) => b.classList.toggle("active", b === btn));
-    fullControls.hidden = mode !== "full";
-    stepControls.hidden = mode !== "step";
-    showOwlChat(mode === "step");
-    if (mode === "step") {
-      // Shares incompleteGuidedFieldKeys() with the Finish branch below, so
-      // the two places that decide whether the walkthrough is actually done
-      // can't quietly start disagreeing about what "done" means.
-      const incompleteGuided = incompleteGuidedFieldKeys();
-      stepIndex = incompleteGuided.length === 0
-        ? stepFieldKeys.length - 1
-        : stepFieldKeys.indexOf(incompleteGuided[0]);
-      applyStepLocks();
-      let guideMessage;
-      if (incompleteGuided.length === 0) {
-        const outsideIncomplete = incompleteEasyFieldKeys();
-        if (outsideIncomplete.length === 0) {
-          guideMessage = "Every field already has an answer. Review them below, or click a pill to revise one.";
-        } else {
-          const n = outsideIncomplete.length;
-          guideMessage = `The guided fields are done. ${n} quick field${n === 1 ? "" : "s"} outside the walkthrough ${n === 1 ? "is" : "are"} still blank. Fill ${n === 1 ? "it" : "them"} in directly below.`;
-        }
-      } else {
-        guideMessage = `Let's start with "${fieldByKey(stepFieldKeys[stepIndex]).label}." Type your answer, then Submit & continue.`;
-      }
-      setOwlState("guide", guideMessage);
-    } else {
-      clearStepLocks();
-      maybeRenderResults();
-    }
+    syncModeUI();
   });
 });
 
