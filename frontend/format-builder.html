@@ -148,6 +148,21 @@
             <div id="doc-toolbar" class="doc-toolbar"></div>
             <div class="lp-doc-wrap doc-builder-canvas" id="doc-builder-canvas"></div>
           </div>
+
+          <section id="field-roles-panel" class="field-roles-panel" hidden>
+            <h3 class="field-roles-title">Which mode writes each field</h3>
+            <p class="text-sm mt-0">
+              Guided walks you through the fields that need real thinking. The rest are filled in
+              automatically when you generate a plan. Adjust any field whose wording we read wrongly.
+            </p>
+            <div id="field-roles-list"></div>
+            <div class="flex gap-8 mt-16" style="align-items:center;">
+              <span class="text-sm" id="field-roles-status"></span>
+              <button type="button" id="field-roles-save-btn" class="btn btn-secondary btn-sm" disabled>
+                Save field roles
+              </button>
+            </div>
+          </section>
         </div>
 
         <hr class="rule" />
@@ -187,6 +202,15 @@
           <option value="textarea" selected>Textarea (paragraph)</option>
           <option value="list">List</option>
           <option value="table">Table</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Which mode writes this</label>
+        <select class="field-role">
+          <option value="">Decide automatically</option>
+          <option value="heavy">Guided walks me through it</option>
+          <option value="easy">Filled in automatically</option>
         </select>
       </div>
 

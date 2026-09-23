@@ -148,8 +148,11 @@ def check_to_dict_resolves():
         assert auto.to_dict()["role"] == "heavy", auto.to_dict()
         assert forced.to_dict()["role"] == "easy", forced.to_dict()
         assert plain.to_dict()["role"] == "easy", plain.to_dict()
-        # The raw override is not exposed; only the resolved role is.
-        assert "role_override" not in auto.to_dict()
+        # The raw override ships too, for the builder's select to tell "decide
+        # automatically" apart from an explicit choice that happens to match.
+        assert auto.to_dict()["role_override"] is None, auto.to_dict()
+        assert forced.to_dict()["role_override"] == "easy", forced.to_dict()
+        assert plain.to_dict()["role_override"] is None, plain.to_dict()
     print("  to_dict resolves OK")
 
 

@@ -84,4 +84,8 @@ class FormatField(db.Model):
             # The resolved role, not the raw override, so the browser reads one
             # value and never needs the keyword list.
             "role": field_roles.role_for(self),
+            # The raw override, for the format builder's own select. The page
+            # needs to tell "decide automatically" apart from an explicit choice
+            # that happens to match what the keywords would have picked.
+            "role_override": self.role,
         }

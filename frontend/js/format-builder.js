@@ -48,6 +48,63 @@ const docDeleteLineBtn = document.getElementById("doc-delete-line-btn");
 const docSaveContentBtn = document.getElementById("doc-save-content-btn");
 const docContentStatus = document.getElementById("doc-content-status");
 
+const fieldRolesPanel = document.getElementById("field-roles-panel");
+const fieldRolesList = document.getElementById("field-roles-list");
+const fieldRolesStatus = document.getElementById("field-roles-status");
+const fieldRolesSaveBtn = document.getElementById("field-roles-save-btn");
+
+// Pending overrides, keyed by field_key: only what the teacher actually changed
+// is sent, so an untouched field keeps whatever it has.
+let pendingRoles = {};
+
+function renderFieldRoles(fields) {
+  if (!fields || !fields.length) {
+    fieldRolesPanel.hidden = true;
+    return;
+  }
+  pendingRoles = {};
+  fieldRolesPanel.hidden = false;
+  fieldRolesSaveBtn.disabled = true;
+  fieldRolesStatus.textContent = "";
+
+  fieldRolesList.innerHTML = fields
+    .map(
+      (f) => `
+      <label class="field-role-row">
+        <span class="field-role-label">${escapeHtml(f.label)}</span>
+        <select class="field-role-select" data-field-key="${escapeHtml(f.field_key)}">
+          <option value=""${f.role_override ? "" : " selected"}>Decide automatically (${escapeHtml(f.role)})</option>
+          <option value="heavy"${f.role_override === "heavy" ? " selected" : ""}>Guided walks me through it</option>
+          <option value="easy"${f.role_override === "easy" ? " selected" : ""}>Filled in automatically</option>
+        </select>
+      </label>`
+    )
+    .join("");
+
+  fieldRolesList.querySelectorAll(".field-role-select").forEach((sel) => {
+    sel.addEventListener("change", () => {
+      pendingRoles[sel.dataset.fieldKey] = sel.value || null;
+      fieldRolesSaveBtn.disabled = false;
+      const count = Object.keys(pendingRoles).length;
+      fieldRolesStatus.textContent = `${count} unsaved ${count === 1 ? "change" : "changes"}`;
+    });
+  });
+}
+
+fieldRolesSaveBtn.addEventListener("click", async () => {
+  if (!editingFormatId || !Object.keys(pendingRoles).length) return;
+  setButtonLoading(fieldRolesSaveBtn, true, "Saving");
+  try {
+    const data = await Api.setFieldRoles(editingFormatId, pendingRoles);
+    showToast("Field roles saved.");
+    renderFieldRoles(data.fields);
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    setButtonLoading(fieldRolesSaveBtn, false);
+  }
+});
+
 document.querySelectorAll("[data-icon]").forEach((el) => {
   const icon = Icons[el.dataset.icon] || "";
   el.innerHTML = el.dataset.iconLabel ? `${icon}<span>${el.dataset.iconLabel}</span>` : icon;
@@ -443,11 +500,16 @@ function addFieldRow(initial, container) {
   const typeSelect = row.querySelector(".field-type");
   const requiredInput = row.querySelector(".field-required");
 
+  const roleSelect = row.querySelector(".field-role");
+
   if (initial) {
     labelInput.value = initial.label || "";
     if (initial.field_type) typeSelect.value = initial.field_type;
     requiredInput.checked = initial.is_required !== false;
     keyPreview.textContent = labelInput.value.trim() ? slugify(labelInput.value) : "—";
+    // The stored override, not the resolved role: "decide automatically" has to
+    // stay distinguishable from an explicit choice that happens to agree.
+    roleSelect.value = initial.role_override || "";
   }
 
   labelInput.addEventListener("input", () => {
@@ -492,6 +554,7 @@ function collectManualFields() {
       field_type: row.querySelector(".field-type").value,
       is_required: row.querySelector(".field-required").checked,
       sort_order: i,
+      role: row.querySelector(".field-role").value || null,
     });
   });
 
@@ -602,6 +665,10 @@ async function enterEditMode(fmt) {
       // disk) — the format still has its fields, just nothing to edit visually.
       docBuilderCanvas.innerHTML = '<p class="hint">This format\'s reference file couldn\'t be rendered.</p>';
     }
+
+    // Only for a format that already exists: roles are saved against a format id,
+    // so a brand-new format gets this panel after its first save.
+    renderFieldRoles(fmt.fields || []);
   } else {
     manualFieldEditor.hidden = false;
     docFieldEditor.hidden = true;
