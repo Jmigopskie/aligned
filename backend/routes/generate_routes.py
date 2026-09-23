@@ -221,6 +221,8 @@ def update_lesson_plan(plan_id):
         plan.set_values(data.get("field_values") or {})
     if "rich_field_values" in data:
         plan.set_rich_values(data.get("rich_field_values") or {})
+    if "mode_values" in data:
+        plan.set_mode_values(data.get("mode_values") or {})
 
     db.session.commit()
     return jsonify({"status": "ok", "lesson_plan": plan.to_dict()})
@@ -245,6 +247,7 @@ def save_lesson_plan():
     )
     plan.set_values(data.get("field_values") or {})
     plan.set_rich_values(data.get("rich_field_values") or {})
+    plan.set_mode_values(data.get("mode_values") or {})
 
     db.session.add(plan)
     db.session.commit()
