@@ -119,10 +119,45 @@ def check_missing_attributes():
     print("  missing attributes OK")
 
 
+def check_to_dict_resolves():
+    """to_dict() ships the resolved role, so the browser never has to know the
+    keyword list. A stored override shows through; a stored NULL resolves."""
+    os.environ["DATABASE_URL"] = "sqlite://"
+    from app import create_app
+    from extensions import db
+    from models.format import FormatField, LessonPlanFormat
+    from models.user import User
+
+    app = create_app()
+    with app.app_context():
+        owner = User(full_name="T", email="roles.t@example.test", role="teacher")
+        owner.set_password("password123")
+        db.session.add(owner)
+        db.session.commit()
+
+        fmt = LessonPlanFormat(owner_id=owner.id, name="Roles")
+        db.session.add(fmt)
+        db.session.commit()
+
+        auto = FormatField(format_id=fmt.id, field_key="flow", label="Flow", sort_order=0)
+        forced = FormatField(format_id=fmt.id, field_key="flow2", label="Flow", role="easy", sort_order=1)
+        plain = FormatField(format_id=fmt.id, field_key="no_of_sessions", label="No. of Sessions", sort_order=2)
+        db.session.add_all([auto, forced, plain])
+        db.session.commit()
+
+        assert auto.to_dict()["role"] == "heavy", auto.to_dict()
+        assert forced.to_dict()["role"] == "easy", forced.to_dict()
+        assert plain.to_dict()["role"] == "easy", plain.to_dict()
+        # The raw override is not exposed; only the resolved role is.
+        assert "role_override" not in auto.to_dict()
+    print("  to_dict resolves OK")
+
+
 check_named_six()
 check_real_format()
 check_easy_default()
 check_override_wins()
 check_key_and_label_both_read()
 check_missing_attributes()
+check_to_dict_resolves()
 print("field roles OK")

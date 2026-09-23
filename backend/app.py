@@ -111,6 +111,7 @@ def _migrate_format_field_columns():
     reference file, set by clicking it in the format builder's document
     editor) to databases created before this feature existed."""
     _add_column("format_fields", "anchor_index", "INTEGER")
+    _add_column("format_fields", "role", "VARCHAR(10)")
 
 
 def _migrate_section_columns():
