@@ -508,9 +508,11 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
             yield {"type": "section_done", "section": "Filled-in gaps",
                    "index": len(chunks), "total": len(chunks), "values": recovered}
 
-    # `missing` is the honest answer to "is this plan finished": the field keys
-    # with no real content even after the retry. The page reports these instead
-    # of celebrating.
+    # `missing` answers "did everything I was asked to write come back": the
+    # requested field keys with no real content even after the retry. It says
+    # nothing about fields outside include_keys, so the page must combine this
+    # with its own check of any fields the teacher chose to write themselves
+    # before it can claim the plan is finished.
     missing = ai_limits.missing_keys(all_values, fields)
     yield {
         "type": "complete",

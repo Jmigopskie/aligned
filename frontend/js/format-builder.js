@@ -57,6 +57,12 @@ const fieldRolesSaveBtn = document.getElementById("field-roles-save-btn");
 // is sent, so an untouched field keeps whatever it has.
 let pendingRoles = {};
 
+// Same teacher-facing wording as the two manual options below, so the
+// "Decide automatically" row doesn't print the internal heavy/easy tokens.
+function roleLabel(role) {
+  return role === "heavy" ? "Guided walks me through it" : "Filled in automatically";
+}
+
 function renderFieldRoles(fields) {
   if (!fields || !fields.length) {
     fieldRolesPanel.hidden = true;
@@ -73,7 +79,7 @@ function renderFieldRoles(fields) {
       <label class="field-role-row">
         <span class="field-role-label">${escapeHtml(f.label)}</span>
         <select class="field-role-select" data-field-key="${escapeHtml(f.field_key)}">
-          <option value=""${f.role_override ? "" : " selected"}>Decide automatically (${escapeHtml(f.role)})</option>
+          <option value=""${f.role_override ? "" : " selected"}>Decide automatically (${escapeHtml(roleLabel(f.role))})</option>
           <option value="heavy"${f.role_override === "heavy" ? " selected" : ""}>Guided walks me through it</option>
           <option value="easy"${f.role_override === "easy" ? " selected" : ""}>Filled in automatically</option>
         </select>

@@ -156,8 +156,9 @@ function paintDocToolbarIcons(toolbarEl) {
 function initDocViewControls({ toolbarEl, wrapEl, stageEl, storageKey }) {
   // What goes fullscreen. The toolbar has to be inside it or it vanishes the
   // moment fullscreen starts, so callers pass the element containing both.
-  // Falls back to wrapEl so a caller with no stage still works.
-  const fsEl = stageEl || wrapEl;
+  // Both call sites pass stageEl, and the wrapper-level fullscreen CSS was
+  // removed when the stage was introduced, so fsEl is always the stage.
+  const fsEl = stageEl;
 
   let zoomIndex = DOC_ZOOM_DEFAULT_INDEX;
 

@@ -234,6 +234,80 @@ def check_role_endpoint():
     print("  role endpoint OK")
 
 
+def check_content_edit_keeps_roles():
+    """Editing a format's document re-detects its fields from scratch, and
+    _suggest_fields()'s payload carries no role — the exact input that used to
+    null out every override. Driving PATCH /formats/<id>/content through the
+    test client needs a real .docx (docx_service.resolve_template_path,
+    apply_content_edits) plus a live AI call (_suggest_fields), so instead this
+    monkeypatches those three I/O-bound pieces out and runs the actual route,
+    which is both truer to the real code path and lighter than faking a .docx.
+    """
+    os.environ["DATABASE_URL"] = "sqlite://"
+    from app import create_app
+    from extensions import db
+    from models.format import FormatField, LessonPlanFormat
+    from models.user import User
+    from routes import format_routes
+
+    app = create_app()
+    app.config.update(TESTING=True)
+    with app.app_context():
+        owner = User(full_name="T", email="roles.edit@example.test", role="teacher")
+        owner.set_password("password123")
+        db.session.add(owner)
+        db.session.commit()
+
+        fmt = LessonPlanFormat(owner_id=owner.id, name="Roles Edit")
+        db.session.add(fmt)
+        db.session.commit()
+        fmt_id = fmt.id
+
+        # "flow" carries an explicit override; "no_of_sessions" does not and
+        # will not survive re-detection at all, which is the expected case of
+        # a field genuinely going away.
+        db.session.add_all([
+            FormatField(format_id=fmt_id, field_key="flow", label="Flow", role="easy", sort_order=0),
+            FormatField(format_id=fmt_id, field_key="no_of_sessions", label="No. of Sessions", sort_order=1),
+        ])
+        db.session.commit()
+
+        # Re-detection finds "flow" again (same key) plus a brand new field
+        # with no override of its own.
+        real_resolve = format_routes.docx_service.resolve_template_path
+        real_apply = format_routes.docx_service.apply_content_edits
+        real_suggest = format_routes._suggest_fields
+        format_routes.docx_service.resolve_template_path = lambda f: "fake.docx"
+        format_routes.docx_service.apply_content_edits = lambda path, edits: ([], edits)
+        format_routes._suggest_fields = lambda path: (
+            [
+                {"label": "Flow", "field_key": "flow", "anchor_index": 0},
+                {"label": "New Field", "field_key": "new_field", "anchor_index": 1},
+            ],
+            None,
+        )
+        try:
+            client = app.test_client()
+            with client.session_transaction() as sess:
+                sess["user_id"] = owner.id
+            res = client.patch(
+                f"/api/formats/{fmt_id}/content",
+                json={"edits": [{"anchor_index": 0, "action": "format", "text": "x"}]},
+            )
+        finally:
+            format_routes.docx_service.resolve_template_path = real_resolve
+            format_routes.docx_service.apply_content_edits = real_apply
+            format_routes._suggest_fields = real_suggest
+
+        assert res.status_code == 200, res.get_json()
+        by_key = {f["field_key"]: f["role_override"] for f in res.get_json()["format"]["fields"]}
+        # The override on a field that still exists after re-detection must
+        # survive; a field re-detection did not bring back simply has no row
+        # to restore it onto, which is correct.
+        assert by_key == {"flow": "easy", "new_field": None}, by_key
+    print("  content edit keeps roles OK")
+
+
 check_named_six()
 check_real_format()
 check_easy_default()
@@ -242,4 +316,5 @@ check_key_and_label_both_read()
 check_missing_attributes()
 check_to_dict_resolves()
 check_role_endpoint()
+check_content_edit_keeps_roles()
 print("field roles OK")

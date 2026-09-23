@@ -443,10 +443,18 @@ def edit_format_content(format_id):
             "message": ai_error or "Couldn't find any fillable fields left in this document after that edit.",
         }), 400
 
+    # _suggest_fields()'s payload carries no role, so rebuilding straight from
+    # it would silently null out every override the teacher set on the roles
+    # panel on this same screen. Keyed by field_key, same as set_field_roles
+    # relies on, so an override survives as long as the field itself does; one
+    # that no longer exists after re-detection has nothing to restore onto.
+    kept_roles = {f.field_key: f.role for f in fmt.fields if f.role}
+
     for existing_field in list(fmt.fields):
         db.session.delete(existing_field)
     db.session.flush()
     for row in _build_format_fields(fmt.id, detected_fields):
+        row.role = kept_roles.get(row.field_key, row.role)
         db.session.add(row)
 
     db.session.commit()

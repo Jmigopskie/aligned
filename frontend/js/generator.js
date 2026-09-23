@@ -10,6 +10,14 @@ let fieldRichValues = {};
 let planId = null;
 let dirty = false;
 
+// True for the duration of a Building Proficiency generation stream. Guards
+// the mode-switch buttons: section_done handlers keep assigning into
+// fieldValues as chunks arrive, so switching mode mid-stream would bank a
+// partial generation into the outgoing slot and then let the still-running
+// stream write the rest into what is now the OTHER mode's slot, splitting
+// the plan across both and overwriting whatever the teacher had typed there.
+let generating = false;
+
 // Guided mode: the flat, ordered list of every field on this format
 // (document order via sort_order) and which one is currently unlocked.
 let stepFieldKeys = [];
@@ -65,6 +73,14 @@ function inactiveModeSlot() {
     rich_field_values: slot.fieldRichValues || {},
     step_index: typeof slot.stepIndex === "number" ? slot.stepIndex : 0,
   };
+}
+
+// Whether the mode NOT currently on screen has anything written in it, so a
+// switch can say so instead of just going blank — nothing is actually lost,
+// but an empty editor with no explanation reads as a vanished lesson plan.
+function inactiveModeHasWork() {
+  const values = inactiveModeSlot().field_values || {};
+  return Object.values(values).some((v) => (Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim())));
 }
 
 let selectedCourseGuide = null;
@@ -1770,6 +1786,10 @@ function paintRestoredValues(blankMissing = false) {
       } else if (blankMissing) {
         el.textContent = "";
         el.classList.remove("lp-filled");
+        // Otherwise a highlight from the mode just left (this field was
+        // reported missing/kept-back there) survives onto a field that, in
+        // the mode being entered, has never even been asked about yet.
+        el.classList.remove("field-needs-answer");
       }
     });
   } else if (blankMissing || hasAnyValue()) {
@@ -1911,6 +1931,13 @@ function syncModeUI() {
   fullControls.hidden = mode !== "full";
   stepControls.hidden = mode !== "step";
   showOwlChat(mode === "step");
+
+  // Named once so both branches below can append the same reassurance without
+  // repeating the lookup.
+  const otherModeLabel = mode === "step" ? "Building Proficiency" : "Guided";
+  const otherHasWork = inactiveModeHasWork();
+  const otherNote = otherHasWork ? ` Your ${otherModeLabel} work is still there if you switch back.` : "";
+
   if (mode === "step") {
     // Shares incompleteGuidedFieldKeys() with the Finish branch below, so
     // the two places that decide whether the walkthrough is actually done
@@ -1932,16 +1959,28 @@ function syncModeUI() {
     } else {
       guideMessage = `Let's start with "${fieldByKey(stepFieldKeys[stepIndex]).label}." Type your answer, then Submit & continue.`;
     }
-    setOwlState("guide", guideMessage);
+    setOwlState("guide", guideMessage + otherNote);
   } else {
     clearStepLocks();
     maybeRenderResults();
+    // Building Proficiency has no chat panel of its own, so this is the only
+    // place left to say it: the guide owl bubble, same as generation status.
+    if (otherHasWork) setOwlState("guide", `Switched to Building Proficiency.${otherNote}`);
   }
 }
 
 modeSwitchBtns.forEach((btn) => {
   btn.addEventListener("click", () => {
     if (btn.dataset.mode === mode) return;   // already here, nothing to swap
+    if (generating) {
+      // The generate button is disabled while a stream runs, but the mode
+      // buttons aren't; switching here would bank a partial generation into
+      // the outgoing slot while the stream keeps writing into the incoming
+      // one. Block the switch rather than gate section_done on mode, which
+      // would just silently drop output the teacher already paid for.
+      showToast("Wait for the plan to finish generating first.", true);
+      return;
+    }
     // restoreDraft() clicks this button purely to trigger syncModeUI() below,
     // after it has already set fieldValues/modeSlots itself for the mode
     // being resumed into. Capturing here would run before `mode` has caught
@@ -2000,6 +2039,7 @@ generateFullBtn.addEventListener("click", async () => {
   errorBox.hidden = true;
   setButtonLoading(generateFullBtn, true, "Generating");
   setOwlState("thinking", "Thinking hard about your lesson...");
+  generating = true;
 
   // Built up live from the stream's own chunk names as they arrive — the
   // Building Proficiency mode batches fields for pacing/streaming purposes,
@@ -2008,8 +2048,14 @@ generateFullBtn.addEventListener("click", async () => {
   const progressRows = [];
   renderProgress(progressRows);
 
+  // Captured once so the outcome report checks exactly what was sent, not a
+  // fresh read of the checklist that could have drifted (it can't change
+  // mid-stream since the panel is part of the same disabled controls, but
+  // recomputing it separately would be one more place for the two to disagree).
+  const payload = baseGenerationPayload();
+
   try {
-    const finalEvent = await Api.generateFullStream(baseGenerationPayload(), (event) => {
+    const finalEvent = await Api.generateFullStream(payload, (event) => {
       if (event.type === "section_start") {
         progressRows.push({ name: event.section, status: "active" });
         renderProgress(progressRows);
@@ -2036,46 +2082,75 @@ generateFullBtn.addEventListener("click", async () => {
       }
     });
     generateFullBtn.dataset.originalLabel = "Regenerate full plan";
-    reportGenerationOutcome(finalEvent);
+    reportGenerationOutcome(finalEvent, payload.include_keys);
   } catch (err) {
     showError(err.message);
   } finally {
+    generating = false;
     setButtonLoading(generateFullBtn, false);
     generationProgressEl.hidden = true;
     startGenerateCooldown();
   }
 });
 
-// What the owl says once generation stops. The server reports which fields it
-// could not fill even after retrying them, so a plan with blanks in it is
-// never announced as finished: that mismatch is exactly what made "All done!"
-// untrustworthy.
-function reportGenerationOutcome(finalEvent) {
+// What the owl says once generation stops. The server only reports on the
+// fields it was asked for (`missing`/`missing_labels`), so an empty
+// `missing_labels` no longer means the plan is finished by itself: fields the
+// teacher unticked in the checklist are still blank and this is the one place
+// that has to know it. The two buckets are kept apart in the wording because
+// they mean different things — one is the AI failing at something, the other
+// is the teacher choosing not to delegate it — but both leave a blank field,
+// so both have to be said and both have to be highlighted.
+function reportGenerationOutcome(finalEvent, requestedKeys) {
   const missingLabels = (finalEvent && finalEvent.missing_labels) || [];
+  const missingKeys = (finalEvent && finalEvent.missing) || [];
+  const asked = new Set(requestedKeys || []);
+  // Fields the teacher deliberately unticked: not a generation failure, so
+  // they get their own wording rather than being folded into "couldn't
+  // generate" and implying the AI tried and failed at them.
+  const yoursFields = (fmt.fields || [])
+    .filter((f) => !asked.has(f.field_key) && !isFieldComplete(f.field_key));
+  const yoursKeys = yoursFields.map((f) => f.field_key);
 
-  if (!missingLabels.length) {
+  if (!missingLabels.length && !yoursKeys.length) {
     setOwlState("celebrate", "All done! Review what I wrote below, then save when you're happy with it.");
+    highlightEmptyFields([]);
     return;
   }
 
-  // Named outright up to a few, counted beyond that, so the message stays
-  // readable on a long format.
-  const shown = missingLabels.slice(0, 3).join(", ");
-  const extra = missingLabels.length - 3;
-  const list = extra > 0 ? `${shown}, and ${extra} more` : shown;
+  const messages = [];
 
-  setOwlState(
-    "guide",
-    `I filled in everything except ${list}. Write ${missingLabels.length === 1 ? "that one" : "those"} in yourself, or ask me about ${missingLabels.length === 1 ? "it" : "them"} in the chat.`
-  );
-  showError(
-    `${missingLabels.length} field${missingLabels.length === 1 ? "" : "s"} couldn't be generated and ${
-      missingLabels.length === 1 ? "is" : "are"
-    } still empty: ${missingLabels.join(", ")}.`
-  );
+  if (missingLabels.length) {
+    // Named outright up to a few, counted beyond that, so the message stays
+    // readable on a long format.
+    const shown = missingLabels.slice(0, 3).join(", ");
+    const extra = missingLabels.length - 3;
+    const list = extra > 0 ? `${shown}, and ${extra} more` : shown;
+    messages.push(
+      `I filled in everything else, but couldn't generate ${list}. Write ${missingLabels.length === 1 ? "that one" : "those"} in yourself, or ask me about ${missingLabels.length === 1 ? "it" : "them"} in the chat.`
+    );
+    showError(
+      `${missingLabels.length} field${missingLabels.length === 1 ? "" : "s"} couldn't be generated and ${
+        missingLabels.length === 1 ? "is" : "are"
+      } still empty: ${missingLabels.join(", ")}.`
+    );
+  }
 
-  // Draw attention to the actual empty fields rather than only naming them.
-  highlightEmptyFields(finalEvent.missing || []);
+  if (yoursKeys.length) {
+    const yoursLabels = yoursFields.map((f) => f.label || f.field_key);
+    const shown = yoursLabels.slice(0, 3).join(", ");
+    const extra = yoursLabels.length - 3;
+    const list = extra > 0 ? `${shown}, and ${extra} more` : shown;
+    messages.push(
+      `${list} ${yoursLabels.length === 1 ? "is" : "are"} still blank because you kept ${yoursLabels.length === 1 ? "it" : "them"} off my list. Fill ${yoursLabels.length === 1 ? "it" : "them"} in whenever you are ready.`
+    );
+  }
+
+  setOwlState("guide", messages.join(" "));
+
+  // Draw attention to the actual empty fields rather than only naming them,
+  // whichever bucket (or both) they came from.
+  highlightEmptyFields([...missingKeys, ...yoursKeys]);
 }
 
 // Marks the still-empty fields in whichever editor this format uses, so the
@@ -2125,7 +2200,7 @@ stepContinueBtn.addEventListener("click", () => {
   syncActiveStepValue();
   const key = stepFieldKeys[stepIndex];
   if (!isFieldComplete(key)) {
-    showError(`Fill in "${fieldByKey(key).label}" before continuing — every field is required in Guided mode.`);
+    showError(`Fill in "${fieldByKey(key).label}" before continuing. Every guided field is required.`);
     return;
   }
   errorBox.hidden = true;
