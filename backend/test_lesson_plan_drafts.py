@@ -184,6 +184,19 @@ def main():
         assert kept["title"] == "Renamed"
         assert kept["mode_values"]["field_values"]["flow"] == "written by Building Proficiency", kept["mode_values"]
 
+        # The guard must be `if "mode_values" in data:` not `if data.get("mode_values"):`.
+        # The latter would silently drop intentional clears (key present, value falsy),
+        # so a PATCH sending {"mode_values": {}} would lose data. This check pins the
+        # distinction: an explicit empty dict must be written, not skipped.
+        res = client.patch(f"/api/lesson-plans/{two_id}", json={"mode_values": {}})
+        cleared = res.get_json()["lesson_plan"]
+        assert cleared["mode_values"] == {}, f"Expected empty dict, got {cleared['mode_values']}"
+        # The next PATCH omits the key entirely, so it must not repopulate the slot;
+        # the cleared value must persist. This pins the other side of the guard.
+        res = client.patch(f"/api/lesson-plans/{two_id}", json={"title": "Double-check"})
+        still_clear = res.get_json()["lesson_plan"]
+        assert still_clear["mode_values"] == {}, "Omitting mode_values must not restore a cleared slot"
+
         # A plan saved before this existed reads as an empty slot rather than
         # None, so the page can use it without a null check.
         plain = LessonPlan(user_id=student_id, format_id=format_id, title="Old plan")
@@ -194,6 +207,11 @@ def main():
 
         # Junk in the column does not crash a read.
         plain.mode_values = "not json"
+        db.session.commit()
+        assert plain.to_dict()["mode_values"] == {}
+
+        # Valid JSON that is not an object (e.g., an array) degrades to {}.
+        plain.mode_values = "[1, 2, 3]"
         db.session.commit()
         assert plain.to_dict()["mode_values"] == {}
 
