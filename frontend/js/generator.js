@@ -40,6 +40,7 @@ const resultsEl = document.getElementById("results");
 const liveDocHint = document.getElementById("live-doc-hint");
 const liveDocToolbar = document.getElementById("live-doc-toolbar");
 const liveDocWrap = document.getElementById("live-doc-wrap");
+const liveDocStage = document.getElementById("live-doc-stage");
 const footer = document.getElementById("footer");
 const saveStatus = document.getElementById("save-status");
 const previewBtn = document.getElementById("preview-btn");
@@ -1031,9 +1032,8 @@ async function initLiveDocView() {
   }
 
   liveDocWrap.innerHTML = docTemplateData.html;
-  liveDocWrap.hidden = false;
+  liveDocStage.hidden = false;
   liveDocHint.hidden = false;
-  liveDocToolbar.hidden = false;
   resultsEl.hidden = true;
   footer.hidden = false;
   wireLiveDocEditing();
@@ -1282,6 +1282,7 @@ function wireLiveDocToolbar() {
   initDocViewControls({
     toolbarEl: liveDocToolbar,
     wrapEl: liveDocWrap,
+    stageEl: liveDocStage,
     storageKey: "alignedDocZoom:generator",
   });
 

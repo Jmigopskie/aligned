@@ -241,8 +241,13 @@
                 or click into any spot to edit and style it directly.
               </div>
 
-              <div id="live-doc-toolbar" class="doc-toolbar mt-16" hidden></div>
-              <div id="live-doc-wrap" class="lp-doc-wrap" hidden></div>
+              <!-- Toolbar and canvas share one stage because the stage is what
+                   goes fullscreen: fullscreening the canvas alone left the
+                   toolbar outside the fullscreened subtree and so invisible. -->
+              <div id="live-doc-stage" class="doc-stage" hidden>
+                <div id="live-doc-toolbar" class="doc-toolbar"></div>
+                <div id="live-doc-wrap" class="lp-doc-wrap"></div>
+              </div>
 
               <div id="results" class="mt-24"></div>
 

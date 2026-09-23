@@ -152,7 +152,12 @@ function paintDocToolbarIcons(toolbarEl) {
 // Scales the document without reflowing the page around it: the wrapper keeps
 // the scaled height so scrollbars stay correct, which a bare transform on the
 // page would get wrong.
-function initDocViewControls({ toolbarEl, wrapEl, storageKey }) {
+function initDocViewControls({ toolbarEl, wrapEl, stageEl, storageKey }) {
+  // What goes fullscreen. The toolbar has to be inside it or it vanishes the
+  // moment fullscreen starts, so callers pass the element containing both.
+  // Falls back to wrapEl so a caller with no stage still works.
+  const fsEl = stageEl || wrapEl;
+
   let zoomIndex = DOC_ZOOM_DEFAULT_INDEX;
 
   const readout = toolbarEl.querySelector(".doc-zoom-readout");
@@ -213,7 +218,7 @@ function initDocViewControls({ toolbarEl, wrapEl, storageKey }) {
   // with its own toolbar still reachable. The fallback class covers browsers
   // that refuse the request (an iframe without the permission, mainly).
   function isFullscreen() {
-    return document.fullscreenElement === wrapEl || wrapEl.classList.contains("is-pseudo-fullscreen");
+    return document.fullscreenElement === fsEl || fsEl.classList.contains("is-pseudo-fullscreen");
   }
 
   function syncFullscreenButton() {
@@ -226,24 +231,24 @@ function initDocViewControls({ toolbarEl, wrapEl, storageKey }) {
 
   async function toggleFullscreen() {
     if (isFullscreen()) {
-      if (document.fullscreenElement === wrapEl) {
+      if (document.fullscreenElement === fsEl) {
         try {
           await document.exitFullscreen();
         } catch (err) {
           /* already leaving */
         }
       }
-      wrapEl.classList.remove("is-pseudo-fullscreen");
+      fsEl.classList.remove("is-pseudo-fullscreen");
       syncFullscreenButton();
       return;
     }
 
     try {
-      await wrapEl.requestFullscreen();
+      await fsEl.requestFullscreen();
     } catch (err) {
       // Not available here, so fill the viewport with CSS instead. The
       // document is still usable, which is the point.
-      wrapEl.classList.add("is-pseudo-fullscreen");
+      fsEl.classList.add("is-pseudo-fullscreen");
     }
     syncFullscreenButton();
   }
@@ -256,8 +261,8 @@ function initDocViewControls({ toolbarEl, wrapEl, storageKey }) {
 
   // Escape also leaves the CSS fallback, matching what Escape does natively.
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && wrapEl.classList.contains("is-pseudo-fullscreen")) {
-      wrapEl.classList.remove("is-pseudo-fullscreen");
+    if (event.key === "Escape" && fsEl.classList.contains("is-pseudo-fullscreen")) {
+      fsEl.classList.remove("is-pseudo-fullscreen");
       syncFullscreenButton();
     }
   });

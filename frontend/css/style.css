@@ -4422,27 +4422,6 @@ body.auth-page::after {
   margin-bottom: calc((var(--doc-zoom) - 1) * 100%);
 }
 
-/* Native fullscreen: the wrapper becomes the whole screen, so it supplies its
-   own page background and scrolling. */
-.lp-doc-wrap:fullscreen {
-  overflow: auto;
-  padding: 24px;
-  background: var(--bg);
-}
-
-/* The fallback for browsers that refuse the fullscreen request. Fixed to the
-   viewport rather than the page, so it covers the sidebar and topbar too. */
-.lp-doc-wrap.is-pseudo-fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  overflow: auto;
-  padding: 24px;
-  margin: 0;
-  background: var(--bg);
-  border-radius: 0;
-}
-
 /* --- The fixed formatting vocabulary ---
    Every one of these class names is preserved by the field sanitizer and turned
    into a real Word run property on export, so nothing a teacher applies here is
@@ -4477,3 +4456,53 @@ body.auth-page::after {
 .doc-builder-canvas .hl-green { background: #BBF7D0; }
 .lp-doc .hl-cyan,
 .doc-builder-canvas .hl-cyan { background: #A5F3FC; }
+
+/* ---------------------------------------------------------------------------
+   Document stage: toolbar plus canvas, and the unit that goes fullscreen
+   --------------------------------------------------------------------------- */
+
+.doc-stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 16px;
+}
+
+/* Sticky rather than fixed, so the toolbar stays reachable while the document
+   scrolls under it both on the page and in fullscreen. */
+.doc-stage .doc-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin-top: 0;
+  background: var(--surface);
+}
+
+/* In fullscreen the stage IS the screen, so it supplies the page ground and
+   owns the scrolling; the canvas inside it scrolls, the toolbar does not. */
+.doc-stage:fullscreen {
+  padding: 0;
+  background: var(--bg);
+}
+
+.doc-stage:fullscreen .lp-doc-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  margin: 0;
+}
+
+.doc-stage.is-pseudo-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  margin: 0;
+  background: var(--bg);
+}
+
+.doc-stage.is-pseudo-fullscreen .lp-doc-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  margin: 0;
+}

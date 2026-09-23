@@ -258,6 +258,7 @@ if (docToolbar) {
   initDocViewControls({
     toolbarEl: docToolbar,
     wrapEl: docBuilderCanvas,
+    stageEl: document.getElementById("doc-stage"),
     storageKey: "alignedDocZoom:builder",
   });
 
