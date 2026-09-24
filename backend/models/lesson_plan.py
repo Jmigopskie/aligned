@@ -52,6 +52,15 @@ class LessonPlan(db.Model):
     # insists on was never stored at all.
     setup_context = db.Column(db.Text)
 
+    # The teacher's own edits to the document body: the labels, headings and
+    # table text around the AI's field slots. Stored as a list of
+    # {anchor_index, text, bold, italic, underline, align, heading, list} against
+    # the same positions the format builder addresses, and replayed onto a fresh
+    # copy of the reference file at export, so the .docx keeps its original
+    # fonts and table layout while carrying the teacher's wording. Per plan, so
+    # one teacher's rewording never reaches the shared format.
+    doc_edits = db.Column(db.Text)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -66,6 +75,22 @@ class LessonPlan(db.Model):
 
     def set_rich_values(self, values: dict):
         self.rich_field_values = json.dumps(values or {})
+
+    def get_doc_edits(self):
+        """The document edits, or [] when there are none.
+
+        [] rather than None for a plan saved before this column existed, and for
+        unparseable content, so export never needs a null check and corruption
+        degrades to "no edits" instead of a failed download.
+        """
+        try:
+            value = json.loads(self.doc_edits or "[]")
+        except ValueError:
+            return []
+        return value if isinstance(value, list) else []
+
+    def set_doc_edits(self, value):
+        self.doc_edits = json.dumps(value or [])
 
     def get_setup_context(self):
         """The saved setup step, or {} when there isn't one.
@@ -123,6 +148,7 @@ class LessonPlan(db.Model):
             "is_public": bool(self.is_public),
             "mode_values": self.get_mode_values(),
             "setup_context": self.get_setup_context(),
+            "doc_edits": self.get_doc_edits(),
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }

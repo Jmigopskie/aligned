@@ -1351,9 +1351,84 @@ function clearField(el) {
   clearFieldState(key);
 }
 
+// The document body, keyed by the position each line occupies in the real .docx
+// (the same anchor_index the format builder addresses). Captured as rendered so
+// an edit can be recognised by comparing against it, and so only what actually
+// changed is ever sent.
+let docBaseline = {};
+
+function captureDocBaseline(canvas) {
+  docBaseline = {};
+  canvas.querySelectorAll("[data-anchor-index]").forEach((el) => {
+    docBaseline[el.dataset.anchorIndex] = anchorText(el);
+  });
+}
+
+// A line's own text, excluding any field slot sitting inside it. The slot's
+// content belongs to the AI field, not to the document body, and folding it in
+// here would make every generated value look like a hand edit to the label.
+function anchorText(el) {
+  let out = "";
+  el.childNodes.forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      out += node.textContent;
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (node.hasAttribute && node.hasAttribute("data-field-key")) return;
+    out += anchorText(node);
+  });
+  return out.replace(/ /g, " ").trim();
+}
+
+// Only the lines the teacher actually changed, in the shape the export replays.
+// Put saved edits back on screen. The baseline stays as the untouched template
+// text on purpose: a restored edit is still a difference from the reference
+// file, so it keeps being sent on the next save rather than being mistaken for
+// the original wording and quietly dropped.
+function applyDocEdits(edits) {
+  const canvas = liveDocWrap.querySelector(".lp-doc");
+  if (!canvas || !Array.isArray(edits) || !edits.length) return;
+  edits.forEach((edit) => {
+    if (!edit || typeof edit.text !== "string") return;
+    const el = canvas.querySelector(`[data-anchor-index="${CSS.escape(String(edit.anchor_index))}"]`);
+    if (!el) return;
+    // Write only the line's own text, keeping any field slot that lives inside
+    // it: the slot belongs to the AI field, not to the body text being replaced.
+    const slot = el.querySelector("[data-field-key]");
+    el.textContent = edit.text;
+    if (slot) el.appendChild(slot);
+  });
+}
+
+function collectDocEdits() {
+  const canvas = liveDocWrap.querySelector(".lp-doc");
+  if (!canvas) return [];
+  const edits = [];
+  canvas.querySelectorAll("[data-anchor-index]").forEach((el) => {
+    const idx = parseInt(el.dataset.anchorIndex, 10);
+    if (Number.isNaN(idx)) return;
+    const now = anchorText(el);
+    if (docBaseline[el.dataset.anchorIndex] === undefined) return;
+    if (now === docBaseline[el.dataset.anchorIndex]) return;
+    edits.push({ anchor_index: idx, text: now });
+  });
+  return edits;
+}
+
 function wireLiveDocEditing() {
   const canvas = liveDocWrap.querySelector(".lp-doc");
   if (!canvas) return;
+
+  captureDocBaseline(canvas);
+
+  // The whole document is the teacher's to edit, not only the AI's slots. The
+  // slots stay marked so it is obvious which parts regenerating will overwrite,
+  // but every label, heading and cell around them takes typing too.
+  canvas.querySelectorAll("[data-anchor-index]").forEach((el) => {
+    el.contentEditable = "true";
+    el.addEventListener("input", () => markDirty());
+  });
   canvas.querySelectorAll("[data-field-key]").forEach((el) => {
     el.setAttribute("data-placeholder", "Not generated yet");
     el.addEventListener("input", () => {
@@ -1668,6 +1743,7 @@ function planPayload() {
     rich_field_values: fieldRichValues,
     mode_values: inactiveModeSlot(),
     setup_context: setupContext(),
+    doc_edits: collectDocEdits(),
     generation_mode: mode,
     is_public: visibilityCheckbox.checked,
   };
@@ -1796,6 +1872,7 @@ function saveDraft() {
         modeSlots,
         // Same shape the saved plan stores, from one definition.
         ...setupContext(),
+        docEdits: collectDocEdits(),
       }));
     } catch (err) {
       /* private mode or quota — the page still works, it just won't persist */
@@ -1902,6 +1979,9 @@ function applyOpenedPlan(plan) {
     }
 
     paintRestoredValues();
+    // After the values, so a slot re-parented by a replayed edit already holds
+    // its content rather than being blanked by the replay.
+    applyDocEdits(plan.doc_edits);
     // Make the visible mode (buttons, controls, owl chat, step locks) match
     // the mode this plan actually opened into — without this, a plan last
     // saved in Guided would show Building Proficiency's controls while
@@ -1939,6 +2019,7 @@ function restoreDraft() {
 
 
     paintRestoredValues();
+    applyDocEdits(draft.docEdits);
 
     if (draft.mode === "step") {
       const stepBtn = modeSwitchBtns.find((b) => b.dataset.mode === "step");

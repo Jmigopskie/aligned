@@ -227,6 +227,8 @@ def update_lesson_plan(plan_id):
     # not wipe the setup step the teacher already filled in.
     if "setup_context" in data:
         plan.set_setup_context(data.get("setup_context") or {})
+    if "doc_edits" in data:
+        plan.set_doc_edits(data.get("doc_edits") or [])
 
     db.session.commit()
     return jsonify({"status": "ok", "lesson_plan": plan.to_dict()})
@@ -253,6 +255,7 @@ def save_lesson_plan():
     plan.set_rich_values(data.get("rich_field_values") or {})
     plan.set_mode_values(data.get("mode_values") or {})
     plan.set_setup_context(data.get("setup_context") or {})
+    plan.set_doc_edits(data.get("doc_edits") or [])
 
     db.session.add(plan)
     db.session.commit()

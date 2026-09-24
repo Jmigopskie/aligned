@@ -4727,3 +4727,33 @@ body.auth-page::after {
   display: inline-flex;
   flex: 0 0 auto;
 }
+
+/* ---------------------------------------------------------------------------
+   Whole-document editing
+   --------------------------------------------------------------------------- */
+
+/* The document body is the teacher's to edit, so the caret has to be welcome
+   anywhere in it, not only in the AI's slots. */
+.lp-doc [data-anchor-index] {
+  cursor: text;
+}
+
+.lp-doc [data-anchor-index]:focus,
+.lp-doc [data-anchor-index]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* The AI's slots stay marked so it is obvious which parts regenerating will
+   overwrite. A tint rather than a box, since everything around them is now
+   editable too and boxing the slots would imply the rest is not. */
+.lp-doc .lp-field {
+  background: var(--primary-tint);
+  border-radius: 3px;
+}
+
+.lp-doc .lp-field.lp-filled {
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--primary-tint);
+}

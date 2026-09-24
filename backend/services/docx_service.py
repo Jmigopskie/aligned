@@ -154,6 +154,37 @@ def apply_content_edits(template_path, edits):
     doc.save(template_path)
     return deletions, applied
 
+def apply_doc_edits(doc, items, edits):
+    """Replay a plan's own document edits onto an open document, in place.
+
+    apply_content_edits() is the format builder's equivalent, and it saves the
+    template back to disk because the builder is editing the format itself. A
+    plan must never do that: its edits belong to one teacher's copy, not to the
+    shared format every other teacher generates from. So this takes a document
+    already in memory, changes it, and saves nothing.
+
+    Every entry is validated rather than trusted. An edit pointing at a position
+    that no longer exists, or carrying a non-numeric anchor, is skipped: the
+    reference file can be re-uploaded and re-detected after these were recorded,
+    and losing one stale line is far better than failing a teacher's export.
+    """
+    if not edits:
+        return 0
+
+    applied = 0
+    for edit in edits:
+        if not isinstance(edit, dict):
+            continue
+        idx = edit.get("anchor_index")
+        if isinstance(idx, bool) or not isinstance(idx, int):
+            continue
+        if not (0 <= idx < len(items)):
+            continue
+        _apply_paragraph_edit(doc, items[idx]["el"], edit)
+        applied += 1
+    return applied
+
+
 def _apply_paragraph_edit(doc, el, edit):
     if "text" in edit:
         _set_paragraph_text(doc, el, edit["text"])
@@ -1177,6 +1208,13 @@ def _export_from_template(plan, fmt, template_path) -> str:
     anchors = _locate_anchors(doc, items, fields_sorted)
     if not anchors:
         raise ValueError("No field labels from this format could be found in the reference file.")
+
+    # After _locate_anchors, deliberately. Anchors resolve by stored position
+    # first but fall back to matching a field's label text, and these edits can
+    # rewrite exactly that text, so resolving first keeps a renamed label from
+    # orphaning its own field. Before the fill, so the values land in the
+    # document the teacher actually edited.
+    apply_doc_edits(doc, items, plan.get_doc_edits())
 
     consumed = _fill_labeled_blanks(doc, items, fields_sorted, anchors, values)
 

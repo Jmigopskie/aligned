@@ -96,6 +96,8 @@ def _migrate_lesson_plan_columns():
         "mode_values": "TEXT",
         # The "Before we start" answers; see LessonPlan.setup_context.
         "setup_context": "TEXT",
+        # The teacher's edits to the document body; see LessonPlan.doc_edits.
+        "doc_edits": "TEXT",
     }
 
     for col_name, col_type in new_columns.items():
