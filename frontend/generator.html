@@ -57,7 +57,7 @@
       </aside>
 
       <main class="dash-main">
-      <a class="back-link" href="lesson-plan.html">&larr; Back to Lesson Plan</a>
+      <a class="back-link" href="lesson-plan.html"><span data-icon="arrowLeft"></span>Back to Lesson Plan</a>
 
       <div class="page-header">
         <h1 id="format-name">&nbsp;</h1>
@@ -114,12 +114,7 @@
                     <option value="college">College</option>
                   </select>
                 </div>
-                <div class="field" id="ctx-section-wrap">
-                  <label for="ctx-section">Section</label>
-                  <input type="text" id="ctx-section" placeholder="e.g. Section A" />
-                </div>
-
-                <div class="field full-width" id="ctx-k12-grade-wrap">
+                <div class="field" id="ctx-k12-grade-wrap">
                   <label for="ctx-k12-grade">Grade level</label>
                   <select id="ctx-k12-grade">
                     <option value="" disabled selected>Select grade level…</option>
@@ -133,6 +128,11 @@
                     <option value="Grade 11">Grade 11</option>
                     <option value="Grade 12">Grade 12</option>
                   </select>
+                </div>
+
+                <div class="field" id="ctx-section-wrap">
+                  <label for="ctx-section">Section</label>
+                  <input type="text" id="ctx-section" placeholder="e.g. Section A" />
                 </div>
 
                 <div class="field full-width intake-grid" id="ctx-college-fields-wrap" hidden>
@@ -193,7 +193,7 @@
           </section>
 
           <div class="generator-actions mt-24">
-            <button type="button" id="setup-continue-btn" class="btn btn-primary">Continue to generate &rarr;</button>
+            <button type="button" id="setup-continue-btn" class="btn btn-primary">Continue to generate<span data-icon="arrowRight"></span></button>
           </div>
         </div>
 
@@ -304,7 +304,7 @@
            already moved past. -->
       <div class="owl-chat-history" id="owl-chat-history" hidden>
         <div class="owl-chat-history-head">
-          <button type="button" class="owl-chat-back" id="owl-chat-history-back" hidden>&larr; All conversations</button>
+          <button type="button" class="owl-chat-back" id="owl-chat-history-back" hidden><span data-icon="arrowLeft"></span>All conversations</button>
           <span id="owl-chat-history-title">Saved conversations</span>
         </div>
         <div class="owl-chat-history-list" id="owl-chat-history-list"></div>

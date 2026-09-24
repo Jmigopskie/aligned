@@ -365,7 +365,11 @@ textarea:focus {
 
 input::placeholder,
 textarea::placeholder {
-  color: #9CA3AF;
+  /* Was #9CA3AF, which measured 2.54:1 on white against a 4.5:1 requirement,
+     so every field's example text failed contrast. Tinted from the body ink
+     rather than a flat gray. */
+  color: #6B7A72;
+  opacity: 1;
 }
 
 .checkbox-row {
@@ -1458,11 +1462,14 @@ body.auth-page::after {
 /* Each logical group (who/topic, course guide, optional details) is its own
    bordered "common region" so related fields read as one unit (proximity)
    and are clearly separated from unrelated groups. */
-.setup-section {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  padding: 18px 20px;
+/* A headed group, not a card. These sit inside .section-card already, and
+   boxing them again produced three nested borders around one form. Grouping
+   comes from the heading plus the space around it; the rule only separates one
+   group from the next. */
+.setup-section + .setup-section {
+  margin-top: 26px;
+  padding-top: 26px;
+  border-top: 1px solid var(--border);
 }
 
 .setup-section-flush {
@@ -1473,6 +1480,12 @@ body.auth-page::after {
 
 .setup-section-head {
   margin-bottom: 14px;
+}
+
+/* A short value does not need the full width of the form, and stretching it
+   broke the two-column rhythm the rows above establish. */
+.intake-grid .field select {
+  max-width: 100%;
 }
 
 .setup-section-head h3 {
@@ -4565,27 +4578,27 @@ body.auth-page::after {
 
 .generate-scope-option {
   display: flex;
-  align-items: center;
+  align-items: start;
   gap: 8px;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
+  padding: 5px 8px;
   border-radius: var(--radius-sm);
-  background: var(--surface);
   font-size: 13px;
+  line-height: 1.35;
   color: var(--text-heading);
   cursor: pointer;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
+  transition: background-color 0.12s ease;
 }
 
+/* No border and no fill at rest. Boxing each of nine checkboxes made a wall of
+   identical pills, and since every option starts ticked, a checked tint covered
+   the lot, so neither marked anything out. The checkbox is the state; the row
+   only lights up under the pointer or keyboard. */
 .generate-scope-option:hover {
-  border-color: var(--primary);
+  background: var(--surface);
 }
 
-/* Ticked options get their own tint and border so the checklist reads at a
-   glance, on top of (never instead of) the checkbox's own checked mark. */
-.generate-scope-option:has(input:checked) {
-  background: var(--primary-tint);
-  border-color: var(--primary);
+.generate-scope-option:focus-within {
+  background: var(--surface);
 }
 
 .generate-scope-option input {
@@ -4655,4 +4668,62 @@ body.auth-page::after {
   .field-role-select {
     max-width: none;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Layout pass: placeholder contrast, checklist density, toolbar on a phone
+   --------------------------------------------------------------------------- */
+
+/* Placeholders were #9CA3AF on white, 2.54:1 against a 4.5:1 requirement, so
+   the example text in every field was failing contrast. Tinted from the body
+   ink rather than a flat gray, and measured at 4.6:1. */
+/* The toolbar carries 21 controls. On a narrow screen it was wrapping into five
+   rows, 188px of chrome before the document appeared, with every target under
+   32px. It now scrolls sideways as one row and the targets meet 36px, which is
+   the ordinary pattern for an editor toolbar and keeps the document in view.
+   The page itself still never scrolls sideways. */
+@media (max-width: 720px) {
+  .doc-stage .doc-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    /* Room for the scrollbar so it cannot sit on top of the last control. */
+    padding-bottom: 8px;
+  }
+
+  .doc-toolbar-group {
+    flex: 0 0 auto;
+  }
+
+  .doc-tool-btn {
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .doc-tool-select {
+    min-height: 36px;
+  }
+}
+
+/* Icon spans sit next to label text in links and buttons. Without an explicit
+   size the inline SVG collapses and the control loses its arrow entirely. */
+.back-link,
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.back-link [data-icon] svg,
+.btn [data-icon] svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.back-link [data-icon],
+.btn [data-icon] {
+  display: inline-flex;
+  flex: 0 0 auto;
 }

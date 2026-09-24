@@ -2557,6 +2557,15 @@ saveBtn.addEventListener("click", async () => {
 
 document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("lesson-plan");
 
+// Page-level icon spans (the back link, the continue button). The toolbar
+// paints its own via paintDocToolbarIcons; this covers the rest, matching how
+// format-builder.js already does it, so no control ships a bare arrow glyph.
+document.querySelectorAll("[data-icon]").forEach((el) => {
+  if (el.closest(".doc-toolbar")) return;
+  const icon = Icons[el.dataset.icon];
+  if (icon) el.innerHTML = icon;
+});
+
 async function init() {
   const user = await requireAuth();
   if (!user) return;
