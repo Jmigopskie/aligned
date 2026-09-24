@@ -194,9 +194,17 @@ function draftProgress(plan) {
     return String(v == null ? "" : v).trim();
   }).length;
   const total = Object.keys(values).length;
-  if (!total) return "Nothing filled in yet";
-  if (filled === total) return `All ${total} fields filled in`;
-  return `${filled} of ${total} fields filled in`;
+  // Editing the document body is real work on the plan, so a card must not
+  // report "nothing filled in yet" over it. It counts separately from the AI
+  // fields because the two are different kinds of progress.
+  const edits = (plan.doc_edits || []).length;
+  const editNote = edits ? `${edits} document edit${edits === 1 ? "" : "s"}` : "";
+
+  if (!total) return editNote || "Nothing filled in yet";
+  const fieldNote = filled === total
+    ? `All ${total} fields filled in`
+    : `${filled} of ${total} fields filled in`;
+  return editNote ? `${fieldNote}, ${editNote}` : fieldNote;
 }
 
 function renderDrafts(plans) {

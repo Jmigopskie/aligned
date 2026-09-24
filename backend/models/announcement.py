@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from extensions import db
+from extensions import db, iso_utc
 
 ANNOUNCEMENT_TYPES = ("info", "maintenance", "urgent")
 
@@ -58,8 +58,8 @@ class Announcement(db.Model):
             "section_id": self.section_id,
             "section_name": self.section.name if self.section else None,
             "is_active": self.is_active,
-            "starts_at": self.starts_at.isoformat() if self.starts_at else None,
-            "ends_at": self.ends_at.isoformat() if self.ends_at else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "starts_at": iso_utc(self.starts_at),
+            "ends_at": iso_utc(self.ends_at),
+            "created_at": iso_utc(self.created_at),
+            "updated_at": iso_utc(self.updated_at),
         }

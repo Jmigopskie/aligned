@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from extensions import db
+from extensions import db, iso_utc
 from services import field_roles
 
 class LessonPlanFormat(db.Model):
@@ -37,7 +37,7 @@ class LessonPlanFormat(db.Model):
             "source_file_path": self.source_file_path,
             "has_source_file": bool(self.source_file_path),
             "has_template_docx": bool(self.template_docx_path),
-            "created_at": self.created_at.isoformat(),
+            "created_at": iso_utc(self.created_at),
         }
         if include_fields:
             data["fields"] = [f.to_dict() for f in self.fields]

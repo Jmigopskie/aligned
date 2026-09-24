@@ -2,7 +2,7 @@ import secrets
 import string
 from datetime import datetime
 
-from extensions import db
+from extensions import db, iso_utc
 
 JOIN_CODE_ALPHABET = string.ascii_uppercase + string.digits
 JOIN_CODE_LENGTH = 6
@@ -46,7 +46,7 @@ class Section(db.Model):
             "grade_level": self.grade_level,
             "join_code": self.join_code,
             "is_active": bool(self.is_active),
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
         }
         if include_counts:
             data["student_count"] = len(self.memberships)
@@ -77,5 +77,5 @@ class SectionMembership(db.Model):
             "student_id": self.student_id,
             "student_name": self.student.full_name if self.student else None,
             "student_email": self.student.email if self.student else None,
-            "joined_at": self.joined_at.isoformat() if self.joined_at else None,
+            "joined_at": iso_utc(self.joined_at),
         }

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from extensions import db
+from extensions import db, iso_utc
 
 
 class Notification(db.Model):
@@ -31,5 +31,5 @@ class Notification(db.Model):
             "message": self.message,
             "link": self.link,
             "is_read": self.is_read,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
         }

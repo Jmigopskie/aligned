@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from extensions import db
+from extensions import db, iso_utc
 
 class CourseGuide(db.Model):
 
@@ -23,5 +23,5 @@ class CourseGuide(db.Model):
             "subject": self.subject,
             "title": self.title,
             "uploaded_by": self.uploader.full_name if self.uploader else None,
-            "created_at": self.created_at.isoformat(),
+            "created_at": iso_utc(self.created_at),
         }

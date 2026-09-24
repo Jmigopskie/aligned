@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from extensions import db, bcrypt
+from extensions import db, bcrypt, iso_utc
 
 class User(db.Model):
     __tablename__ = "users"
@@ -50,5 +50,5 @@ class User(db.Model):
             "is_active": self.is_active,
             "avatar_url": f"/api/avatars/{self.id}" if self.avatar_path else None,
             "banner_url": f"/api/banners/{banner_owner.id}" if banner_owner else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
         }

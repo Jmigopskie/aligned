@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from extensions import db
+from extensions import db, iso_utc
 
 class LessonPlan(db.Model):
     __tablename__ = "lesson_plans"
@@ -143,12 +143,12 @@ class LessonPlan(db.Model):
             "status": self.status,
             "teacher_feedback": self.teacher_feedback,
             "score": self.score,
-            "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
-            "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
+            "submitted_at": iso_utc(self.submitted_at),
+            "reviewed_at": iso_utc(self.reviewed_at),
             "is_public": bool(self.is_public),
             "mode_values": self.get_mode_values(),
             "setup_context": self.get_setup_context(),
             "doc_edits": self.get_doc_edits(),
-            "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat(),
+            "created_at": iso_utc(self.created_at),
+            "updated_at": iso_utc(self.updated_at),
         }
