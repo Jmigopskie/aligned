@@ -673,10 +673,24 @@ function getAdvancedContext() {
 
 let gateWasReady = false;
 
-// Whether the teacher is past "Before we start" and actually editing. The owl
-// keys off this as well as the mode, so it cannot appear over the setup form.
+// Whether the teacher is past "Before we start" and actually editing.
 function isEditorUnlocked() {
   return !unlockedContent.hidden;
+}
+
+// The owl belongs on screen only while the teacher is actually being guided
+// through fields: Guided mode, past the setup gate, and on the tab that shows
+// the document. Keying it off the mode alone left it floating over the setup
+// form, and keying it off the gate as well still left it on the Setup tab,
+// because the tabs live inside the gated content and switching them does not
+// change that flag. One predicate now answers the question, and everything
+// that can change the answer calls syncOwlVisibility().
+function shouldShowOwlChat() {
+  return mode === "step" && isEditorUnlocked() && !tabPanelGenerate.hidden;
+}
+
+function syncOwlVisibility() {
+  showOwlChat(shouldShowOwlChat());
 }
 
 function updateGate() {
@@ -690,7 +704,7 @@ function updateGate() {
 
   // The owl's visibility depends on this gate, so it has to be re-checked
   // whenever the gate moves rather than only when the mode changes.
-  showOwlChat(mode === "step" && ready);
+  syncOwlVisibility();
 
   if (ready && !gateWasReady) {
     setOwlState("guide", "Nice — you're all set. Head to “Generate & review” when you're ready.");
@@ -718,6 +732,8 @@ function goToTab(tabName) {
   genTabsEl.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tabName));
   tabPanelSetup.hidden = tabName !== "setup";
   tabPanelGenerate.hidden = tabName !== "generate";
+  // The document lives on the generate tab, so the owl leaves with it.
+  syncOwlVisibility();
   if (tabName === "generate") {
     window.scrollTo({ top: 0, behavior: "smooth" });
     if (!hasAnyValue()) {
@@ -1964,11 +1980,9 @@ function syncModeUI() {
   modeSwitchBtns.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
   fullControls.hidden = mode !== "full";
   stepControls.hidden = mode !== "step";
-  // Guided mode alone is not enough: the owl is a fixed-position element
-  // outside the gated content, so hiding the editor does not hide it. Opening a
-  // plan whose saved mode is Guided used to float the chat over the "Before we
-  // start" form, offering help with a field the teacher cannot even see yet.
-  showOwlChat(mode === "step" && isEditorUnlocked());
+  // The owl is a fixed-position element outside the gated content, so nothing
+  // about hiding the editor or switching tabs hides it on its own.
+  syncOwlVisibility();
 
   // Named once so both branches below can append the same reassurance without
   // repeating the lookup.
