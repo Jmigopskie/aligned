@@ -673,6 +673,12 @@ function getAdvancedContext() {
 
 let gateWasReady = false;
 
+// Whether the teacher is past "Before we start" and actually editing. The owl
+// keys off this as well as the mode, so it cannot appear over the setup form.
+function isEditorUnlocked() {
+  return !unlockedContent.hidden;
+}
+
 function updateGate() {
   const teacherOk = teacherNameInput.value.trim().length > 0;
   const subjectOk = subjectInput.value.trim().length > 0;
@@ -681,6 +687,10 @@ function updateGate() {
 
   gateLock.hidden = ready;
   unlockedContent.hidden = !ready;
+
+  // The owl's visibility depends on this gate, so it has to be re-checked
+  // whenever the gate moves rather than only when the mode changes.
+  showOwlChat(mode === "step" && ready);
 
   if (ready && !gateWasReady) {
     setOwlState("guide", "Nice — you're all set. Head to “Generate & review” when you're ready.");
@@ -1591,6 +1601,44 @@ let serverSaveInFlight = false;
 // in another tab). Autosaving stops rather than retrying into a wall.
 let serverSaveLocked = false;
 
+// The "Before we start" answers, in one shape used by both the localStorage
+// draft and the saved plan. They had no home on the plan row before, so
+// reopening one dropped the teacher back into that form with the fields blank:
+// grade_level only holds a display string that cannot be split back into the
+// dropdowns it came from, and the course guide the gate insists on was never
+// stored at all.
+function setupContext() {
+  return {
+    setup: {
+      teacher: teacherNameInput.value,
+      subject: subjectInput.value,
+      topic: topicInput.value,
+      levelType: levelTypeSelect.value,
+      collegeProgram: collegeProgramInput.value,
+      collegeYear: collegeYearSelect.value,
+      k12Grade: k12GradeSelect.value,
+      section: sectionInput.value,
+    },
+    courseGuide: selectedCourseGuide,
+  };
+}
+
+// Puts a saved setup block back on screen. Shared by the draft restore and the
+// plan restore so the two can never drift into filling different fields.
+function applySetupContext(ctx) {
+  const setup = (ctx && ctx.setup) || {};
+  if (setup.teacher) teacherNameInput.value = setup.teacher;
+  if (setup.subject) subjectInput.value = setup.subject;
+  if (setup.topic) topicInput.value = setup.topic;
+  if (setup.levelType) levelTypeSelect.value = setup.levelType;
+  if (setup.collegeProgram) collegeProgramInput.value = setup.collegeProgram;
+  if (setup.collegeYear) collegeYearSelect.value = setup.collegeYear;
+  if (setup.k12Grade) k12GradeSelect.value = setup.k12Grade;
+  if (setup.section) sectionInput.value = setup.section;
+  updateLevelFields();
+  if (ctx && ctx.courseGuide) selectCourseGuide(ctx.courseGuide);
+}
+
 function planPayload() {
   // The active slot must be current before it (or the inactive one below) is
   // read, or a save right after typing could ship a stale mode_values.
@@ -1603,6 +1651,7 @@ function planPayload() {
     field_values: fieldValues,
     rich_field_values: fieldRichValues,
     mode_values: inactiveModeSlot(),
+    setup_context: setupContext(),
     generation_mode: mode,
     is_public: visibilityCheckbox.checked,
   };
@@ -1729,17 +1778,8 @@ function saveDraft() {
         fieldValues,
         fieldRichValues,
         modeSlots,
-        courseGuide: selectedCourseGuide,
-        setup: {
-          teacher: teacherNameInput.value,
-          subject: subjectInput.value,
-          topic: topicInput.value,
-          levelType: levelTypeSelect.value,
-          collegeProgram: collegeProgramInput.value,
-          collegeYear: collegeYearSelect.value,
-          k12Grade: k12GradeSelect.value,
-          section: sectionInput.value,
-        },
+        // Same shape the saved plan stores, from one definition.
+        ...setupContext(),
       }));
     } catch (err) {
       /* private mode or quota — the page still works, it just won't persist */
@@ -1817,6 +1857,10 @@ function applyOpenedPlan(plan) {
       stepIndex: stored.step_index || 0,
     };
     if (plan.generation_mode) mode = plan.generation_mode;
+    // Before anything reads the gate: without the course guide and the level
+    // parts this restores, updateGate() stays locked and the teacher is sent
+    // back through "Before we start" on a plan they already filled in.
+    applySetupContext(plan.setup_context);
     if (plan.subject) subjectInput.value = plan.subject;
     if (plan.is_public) visibilityCheckbox.checked = true;
 
@@ -1868,16 +1912,7 @@ function restoreDraft() {
 
   restoringDraft = true;
   try {
-    const setup = draft.setup || {};
-    if (setup.teacher) teacherNameInput.value = setup.teacher;
-    if (setup.subject) subjectInput.value = setup.subject;
-    if (setup.topic) topicInput.value = setup.topic;
-    if (setup.levelType) levelTypeSelect.value = setup.levelType;
-    if (setup.collegeProgram) collegeProgramInput.value = setup.collegeProgram;
-    if (setup.collegeYear) collegeYearSelect.value = setup.collegeYear;
-    if (setup.k12Grade) k12GradeSelect.value = setup.k12Grade;
-    if (setup.section) sectionInput.value = setup.section;
-    updateLevelFields();
+    applySetupContext(draft);
 
     fieldValues = draft.fieldValues || {};
     fieldRichValues = draft.fieldRichValues || {};
@@ -1886,7 +1921,6 @@ function restoreDraft() {
     planId = draft.planId || null;
     stepIndex = draft.stepIndex || 0;
 
-    if (draft.courseGuide) selectCourseGuide(draft.courseGuide);
 
     paintRestoredValues();
 
@@ -1930,7 +1964,11 @@ function syncModeUI() {
   modeSwitchBtns.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
   fullControls.hidden = mode !== "full";
   stepControls.hidden = mode !== "step";
-  showOwlChat(mode === "step");
+  // Guided mode alone is not enough: the owl is a fixed-position element
+  // outside the gated content, so hiding the editor does not hide it. Opening a
+  // plan whose saved mode is Guided used to float the chat over the "Before we
+  // start" form, offering help with a field the teacher cannot even see yet.
+  showOwlChat(mode === "step" && isEditorUnlocked());
 
   // Named once so both branches below can append the same reassurance without
   // repeating the lookup.

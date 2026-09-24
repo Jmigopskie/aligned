@@ -43,6 +43,15 @@ class LessonPlan(db.Model):
     # {"field_values": {...}, "rich_field_values": {...}, "step_index": int}
     mode_values = db.Column(db.Text)
 
+    # Everything the "Before we start" step asked for, stored verbatim as JSON:
+    # the topic, the level and its parts, the section, and the chosen course
+    # guide. None of it had a home before, so reopening a saved plan dropped the
+    # teacher back into that form with the fields blank. grade_level is not a
+    # substitute: it holds a display string ("Grade 7 - Campos") that cannot be
+    # split back into the dropdowns it came from, and the course guide the gate
+    # insists on was never stored at all.
+    setup_context = db.Column(db.Text)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -57,6 +66,21 @@ class LessonPlan(db.Model):
 
     def set_rich_values(self, values: dict):
         self.rich_field_values = json.dumps(values or {})
+
+    def get_setup_context(self):
+        """The saved setup step, or {} when there isn't one.
+
+        Returns {} rather than None for a plan saved before this column existed
+        and for unparseable content, so the page never needs a null check.
+        """
+        try:
+            value = json.loads(self.setup_context or "{}")
+        except ValueError:
+            return {}
+        return value if isinstance(value, dict) else {}
+
+    def set_setup_context(self, value: dict):
+        self.setup_context = json.dumps(value or {})
 
     def get_mode_values(self):
         """The inactive mode's slot, or {} when there isn't one.
@@ -98,6 +122,7 @@ class LessonPlan(db.Model):
             "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
             "is_public": bool(self.is_public),
             "mode_values": self.get_mode_values(),
+            "setup_context": self.get_setup_context(),
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }

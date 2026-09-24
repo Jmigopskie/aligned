@@ -223,6 +223,10 @@ def update_lesson_plan(plan_id):
         plan.set_rich_values(data.get("rich_field_values") or {})
     if "mode_values" in data:
         plan.set_mode_values(data.get("mode_values") or {})
+    # Key presence, not truthiness: an autosave carrying only field values must
+    # not wipe the setup step the teacher already filled in.
+    if "setup_context" in data:
+        plan.set_setup_context(data.get("setup_context") or {})
 
     db.session.commit()
     return jsonify({"status": "ok", "lesson_plan": plan.to_dict()})
@@ -248,6 +252,7 @@ def save_lesson_plan():
     plan.set_values(data.get("field_values") or {})
     plan.set_rich_values(data.get("rich_field_values") or {})
     plan.set_mode_values(data.get("mode_values") or {})
+    plan.set_setup_context(data.get("setup_context") or {})
 
     db.session.add(plan)
     db.session.commit()

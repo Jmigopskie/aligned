@@ -94,6 +94,8 @@ def _migrate_lesson_plan_columns():
         "is_public": "BOOLEAN NOT NULL DEFAULT 0",
         # The inactive generation mode's values; see LessonPlan.mode_values.
         "mode_values": "TEXT",
+        # The "Before we start" answers; see LessonPlan.setup_context.
+        "setup_context": "TEXT",
     }
 
     for col_name, col_type in new_columns.items():

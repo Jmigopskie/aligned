@@ -215,6 +215,66 @@ def main():
         db.session.commit()
         assert plain.to_dict()["mode_values"] == {}
 
+        # --- Setup context round trip -----------------------------------------
+        # Reopening a saved plan used to drop the teacher straight back into the
+        # "Before we start" form, because the only setup detail the row kept was
+        # grade_level, and that as a display string ("Grade 7 - Campos") rather
+        # than its parts. The course guide in particular is required by the
+        # page's gate, so a plan with no stored guide could never reopen past
+        # setup no matter how much content it held. The whole setup block now
+        # rides along verbatim.
+        login(student_id)
+        setup_ctx = {
+            "setup": {
+                "teacher": "John Mark V. Aguirre",
+                "subject": "ICT",
+                "topic": "Conversion of number system",
+                "levelType": "k12",
+                "collegeProgram": "",
+                "collegeYear": "",
+                "k12Grade": "Grade 7",
+                "section": "Campos",
+            },
+            "courseGuide": {"id": 3, "title": "ICT Grade 7 Guide", "subject": "ICT"},
+        }
+        res = client.post("/api/lesson-plans", json={
+            "format_id": format_id,
+            "title": "With setup",
+            "subject": "ICT",
+            "setup_context": setup_ctx,
+        })
+        assert res.status_code == 201, res.status_code
+        ctx_id = res.get_json()["lesson_plan"]["id"]
+
+        got = client.get(f"/api/lesson-plans/{ctx_id}").get_json()["lesson_plan"]
+        assert got["setup_context"]["setup"]["topic"] == "Conversion of number system", got["setup_context"]
+        assert got["setup_context"]["setup"]["k12Grade"] == "Grade 7"
+        assert got["setup_context"]["setup"]["section"] == "Campos"
+        # The guide is the one the gate insists on, so it must survive.
+        assert got["setup_context"]["courseGuide"]["id"] == 3, got["setup_context"]
+
+        # A PATCH that omits it leaves it alone, exactly like mode_values: the
+        # autosave sometimes carries only field values.
+        res = client.patch(f"/api/lesson-plans/{ctx_id}", json={"title": "Renamed again"})
+        kept = res.get_json()["lesson_plan"]
+        assert kept["setup_context"]["courseGuide"]["id"] == 3, kept["setup_context"]
+
+        # Present but empty clears it, which is a deliberate instruction.
+        res = client.patch(f"/api/lesson-plans/{ctx_id}", json={"setup_context": {}})
+        assert res.get_json()["lesson_plan"]["setup_context"] == {}
+
+        # A plan saved before this column existed reads as {}, never None, so
+        # the page can use it without a null check.
+        legacy = LessonPlan(user_id=student_id, format_id=format_id, title="Legacy")
+        db.session.add(legacy)
+        db.session.commit()
+        assert legacy.to_dict()["setup_context"] == {}, legacy.to_dict()["setup_context"]
+
+        # Junk degrades to {} rather than raising.
+        legacy.setup_context = "not json"
+        db.session.commit()
+        assert legacy.to_dict()["setup_context"] == {}
+
     print("lesson plan drafts OK")
 
 
