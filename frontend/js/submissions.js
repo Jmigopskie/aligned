@@ -112,7 +112,7 @@ async function loadSubmissions() {
 
 function renderSubmissions(plans) {
   if (!plans.length) {
-    submissionsList.innerHTML = `<div class="empty-state"><h3>Nothing here yet</h3><p>Submitted lesson plans for this section will show up here.</p></div>`;
+    submissionsList.innerHTML = `<div class="empty-state"><h2>Nothing here yet</h2><p>Submitted lesson plans for this section will show up here.</p></div>`;
     return;
   }
 

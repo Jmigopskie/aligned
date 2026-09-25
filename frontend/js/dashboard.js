@@ -73,6 +73,9 @@ function fmtDate(iso) {
 }
 
 function renderRecentPlans(plans) {
+  // Column headings over nothing read as a broken table, so they only show
+  // once there is a row to label.
+  recentBody.closest("table").tHead.hidden = !plans.length;
   if (!plans.length) {
     recentBody.innerHTML = `
       <tr class="table-empty-row">

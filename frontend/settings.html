@@ -21,7 +21,7 @@
         <img src="img/Icon.png" alt="" />
         <div>
           <div class="brand-name">AlignED</div>
-          <div class="brand-sub">Lesson Plan Maker</div>
+          <div class="brand-sub">TLE-ICT Lesson Plan Maker</div>
         </div>
       </div>
       <div class="topbar-actions">
@@ -56,16 +56,21 @@
         </div>
       </aside>
 
-      <main class="dash-main" style="max-width:640px;">
-        <h1 class="dash-page-title">Settings</h1>
+      <main class="dash-main settings-main">
+        <div class="page-header">
+          <div class="page-heading">
+            <h1 class="dash-page-title">Settings</h1>
+            <p class="page-subtitle">Your photo, profile, password and session.</p>
+          </div>
+        </div>
 
         <div id="settings-error" class="alert alert-error" hidden></div>
 
-        <div class="panel" style="margin-bottom:20px;">
+        <div class="panel settings-panel">
           <div class="settings-panel-head">
             <span class="avatar-chip js-user-initials settings-avatar">&nbsp;</span>
             <div>
-              <h3 class="js-user-name" style="margin:0; font-size:16px;">&nbsp;</h3>
+              <p class="js-user-name panel-title">&nbsp;</p>
               <span class="badge" id="profile-role-badge">&nbsp;</span>
               <span class="text-sm" id="profile-member-since"></span>
             </div>
@@ -75,27 +80,27 @@
             <button type="button" class="btn btn-ghost btn-sm" id="avatar-remove-btn" hidden>Remove photo</button>
             <input type="file" id="avatar-file-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
           </div>
-          <p class="hint" style="margin-top:8px;">PNG, JPG, WEBP, or GIF. It'll be cropped to a square.</p>
+          <p class="hint">PNG, JPG, WEBP, or GIF. It'll be cropped to a square.</p>
         </div>
 
-        <div class="panel js-role-action" data-role="teacher" style="margin-bottom:20px;" hidden>
-          <h3 style="font-size:15px; margin-bottom:12px;">Dashboard banner</h3>
-          <img id="banner-preview" src="" alt="" style="width:100%; max-height:140px; object-fit:cover; border-radius:10px; display:none; margin-bottom:12px;" />
+        <div class="panel settings-panel js-role-action" data-role="teacher" hidden>
+          <h2 class="panel-title">Dashboard banner</h2>
+          <img id="banner-preview" class="banner-preview" alt="" />
           <div class="flex gap-8">
             <button type="button" class="btn btn-secondary btn-sm" id="banner-upload-btn">Change banner</button>
             <button type="button" class="btn btn-ghost btn-sm" id="banner-remove-btn" hidden>Remove banner</button>
             <input type="file" id="banner-file-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
           </div>
-          <p class="hint" style="margin-top:8px;">Shown on your dashboard, and on the dashboard of every student in your sections.</p>
+          <p class="hint">Shown on your dashboard, and on the dashboard of every student in your sections.</p>
         </div>
 
-        <form id="profile-form" class="panel" style="margin-bottom:20px;">
-          <h3 style="font-size:15px; margin-bottom:16px;">Profile</h3>
+        <form id="profile-form" class="panel settings-panel">
+          <h2 class="panel-title">Profile</h2>
           <div class="field">
             <label for="profile-name">Full name</label>
             <input type="text" id="profile-name" required />
           </div>
-          <div class="field" style="margin-bottom:0;">
+          <div class="field field-last">
             <label for="profile-email">Email</label>
             <input type="email" id="profile-email" required />
           </div>
@@ -105,9 +110,9 @@
           </div>
         </form>
 
-        <form id="password-form" class="panel" style="margin-bottom:20px;">
-          <h3 style="font-size:15px; margin-bottom:6px;">Change password</h3>
-          <p class="text-sm mt-0" style="margin-bottom:16px;">Use at least 8 characters.</p>
+        <form id="password-form" class="panel settings-panel">
+          <h2 class="panel-title">Change password</h2>
+          <p class="text-sm panel-note">Use at least 8 characters.</p>
           <div class="field">
             <label for="current-password">Current password</label>
             <input type="password" id="current-password" autocomplete="current-password" required />
@@ -116,7 +121,7 @@
             <label for="new-password">New password</label>
             <input type="password" id="new-password" autocomplete="new-password" minlength="8" required />
           </div>
-          <div class="field" style="margin-bottom:0;">
+          <div class="field field-last">
             <label for="confirm-password">Confirm new password</label>
             <input type="password" id="confirm-password" autocomplete="new-password" minlength="8" required />
           </div>
@@ -127,8 +132,8 @@
         </form>
 
         <div class="panel">
-          <h3 style="font-size:15px; margin-bottom:6px;">Session</h3>
-          <p class="text-sm mt-0" style="margin-bottom:16px;">Log out of AlignED on this device.</p>
+          <h2 class="panel-title">Session</h2>
+          <p class="text-sm panel-note">Log out of AlignED on this device.</p>
           <button class="btn btn-danger" id="logout-btn2" type="button">Log out</button>
         </div>
       </main>

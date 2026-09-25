@@ -147,6 +147,10 @@ const cgDropzone = document.getElementById("cg-dropzone");
 const cgFileInput = document.getElementById("cg-file-input");
 const cgSelectedEl = document.getElementById("cg-selected");
 const gateLock = document.getElementById("gate-lock");
+// The locked Generate tab's way out: the tab button does the real switching.
+document.getElementById("gate-setup-btn").addEventListener("click", () => {
+  document.querySelector('[data-tab="setup"]').click();
+});
 const unlockedContent = document.getElementById("unlocked-content");
 
 const genTabsEl = document.getElementById("gen-tabs");

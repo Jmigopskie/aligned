@@ -89,7 +89,7 @@ function renderResults(guides) {
   const filtered = hasFilters();
   resultsEmpty.hidden = guides.length > 0;
   clearFiltersBtn.hidden = !filtered;
-  resultsEmpty.querySelector("h3").textContent = filtered ? "No guides match these filters" : "No course guides yet";
+  resultsEmpty.querySelector("h2").textContent = filtered ? "No guides match these filters" : "No course guides yet";
   resultsEmpty.querySelector("p").textContent = filtered
     ? "Try another grade or subject, or clear the filters to see every guide."
     : "Be the first to upload a course guide for other teachers to use.";
