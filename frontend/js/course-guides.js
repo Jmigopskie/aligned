@@ -29,7 +29,7 @@ function renderResults(guides, searchedSubject) {
     resultsEmpty.hidden = false;
     if (searchedSubject) {
       resultsEmpty.querySelector("h3").textContent = "No course guides found";
-      resultsEmpty.querySelector("p").textContent = "No one has shared a guide for this TLE-ICT topic yet — be the first to upload one.";
+      resultsEmpty.querySelector("p").textContent = "No one has shared a guide for this topic yet. Be the first to upload one.";
     } else {
       resultsEmpty.querySelector("h3").textContent = "No course guides yet";
       resultsEmpty.querySelector("p").textContent = "Be the first to upload a TLE-ICT course guide for other teachers to use.";

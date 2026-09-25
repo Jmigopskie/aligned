@@ -653,10 +653,10 @@ levelTypeSelect.addEventListener("change", updateLevelFields);
 function getClassLabel() {
   if (levelTypeSelect.value === "college") {
     const parts = [collegeProgramInput.value.trim(), collegeYearSelect.value.trim(), sectionInput.value.trim()].filter(Boolean);
-    return parts.join(" — ");
+    return parts.join(" · ");
   }
   const parts = [k12GradeSelect.value.trim(), sectionInput.value.trim()].filter(Boolean);
-  return parts.join(" — ");
+  return parts.join(" · ");
 }
 
 function getAdvancedContext() {
@@ -707,7 +707,7 @@ function updateGate() {
   syncOwlVisibility();
 
   if (ready && !gateWasReady) {
-    setOwlState("guide", "Nice — you're all set. Head to “Generate & review” when you're ready.");
+    setOwlState("guide", "Nice, you're all set. Head to “Generate & review” when you're ready.");
   }
   gateWasReady = ready;
 
@@ -737,10 +737,10 @@ function goToTab(tabName) {
   if (tabName === "generate") {
     window.scrollTo({ top: 0, behavior: "smooth" });
     if (!hasAnyValue()) {
-      setOwlState("guide", "Pick “Building Proficiency” or “Guided mode,” then click Generate — I'll help write it.");
+      setOwlState("guide", "Pick “Building Proficiency” or “Guided mode,” then click Generate. I'll help write it.");
     }
   } else if (tabName === "setup") {
-    setOwlState("idle", "Let's set up your lesson plan — tell me who's teaching and what subject.");
+    setOwlState("idle", "Let's set up your lesson plan. Tell me who's teaching and what subject.");
   }
 }
 
@@ -866,7 +866,7 @@ async function handleCourseGuideUpload(file) {
     selectCourseGuide(data.course_guide);
     showToast(
       data.duplicate
-        ? "This course guide is already in the shared library — using the existing copy."
+        ? "This course guide is already in the shared library, so the existing copy is used."
         : "Course guide added to the shared library."
     );
   } catch (err) {
@@ -1045,14 +1045,16 @@ function renderStepFieldNav() {
     // Disabled (locked) still goes purely by position: staying reachable and
     // unlocked when it's before the cursor is what lets the teacher go back
     // and fix it, whether or not it's currently complete.
+    // Words, not symbols: an <option> can't hold an icon, and emoji or
+    // geometric glyphs render differently on every OS.
     opt.textContent =
       i === stepIndex
-        ? `▸ ${label} (current)`
+        ? `${label} (current)`
         : i > stepIndex
-        ? `🔒 ${label}`
+        ? `${label} (locked)`
         : isFieldComplete(key)
-        ? `✓ ${label}`
-        : `○ ${label}`;
+        ? `${label} (done)`
+        : label;
     opt.disabled = i > stepIndex;
     sectionNav.appendChild(opt);
   });
@@ -1672,7 +1674,7 @@ function maybeRenderResults() {
 
 function markDirty() {
   dirty = true;
-  saveStatus.textContent = "Unsaved changes — save to export the latest version.";
+  saveStatus.textContent = "Unsaved changes. Save to export the latest version.";
   exportBtn.style.pointerEvents = "none";
   exportBtn.style.opacity = "0.5";
   saveDraft();
@@ -1755,8 +1757,8 @@ function planTitle() {
   // Topic first when there is one: a teacher's drafts are nearly all the same
   // subject and format, so "Subject — Format" would give every card in the
   // "continue where you left off" strip an identical name.
-  if (topic) return `${topic}${subject ? ` — ${subject}` : ""}`;
-  if (subject) return `${subject} — ${fmt.name}`;
+  if (topic) return `${topic}${subject ? ` · ${subject}` : ""}`;
+  if (subject) return `${subject} · ${fmt.name}`;
   return `Untitled ${fmt.name}`;
 }
 
@@ -1810,7 +1812,7 @@ async function runServerSave() {
     } else {
       // A transient failure (offline, server restart) leaves the localStorage
       // draft as the safety net and the page still marked unsaved.
-      saveStatus.textContent = "Couldn't save the draft automatically — use Save lesson plan.";
+      saveStatus.textContent = "Couldn't save the draft automatically. Use Save lesson plan.";
     }
   } finally {
     serverSaveInFlight = false;
@@ -2147,7 +2149,9 @@ function renderProgress(sectionStates) {
   generationProgressEl.hidden = false;
   generationProgressEl.innerHTML = sectionStates
     .map((s) => {
-      const icon = s.status === "done" ? "✓" : s.status === "active" ? "…" : s.status === "retrying" ? "⟳" : "";
+      const icon = s.status === "done" ? Icons.check
+        : s.status === "active" ? Icons.moreHorizontal
+        : s.status === "retrying" ? Icons.refresh : "";
       return `
         <div class="progress-row progress-${s.status}">
           <span class="progress-icon">${icon}</span>
@@ -2712,7 +2716,7 @@ async function init() {
     }
 
     sections = buildSections(fmt.fields);
-    document.title = `${fmt.name} — AlignED`;
+    document.title = `${fmt.name} | AlignED`;
     document.getElementById("format-name").textContent = fmt.name;
 
     // Guided walks the fields that need real thinking. The quick ones are left

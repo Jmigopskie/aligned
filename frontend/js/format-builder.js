@@ -193,7 +193,7 @@ async function handleFileSelected(file) {
       docFieldEditor.hidden = false;
       renderDocCanvas(data.preview_html);
       updateFieldCount();
-      showToast(`Loaded "${file.name}". Clean it up below, then save — AlignED figures out the fields for you.`);
+      showToast(`Loaded "${file.name}". Clean it up below, then save. AlignED works out the fields for you.`);
     } else {
       // Couldn't render this file as a real document (e.g. a scanned/image PDF)
       // — the file is still attached as the reference, but fields must be
@@ -461,7 +461,7 @@ if (docToolbar) {
         await Api.editFormatContent(editingFormatId, edits);
         const refreshed = await Api.getFormatTemplateHtml(editingFormatId);
         renderDocCanvas(refreshed.html);
-        showToast("Document updated — fields refreshed automatically.");
+        showToast("Document updated. Fields refreshed automatically.");
       } else {
         const data = await Api.editScannedContent(sourceTempToken, edits);
         renderDocCanvas(data.preview_html);
@@ -512,14 +512,14 @@ function addFieldRow(initial, container) {
     labelInput.value = initial.label || "";
     if (initial.field_type) typeSelect.value = initial.field_type;
     requiredInput.checked = initial.is_required !== false;
-    keyPreview.textContent = labelInput.value.trim() ? slugify(labelInput.value) : "—";
+    keyPreview.textContent = labelInput.value.trim() ? slugify(labelInput.value) : "\u2013";
     // The stored override, not the resolved role: "decide automatically" has to
     // stay distinguishable from an explicit choice that happens to agree.
     roleSelect.value = initial.role_override || "";
   }
 
   labelInput.addEventListener("input", () => {
-    keyPreview.textContent = labelInput.value.trim() ? slugify(labelInput.value) : "—";
+    keyPreview.textContent = labelInput.value.trim() ? slugify(labelInput.value) : "\u2013";
   });
 
   row.querySelector(".remove-field-btn").addEventListener("click", () => {
@@ -649,7 +649,7 @@ document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("lesson-plan
 async function enterEditMode(fmt) {
   editingFormatId = fmt.id;
   pageTitle.textContent = "Edit format";
-  document.title = "Edit format — AlignED";
+  document.title = "Edit format | AlignED";
   stepIndicator.hidden = true;
   backToStep1Btn.textContent = "Cancel";
   backToStep1Btn.onclick = () => (window.location.href = "lesson-plan.html");

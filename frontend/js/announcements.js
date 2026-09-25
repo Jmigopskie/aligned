@@ -90,7 +90,7 @@ function renderAnnouncements() {
         <td>${windowLabel(a)}</td>
         <td>${statusPill(a)}</td>
         <td>${escapeHtml(a.author_name || "–")}</td>
-        <td>
+        <td${actionsColHead.hidden ? " hidden" : ""}>
           ${
             canManage
               ? `<div class="row-actions">
@@ -258,7 +258,7 @@ async function init() {
   if (user.role === "teacher") {
     newAnnouncementBtn.hidden = false;
     actionsColHead.hidden = false;
-    pageSubtitle.textContent = "Notices from your school admin and other teachers — and a place to post your own.";
+    pageSubtitle.textContent = "Notices from your school admin and other teachers, and a place to post your own.";
     try {
       const data = await Api.listSections();
       mySections = data.sections || [];

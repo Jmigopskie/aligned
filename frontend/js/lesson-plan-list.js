@@ -73,7 +73,7 @@ function renderPlans(plans) {
       <tr class="table-empty-row">
         <td colspan="${visibleCols}">${
           isMineTab
-            ? `No lesson plans match yet — <a href="lesson-plan.html">create your first one</a>.`
+            ? `No lesson plans match yet. <a href="lesson-plan.html">Create your first one</a>.`
             : `No public lesson plans yet.`
         }</td>
       </tr>`;

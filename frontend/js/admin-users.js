@@ -239,7 +239,7 @@ async function init() {
   if (initialFilters.has("role")) roleFilter.value = initialFilters.get("role");
   if (initialFilters.has("active")) statusFilter.value = initialFilters.get("active");
   if (isArchiveView) {
-    document.title = "Student Archive — AlignED";
+    document.title = "Student Archive | AlignED";
     document.getElementById("page-title").textContent = "Student Archive";
     document.getElementById("page-intro").textContent =
       "Archived accounts can no longer sign in, but their sections, lesson plans and submissions are kept. Restore an account to give it access again.";

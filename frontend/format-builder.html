@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>New format — AlignED</title>
+  <title>New format | AlignED</title>
   <link rel="icon" href="img/Icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-09-24c" />
+  <link rel="stylesheet" href="css/style.css?v=2026-09-25a" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -78,18 +78,16 @@
       <div id="error-box" class="alert alert-error form-narrow" hidden></div>
 
       <section id="step-1" class="panel form-narrow">
-        <p class="text-sm mt-0" style="margin-bottom: 18px;">
-          Have a blank copy of this format? Upload it — you'll get an exact live copy to clean up (fix typos,
-          remove unwanted lines, adjust formatting). AlignED figures out the fillable fields for you
-          automatically once you save, so there's nothing to define by hand. No file? Start from a blank sheet
-          instead.
+        <p class="text-sm mt-0 section-intro">
+          Upload a blank copy of your format to get an exact live copy you can tidy up. AlignED works out
+          the fillable fields when you save. No file? Start from a blank sheet instead.
         </p>
 
         <div class="source-choice">
           <button type="button" class="source-option" id="choose-upload">
             <div class="icon" data-icon="upload"></div>
             <h3>Upload a file</h3>
-            <p class="text-sm mt-0">Upload a .docx, .dotx, or .pdf — an exact copy for you to tidy up.</p>
+            <p class="text-sm mt-0">Upload a .docx, .dotx or .pdf to get an exact copy you can tidy up.</p>
           </button>
           <button type="button" class="source-option" id="choose-blank">
             <div class="icon" data-icon="edit"></div>
@@ -129,7 +127,7 @@
         <!-- Manual editor: used only when there's no reference document (blank-start formats). -->
         <div id="manual-field-editor" class="form-narrow" hidden>
           <div id="field-rows"></div>
-          <button type="button" id="add-field-btn" class="btn btn-secondary btn-block">+ Add field</button>
+          <button type="button" id="add-field-btn" class="btn btn-secondary btn-block"><span data-icon="plus"></span>Add field</button>
         </div>
 
         <!-- Document editor: the real reference file, rendered live, with a
@@ -141,7 +139,7 @@
           <p class="text-sm mt-0">
             Click into the document, then use the toolbar to format text, restyle headings and
             lists, or delete a leftover line entirely. Fields are figured out automatically when
-            you save — there's nothing to define here.
+            you save, so there's nothing to define here.
           </p>
 
           <div id="doc-stage" class="doc-stage">
@@ -192,7 +190,7 @@
       <div class="field">
         <label>Field label</label>
         <input type="text" class="field-label" placeholder="e.g. Learning Objectives" />
-        <p class="hint">Key: <span class="field-key-preview">—</span></p>
+        <p class="hint">Key: <span class="field-key-preview">&ndash;</span></p>
       </div>
 
       <div class="field">
@@ -221,9 +219,9 @@
     </div>
   </template>
 
-  <script src="js/api.js?v=2026-09-24c"></script>
-  <script src="js/icons.js?v=2026-09-24c"></script>
-  <script src="js/doc-toolbar.js?v=2026-09-24c"></script>
-  <script src="js/format-builder.js?v=2026-09-24c"></script>
+  <script src="js/api.js?v=2026-09-25a"></script>
+  <script src="js/icons.js?v=2026-09-25a"></script>
+  <script src="js/doc-toolbar.js?v=2026-09-25a"></script>
+  <script src="js/format-builder.js?v=2026-09-25a"></script>
 </body>
 </html>

@@ -26,6 +26,25 @@
      bottom + 1px border. The sticky sidebar sits directly under it. */
   --topbar-h: 71px;
 
+  /* One spacing step and one type step for everything laid out from here
+     on, instead of a new pixel value per rule. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  /* Inputs, selects and buttons share one height so a filter row lines up. */
+  --control-h: 42px;
+
   /* This app has one light theme; saying so keeps native controls (notably
      <select> on Windows) from being painted in the OS's dark scheme against
      a light page. */
@@ -210,25 +229,62 @@ button {
   padding: 40px 28px 80px;
 }
 
+/* Every page opens the same way: the title with its one-line purpose under
+   it, and the page's actions on the right. On a phone the actions follow the
+   subtitle rather than wedging between the title and it. */
 .page-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 28px;
+  gap: var(--space-4) var(--space-6);
+  margin-bottom: var(--space-6);
   flex-wrap: wrap;
 }
 
-.page-header h1 {
-  font-size: 22px;
+.page-heading {
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.page-header h1,
+.page-header .dash-page-title {
+  font-size: var(--text-xl);
+  line-height: 1.2;
   margin: 0;
 }
 
 .page-subtitle {
-  font-size: 13.5px;
+  font-size: var(--text-base);
+  line-height: 1.5;
   color: var(--text-body);
-  margin: -20px 0 22px;
+  margin: var(--space-2) 0 0;
   max-width: 640px;
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .page-header {
+    align-items: stretch;
+    margin-bottom: var(--space-5);
+  }
+
+  .page-header h1,
+  .page-header .dash-page-title {
+    font-size: var(--text-lg);
+  }
+
+  .page-actions {
+    width: 100%;
+  }
+
+  .page-actions .btn {
+    flex: 1 1 auto;
+  }
 }
 
 .back-link {
@@ -253,6 +309,7 @@ button {
   margin-bottom: 6px;
 }
 
+.hint,
 .field .hint {
   font-size: 12px;
   color: var(--text-body);
@@ -419,6 +476,16 @@ textarea::placeholder {
   background: var(--primary-hover);
 }
 
+/* A button that is an <a> must not take the link hover colour, which is the
+   same dark green as the hovered button behind it. */
+a.btn:hover {
+  text-decoration: none;
+}
+
+a.btn-primary:hover {
+  color: #FFFFFF;
+}
+
 .btn-secondary {
   background: var(--surface);
   color: var(--text-heading);
@@ -575,15 +642,25 @@ textarea::placeholder {
   color: var(--primary);
 }
 
+/* The amber accent itself is too light to read as text on its tint (2.9:1),
+   so the label uses a darker amber from the same hue. */
 .badge {
-  display: inline-block;
-  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
   font-weight: 600;
   padding: 3px 9px;
   border-radius: 999px;
   background: var(--accent-tint);
-  color: var(--accent);
+  color: #7A5516;
   border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.badge svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* De-emphasized variant for a "default"/unremarkable state (e.g. a private
@@ -1007,6 +1084,11 @@ textarea::placeholder {
   font-size: 12px;
 }
 
+.progress-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
 .progress-row.progress-done .progress-icon {
   color: var(--primary);
 }
@@ -1212,8 +1294,8 @@ body.auth-page::after {
   align-items: center;
   gap: 12px;
   margin: 22px 0;
-  color: #9CA3AF;
-  font-size: 11px;
+  color: var(--text-body);
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
 }
@@ -1659,11 +1741,6 @@ body.auth-page::after {
 
   .main {
     padding: 28px 16px 64px;
-  }
-
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }
 
@@ -2447,7 +2524,7 @@ body.auth-page::after {
 
 .data-table th {
   text-align: left;
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -2463,9 +2540,11 @@ body.auth-page::after {
   color: var(--text-heading);
   vertical-align: middle;
   /* Names and emails are user-supplied and can be a single unbroken 80
-     character string — wrap it rather than letting one row set the table's
-     width and push the action buttons off screen. */
-  overflow-wrap: anywhere;
+     character string, so a long word still breaks. break-word rather than
+     anywhere: "anywhere" also lowers each column's minimum width to one
+     character, which let a narrow screen squeeze titles to a letter per line
+     instead of scrolling or stacking. */
+  overflow-wrap: break-word;
 }
 
 /* Dates and counts are read down the column and compared, so the digits
@@ -2508,14 +2587,23 @@ body.auth-page::after {
 }
 
 .row-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
   background: none;
   border: none;
   color: var(--text-body);
   cursor: pointer;
-  font-size: 16px;
-  padding: 4px 9px;
+  padding: 4px;
   border-radius: 6px;
   line-height: 1;
+}
+
+.row-menu-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
 .row-menu-btn:hover {
@@ -2899,10 +2987,14 @@ body.auth-page::after {
   background: repeating-linear-gradient(135deg, #F3F4F6, #F3F4F6 6px, #E9EBEE 6px, #E9EBEE 12px);
 }
 
+/* The lock is icons.js's lock drawn in the body text colour, rather than an
+   emoji that renders differently on every OS. */
 .lp-field.step-locked:empty::before {
-  content: "🔒 Locked — complete the current field first";
-  color: #9CA3AF;
+  content: "Locked. Finish the current field first.";
+  padding-left: 20px;
+  color: var(--text-body);
   font-style: italic;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2355635B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='11' width='18' height='11' rx='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E") left center / 14px 14px no-repeat;
 }
 
 .lp-field.step-active {
@@ -3505,6 +3597,7 @@ body.auth-page::after {
   font-weight: 600;
   padding: 3px 9px;
   border-radius: 999px;
+  white-space: nowrap;
 }
 
 .status-pill.draft {
@@ -4756,4 +4849,207 @@ body.auth-page::after {
 .lp-doc .lp-field.lp-filled {
   background: transparent;
   box-shadow: inset 0 -1px 0 var(--primary-tint);
+}
+
+/* ---------------------------------------------------------------------------
+   Shared layout pass (2026-09-25)
+   --------------------------------------------------------------------------- */
+
+/* A short lead-in paragraph at the top of a panel or section. */
+.section-intro {
+  margin-bottom: var(--space-5);
+  max-width: 640px;
+}
+
+/* A table that is wider than its column scrolls inside this box, never the
+   page. At phone width tables become cards instead (below). */
+.table-scroll {
+  overflow-x: auto;
+}
+
+/* Filters above a list: one row on a desktop, wrapping on a phone, every
+   control the same height so labels and bottoms line up. */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.filter-bar .field {
+  flex: 1 1 180px;
+  max-width: 280px;
+  margin: 0;
+}
+
+.filter-bar .field-wide {
+  flex-basis: 260px;
+  max-width: 420px;
+}
+
+.filter-bar input,
+.filter-bar select,
+.filter-bar .btn {
+  min-height: var(--control-h);
+}
+
+@media (max-width: 640px) {
+  .filter-bar .field {
+    max-width: none;
+  }
+}
+
+/* Phone tables read as a stack of cards: the row's title on top, then each
+   value beside its column name (data-label, set by labelTableCells in
+   api.js), then the row's actions along the bottom. */
+@media (max-width: 640px) {
+  .data-table,
+  .data-table tbody,
+  .data-table tr,
+  .data-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .data-table thead tr {
+    display: flex;
+    border: 0;
+  }
+
+  /* The rows are cards now, so the card around the table steps back: no
+     second border and padding boxing the first. */
+  .section-card:has(> .table-scroll),
+  .section-card:has(> div > .table-scroll),
+  .panel:has(> .table-scroll) {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .data-table thead th {
+    display: none;
+  }
+
+  .data-table thead th.bulk-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0 0 var(--space-3);
+    border: 0;
+  }
+
+  .data-table thead th.bulk-cell::after {
+    content: "Select all";
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .data-table tbody tr {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+
+  .data-table td,
+  .data-table tr:last-child td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-1) 0;
+    border: 0;
+    text-align: right;
+  }
+
+  .data-table td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-body);
+    text-align: left;
+  }
+
+  /* The row's name: first cell, or the first after the selection box. */
+  .data-table td:first-child:not(.bulk-cell),
+  .data-table td.bulk-cell + td {
+    display: block;
+    text-align: left;
+    font-size: var(--text-base);
+    font-weight: 600;
+    padding: 0 0 var(--space-2);
+  }
+
+  .data-table td:first-child:not(.bulk-cell)::before,
+  .data-table td.bulk-cell + td::before {
+    content: none;
+  }
+
+  .data-table td.bulk-cell {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    width: auto;
+    padding: 0;
+  }
+
+  .data-table td.bulk-cell + td {
+    padding-right: 44px;
+  }
+
+  /* Actions: a full-width strip along the bottom of the card. */
+  .data-table td:last-child:has(button, a.btn, .row-menu) {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border);
+  }
+
+  .data-table td:last-child:has(button, a.btn, .row-menu)::before {
+    content: none;
+  }
+
+  /* An empty-state or loading row spans every column. */
+  .data-table td.cell-full {
+    display: block;
+    text-align: center;
+  }
+
+  .data-table tbody tr:has(td.cell-full) {
+    border-style: dashed;
+  }
+}
+
+/* Touch: every control a finger has to hit gets a 44px target on a phone. */
+@media (max-width: 640px) {
+  .row-action-btn,
+  .row-menu-btn,
+  .btn-sm,
+  .icon-btn,
+  .password-toggle-btn,
+  .announcement-banner-close {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .announcement-banner-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+  }
 }

@@ -76,7 +76,7 @@ function renderRecentPlans(plans) {
   if (!plans.length) {
     recentBody.innerHTML = `
       <tr class="table-empty-row">
-        <td colspan="5">No lesson plans yet — <a href="lesson-plan.html">create your first one</a>.</td>
+        <td colspan="5">No lesson plans yet. <a href="lesson-plan.html">Create your first one</a>.</td>
       </tr>`;
     return;
   }
@@ -100,7 +100,7 @@ function renderRecentPlans(plans) {
         <td>${fmtDate(p.updated_at)}</td>
         <td>
           <div class="row-menu">
-            <button class="row-menu-btn" type="button" data-plan="${p.id}">&hellip;</button>
+            <button class="row-menu-btn" type="button" data-plan="${p.id}" aria-label="More actions" title="More actions">${Icons.moreHorizontal}</button>
             <div class="row-menu-dropdown" data-menu="${p.id}">
               <button type="button" data-action="export" data-plan="${p.id}">Export as Word</button>
               <button type="button" data-action="delete" data-plan="${p.id}" class="danger">Delete</button>

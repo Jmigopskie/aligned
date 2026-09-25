@@ -35,7 +35,7 @@ function renderFormats(formats) {
     emptyState.querySelector("h3").textContent = query ? "No matching formats" : "No formats yet";
     emptyState.querySelector("p").textContent = query
       ? `No format name matches "${searchInput.value.trim()}".`
-      : "Add a lesson plan format — DLP, SDLP, ILAP, or your own — to start generating plans.";
+      : "Add a lesson plan format, such as your school's DLP or SDLP, to start generating plans.";
     emptyState.hidden = false;
     grid.hidden = true;
     return;

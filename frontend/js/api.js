@@ -513,7 +513,7 @@ function wireNotificationBell() {
 
   function renderPanel(items) {
     if (!items.length) {
-      panel.innerHTML = `<div class="notif-empty">You're all caught up — no notifications yet.</div>`;
+      panel.innerHTML = `<div class="notif-empty">You're all caught up. No notifications yet.</div>`;
       return;
     }
     panel.innerHTML = `
@@ -644,7 +644,7 @@ function loadAnnouncementBanner() {
             <strong>${escapeHtml(a.title)}</strong>
             <span>${escapeHtml(a.message)}</span>
           </div>
-          <button type="button" class="announcement-banner-close" aria-label="Dismiss">&times;</button>
+          <button type="button" class="announcement-banner-close" aria-label="Dismiss"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         </div>`
       )
       .join("");
@@ -705,13 +705,13 @@ const OWL_GUIDE_STEPS = {
   "plan-ready": { pose: "check", text: "Setup is complete. Open “Generate & review” when you are ready to write the plan." },
   "plan-mode": { pose: "idea", text: "Two ways to write it: let me draft the whole plan, or take it field by field in guided mode." },
   "plan-guided": { pose: "point", text: "Guided mode: you write each field, and the next one opens once the current one is filled. Ask me in the chat for help with a field." },
-  "plan-full": { pose: "think", text: "Writing your plan now. This takes a moment — the fields fill in as each one is finished." },
+  "plan-full": { pose: "think", text: "Writing your plan now. This takes a moment. The fields fill in as each one is finished." },
   "plan-done": { pose: "celebrate", text: "The plan is written. Read it through, change anything you like, then save it." },
   "plan-saved": { pose: "celebrate", text: "Saved. You can export it as a Word file whenever you need a copy." },
 
   // Lesson plan format making
   "format-source": { pose: "wave", text: "A format is the layout your plans are printed in. Upload a blank copy of yours, or start from an empty sheet." },
-  "format-cleanup": { pose: "check", text: "This is a live copy of your document. Fix any typos and delete what you do not need — the fillable fields are worked out for you when you save." },
+  "format-cleanup": { pose: "check", text: "This is a live copy of your document. Fix any typos and delete what you do not need. The fillable fields are worked out for you when you save." },
   "format-blank": { pose: "point", text: "Add a row for each field your format needs, in the order they appear on the page." },
 };
 
@@ -965,3 +965,37 @@ if (document.readyState === "loading") {
 } else {
   wirePasswordToggles();
 }
+
+// Lets a table read as a stack of cards at phone width: each cell carries its
+// column's header as data-label, which the CSS prints beside the value. Rows
+// are rendered by each page's own script, at different times, so this
+// watches for them rather than asking every page to call it.
+function labelTableCells(root = document) {
+  root.querySelectorAll("table.data-table").forEach((table) => {
+    // Pages hide whole columns per tab with the hidden attribute, on the th
+    // and its cells alike, so both sides skip hidden ones to stay aligned.
+    const heads = Array.from(table.querySelectorAll("thead th")).filter((th) => !th.hidden).map((th) => th.textContent.trim());
+    table.querySelectorAll("tbody tr").forEach((tr) => {
+      Array.from(tr.children).filter((td) => !td.hidden).forEach((td, i) => {
+        if (td.colSpan > 1) td.classList.add("cell-full");
+        else if (heads[i] && !td.hasAttribute("data-label")) td.setAttribute("data-label", heads[i]);
+      });
+    });
+  });
+}
+
+(function watchTables() {
+  let queued = false;
+  const run = () => {
+    queued = false;
+    labelTableCells();
+  };
+  // Batched to one pass per frame: a page filling a table fires a mutation
+  // per row, and labelling is cheap but not free.
+  new MutationObserver(() => {
+    if (!queued) {
+      queued = true;
+      requestAnimationFrame(run);
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
+})();
