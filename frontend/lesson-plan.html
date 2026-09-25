@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lesson Plan | AlignED</title>
+  <title>Create Lesson Plan | AlignED</title>
   <link rel="icon" href="img/Icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -59,8 +59,8 @@
       <main class="dash-main">
         <div class="page-header">
           <div class="page-heading">
-            <h1 class="dash-page-title">Lesson Plan</h1>
-            <p class="page-subtitle">Start from a ready-made school format, or use one of your own.</p>
+            <h1 class="dash-page-title">Create Lesson Plan</h1>
+            <p class="page-subtitle">Pick the format your school uses. Every plan you make follows its layout, from the header table to the procedure.</p>
           </div>
           <div class="page-actions">
             <button id="new-format-btn" class="btn btn-primary"><span data-icon="plus"></span>New format</button>
@@ -80,9 +80,11 @@
           <div id="drafts-list" class="drafts-list"></div>
         </section>
 
-        <div class="field" id="format-search-row" style="max-width:320px;" hidden>
-          <label for="format-search">Search</label>
-          <input type="text" id="format-search" placeholder="Search formats by name&hellip;" />
+        <div class="filter-bar" id="format-search-row">
+          <div class="field field-wide">
+            <label for="format-search">Search formats</label>
+            <input type="search" id="format-search" placeholder="e.g. DLP, 4A's, SDLP" autocomplete="off" />
+          </div>
         </div>
 
         <div id="loading-state" class="card-grid">
@@ -92,12 +94,37 @@
         </div>
 
         <div id="empty-state" class="empty-state" hidden>
-          <h3>No formats yet</h3>
-          <p>Add a lesson plan format, such as your school's DLP or SDLP, to start generating plans.</p>
-          <button class="btn btn-primary" onclick="window.location.href='format-builder.html'"><span data-icon="plus"></span>New format</button>
+          <h3>No matching formats</h3>
+          <p>Try another name, or clear the search to see every format.</p>
         </div>
 
-        <div id="format-grid" class="card-grid" hidden></div>
+        <section class="format-section" id="builtin-section" hidden aria-labelledby="builtin-title">
+          <div class="format-section-head">
+            <h2 class="section-title" id="builtin-title">Ready-to-use formats</h2>
+            <p class="section-note">School formats set up for you. Use them as they are; to change one, make your own copy with New format.</p>
+          </div>
+          <div id="builtin-grid" class="card-grid format-grid-builtin"></div>
+        </section>
+
+        <section class="format-section" id="mine-section" hidden aria-labelledby="mine-title">
+          <div class="format-section-head">
+            <h2 class="section-title" id="mine-title">My formats</h2>
+            <p class="section-note">Formats you made. Only you can edit or delete them.</p>
+          </div>
+          <div id="mine-empty" class="empty-state empty-state-compact" hidden>
+            <p>You haven't made a format yet. Upload your school's blank template and AlignED finds the fields for you.</p>
+            <button class="btn btn-secondary" type="button" onclick="window.location.href='format-builder.html'"><span data-icon="plus"></span>New format</button>
+          </div>
+          <div id="mine-grid" class="card-grid"></div>
+        </section>
+
+        <section class="format-section" id="shared-section" hidden aria-labelledby="shared-title">
+          <div class="format-section-head">
+            <h2 class="section-title" id="shared-title">Shared by other teachers</h2>
+            <p class="section-note">Formats other teachers chose to make public.</p>
+          </div>
+          <div id="shared-grid" class="card-grid"></div>
+        </section>
       </main>
     </div>
   </div>

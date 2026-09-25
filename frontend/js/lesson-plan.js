@@ -1,11 +1,19 @@
 const loadingState = document.getElementById("loading-state");
 const emptyState = document.getElementById("empty-state");
-const grid = document.getElementById("format-grid");
 const errorBox = document.getElementById("error-box");
-const searchRow = document.getElementById("format-search-row");
 const searchInput = document.getElementById("format-search");
 const draftsStrip = document.getElementById("drafts-strip");
 const draftsList = document.getElementById("drafts-list");
+
+// Three shelves: the ready-made formats everyone gets, the teacher's own, and
+// whatever other teachers chose to share. Built-ins come first because a new
+// teacher has nothing else yet, and most schools use one of them anyway.
+const sections = {
+  builtin: { section: document.getElementById("builtin-section"), grid: document.getElementById("builtin-grid") },
+  mine: { section: document.getElementById("mine-section"), grid: document.getElementById("mine-grid") },
+  shared: { section: document.getElementById("shared-section"), grid: document.getElementById("shared-grid") },
+};
+const mineEmpty = document.getElementById("mine-empty");
 
 let currentUser = null;
 let allFormats = [];
@@ -18,110 +26,163 @@ document.getElementById("new-format-btn").addEventListener("click", () => {
   window.location.href = "format-builder.html";
 });
 
-
 document.addEventListener("click", () => {
   document.querySelectorAll(".row-menu-dropdown.open").forEach((m) => m.classList.remove("open"));
 });
 
+function shelfOf(fmt) {
+  if (fmt.is_builtin) return "builtin";
+  return currentUser && fmt.owner_id === currentUser.id ? "mine" : "shared";
+}
+
+function matches(fmt, query) {
+  if (!query) return true;
+  return `${fmt.name} ${fmt.description || ""}`.toLowerCase().includes(query);
+}
+
+function fmtAdded(iso) {
+  return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function useFormat(fmt) {
+  window.location.href = `generator.html?format_id=${fmt.id}`;
+}
+
+function openOriginal(fmt) {
+  window.open(`${Api.formatSourceUrl(fmt.id)}?inline=1`, "_blank", "noopener");
+}
+
+// A built-in shows its first page, so a teacher recognises the layout their
+// school hands out before reading a single word. It has no menu: there is
+// nothing to edit or delete.
+function builtinCard(fmt) {
+  const card = document.createElement("article");
+  card.className = "format-card is-builtin";
+  card.innerHTML = `
+    <div class="format-thumb-wrap">
+      <button type="button" class="format-thumb-frame" data-action="use" tabindex="-1" aria-hidden="true">
+        <img class="format-thumb" src="${fmt.thumbnail}" alt="" loading="lazy" width="480" height="679" />
+      </button>
+      <span class="badge badge-lock" title="Built-in formats can't be edited or deleted">${Icons.lock}Built-in</span>
+    </div>
+    <div class="format-card-body">
+      <h3></h3>
+      <p class="format-card-desc"></p>
+      <p class="format-card-meta">${fmt.field_count} fields</p>
+    </div>
+    <div class="format-card-actions">
+      <button class="btn btn-primary" type="button" data-action="use">Use this format</button>
+      <button class="btn btn-secondary" type="button" data-action="source"><span data-icon="externalLink"></span>View original</button>
+    </div>`;
+  card.querySelector("h3").textContent = fmt.name;
+  card.querySelector(".format-card-desc").textContent = fmt.description || "";
+  card.querySelectorAll('[data-action="use"]').forEach((b) => b.addEventListener("click", () => useFormat(fmt)));
+  card.querySelector('[data-action="source"]').addEventListener("click", () => openOriginal(fmt));
+  hydrateIcons(card);
+  return card;
+}
+
+function teacherCard(fmt) {
+  const isOwner = currentUser && fmt.owner_id === currentUser.id;
+  const hasMenu = isOwner || fmt.has_source_file;
+  const card = document.createElement("article");
+  card.className = "format-card";
+  card.innerHTML = `
+    <div class="format-card-top">
+      <div class="format-card-heading">
+        <h3></h3>
+        <span class="badge${fmt.is_public ? "" : " badge-neutral"}">${fmt.is_public ? "Public" : "Private"}</span>
+      </div>
+      ${
+        hasMenu
+          ? `<div class="row-menu">
+              <button class="row-menu-btn" type="button" title="More actions">${Icons.moreHorizontal}</button>
+              <div class="row-menu-dropdown">
+                ${fmt.has_source_file ? `<button type="button" data-action="source">View original file</button>` : ""}
+                ${isOwner ? `<button type="button" data-action="edit">Edit</button>` : ""}
+                ${isOwner ? `<button type="button" data-action="delete" class="danger">Delete</button>` : ""}
+              </div>
+            </div>`
+          : ""
+      }
+    </div>
+    <p class="format-card-meta">${fmt.field_count} fields &middot; added ${fmtAdded(fmt.created_at)}${
+      isOwner ? "" : ` &middot; by ${escapeHtml(fmt.owner_name || "another teacher")}`
+    }</p>
+    <button class="btn btn-primary btn-block format-card-cta" type="button" data-action="use">Use this format</button>`;
+  card.querySelector("h3").textContent = fmt.name;
+  card.querySelector('[data-action="use"]').addEventListener("click", () => useFormat(fmt));
+
+  const menuBtn = card.querySelector(".row-menu-btn");
+  if (menuBtn) {
+    // Set via the DOM API rather than interpolated into the HTML string:
+    // escapeHtml() only escapes &, <, > for text-node context, so a format
+    // name containing a literal " could otherwise break out of the attribute.
+    menuBtn.setAttribute("aria-label", `More actions for ${fmt.name}`);
+    const menu = card.querySelector(".row-menu-dropdown");
+    menuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      document.querySelectorAll(".row-menu-dropdown.open").forEach((m) => {
+        if (m !== menu) m.classList.remove("open");
+      });
+      menu.classList.toggle("open");
+    });
+  }
+  const sourceBtn = card.querySelector('[data-action="source"]');
+  if (sourceBtn) sourceBtn.addEventListener("click", () => openOriginal(fmt));
+  const editBtn = card.querySelector('[data-action="edit"]');
+  if (editBtn) {
+    editBtn.addEventListener("click", () => {
+      window.location.href = `format-builder.html?format_id=${fmt.id}`;
+    });
+  }
+  const deleteBtn = card.querySelector('[data-action="delete"]');
+  if (deleteBtn) deleteBtn.addEventListener("click", () => deleteFormat(fmt.id, deleteBtn));
+  return card;
+}
+
+function newFormatTile() {
+  const tile = document.createElement("button");
+  tile.type = "button";
+  tile.className = "new-format-tile";
+  tile.innerHTML = `<span class="new-format-tile-icon">${Icons.plus}</span><span>New format</span>`;
+  tile.addEventListener("click", () => (window.location.href = "format-builder.html"));
+  return tile;
+}
+
 function renderFormats(formats) {
   loadingState.hidden = true;
   allFormats = formats;
-  searchRow.hidden = !formats.length;
 
   const query = searchInput.value.trim().toLowerCase();
-  const shown = query ? formats.filter((f) => f.name.toLowerCase().includes(query)) : formats;
+  const shelves = { builtin: [], mine: [], shared: [] };
+  formats.forEach((f) => shelves[shelfOf(f)].push(f));
+  // Built-ins keep the order they were seeded in, so they never shuffle
+  // between visits; the teacher shelves stay newest first.
+  shelves.builtin.sort((a, b) => a.id - b.id);
 
-  if (!shown.length) {
-    emptyState.querySelector("h3").textContent = query ? "No matching formats" : "No formats yet";
-    emptyState.querySelector("p").textContent = query
-      ? `No format name matches "${searchInput.value.trim()}".`
-      : "Add a lesson plan format, such as your school's DLP or SDLP, to start generating plans.";
-    emptyState.hidden = false;
-    grid.hidden = true;
-    return;
-  }
+  let shownAnywhere = 0;
+  Object.entries(sections).forEach(([key, { section, grid }]) => {
+    const shown = shelves[key].filter((f) => matches(f, query));
+    shownAnywhere += shown.length;
+    grid.innerHTML = "";
+    shown.forEach((f) => grid.appendChild(key === "builtin" ? builtinCard(f) : teacherCard(f)));
 
-  emptyState.hidden = true;
-  grid.hidden = false;
-  grid.innerHTML = "";
-
-  shown.forEach((fmt) => {
-    const isOwner = currentUser && fmt.owner_id === currentUser.id;
-    const hasMenu = isOwner || fmt.has_source_file;
-    const card = document.createElement("div");
-    card.className = "format-card";
-    card.innerHTML = `
-      <div class="format-card-top">
-        <div class="format-card-heading">
-          <h3>${escapeHtml(fmt.name)}</h3>
-          <span class="badge${fmt.is_public ? "" : " badge-neutral"}">${fmt.is_public ? "Public" : "Private"}</span>
-        </div>
-        ${
-          hasMenu
-            ? `<div class="row-menu">
-                <button class="row-menu-btn" type="button">&hellip;</button>
-                <div class="row-menu-dropdown">
-                  ${fmt.has_source_file ? `<button type="button" data-action="source">View original file</button>` : ""}
-                  ${isOwner ? `<button type="button" data-action="edit">Edit</button>` : ""}
-                  ${isOwner ? `<button type="button" data-action="delete" class="danger">Delete</button>` : ""}
-                </div>
-              </div>`
-            : ""
-        }
-      </div>
-      <p class="format-card-meta">Added ${new Date(fmt.created_at).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      })}${isOwner ? "" : ` &middot; by ${escapeHtml(fmt.owner_name || "another teacher")}`}</p>
-      <button class="btn btn-primary btn-block format-card-cta" type="button" data-action="use">Use this format</button>
-    `;
-
-    card.querySelector('[data-action="use"]').addEventListener("click", () => {
-      window.location.href = `generator.html?format_id=${fmt.id}`;
-    });
-
-    const menuBtn = card.querySelector(".row-menu-btn");
-    if (menuBtn) {
-      // Set via the DOM API rather than interpolated into the HTML string —
-      // escapeHtml() only escapes &, <, > for text-node context, so a format
-      // name containing a literal " could otherwise break out of the
-      // aria-label attribute.
-      menuBtn.setAttribute("aria-label", `More actions for ${fmt.name}`);
-      const menu = card.querySelector(".row-menu-dropdown");
-      menuBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        document.querySelectorAll(".row-menu-dropdown.open").forEach((m) => {
-          if (m !== menu) m.classList.remove("open");
-        });
-        menu.classList.toggle("open");
-      });
+    if (key === "mine") {
+      // Your own shelf stays visible while browsing, empty or not, since it
+      // is where a new format would land. A search that matches none of
+      // yours hides it like any other shelf.
+      const hasOwn = shelves.mine.length > 0;
+      mineEmpty.hidden = hasOwn || !!query;
+      if (hasOwn && !query) grid.appendChild(newFormatTile());
+      grid.hidden = !grid.children.length;
+      section.hidden = query ? shown.length === 0 : false;
+    } else {
+      section.hidden = shown.length === 0;
     }
-
-    const sourceBtn = card.querySelector('[data-action="source"]');
-    if (sourceBtn) {
-      sourceBtn.addEventListener("click", () => {
-        window.open(Api.formatSourceUrl(fmt.id), "_blank", "noopener");
-      });
-    }
-    const editBtn = card.querySelector('[data-action="edit"]');
-    if (editBtn) {
-      editBtn.addEventListener("click", () => {
-        window.location.href = `format-builder.html?format_id=${fmt.id}`;
-      });
-    }
-    const deleteBtn = card.querySelector('[data-action="delete"]');
-    if (deleteBtn) {
-      deleteBtn.addEventListener("click", () => deleteFormat(fmt.id, deleteBtn));
-    }
-    grid.appendChild(card);
   });
 
-  const tile = document.createElement("button");
-  tile.className = "new-format-tile";
-  tile.innerHTML = `<span class="plus">+</span><span>New format</span>`;
-  tile.addEventListener("click", () => (window.location.href = "format-builder.html"));
-  grid.appendChild(tile);
+  emptyState.hidden = !(query && shownAnywhere === 0);
 }
 
 async function deleteFormat(id, btn) {

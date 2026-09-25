@@ -4855,6 +4855,162 @@ body.auth-page::after {
    Shared layout pass (2026-09-25)
    --------------------------------------------------------------------------- */
 
+/* ---- Create Lesson Plan: three shelves of formats ---- */
+.format-section {
+  margin-top: var(--space-8);
+}
+
+.format-section:first-of-type,
+.drafts-strip + .filter-bar + .card-grid + .empty-state + .format-section {
+  margin-top: var(--space-6);
+}
+
+.format-section-head {
+  margin-bottom: var(--space-4);
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-heading);
+  margin: 0;
+}
+
+.section-note {
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  margin: var(--space-1) 0 0;
+  max-width: 640px;
+}
+
+.format-grid-builtin {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-5);
+}
+
+/* A built-in reads as the sheet itself: the top of page one, sitting on the
+   paper-coloured page like a handout on a desk, cropped where the fold
+   would be. */
+.format-card.is-builtin {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.format-thumb-wrap {
+  position: relative;
+}
+
+.format-thumb-frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  padding: var(--space-4) var(--space-6) 0;
+  overflow: hidden;
+  background: var(--bg);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.format-thumb {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #FFFFFF;
+  border-radius: 3px 3px 0 0;
+  box-shadow: 0 2px 10px rgba(22, 35, 30, 0.12);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.format-card.is-builtin:hover .format-thumb {
+  transform: translateY(-3px);
+}
+
+.badge-lock {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  background: var(--surface);
+  color: var(--text-heading);
+  border-color: var(--border);
+  box-shadow: 0 1px 3px rgba(22, 35, 30, 0.1);
+}
+
+.format-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.format-card-body h3 {
+  margin: 0;
+}
+
+.format-card-desc {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-body);
+  margin: 0;
+}
+
+.format-card-body .format-card-meta {
+  margin: var(--space-1) 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.format-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  margin-top: auto;
+}
+
+.format-card-actions .btn {
+  flex: 1 1 100%;
+}
+
+.new-format-tile-icon svg {
+  width: 22px;
+  height: 22px;
+  color: var(--primary);
+}
+
+.empty-state-compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-5) var(--space-6);
+}
+
+.empty-state-compact p {
+  margin: 0;
+  max-width: 520px;
+  font-size: var(--text-sm);
+  color: var(--text-body);
+}
+
+@media (max-width: 640px) {
+  .new-format-tile {
+    min-height: 96px;
+  }
+
+  /* Five full-width sheets make a long scroll; the header table at the top
+     of page one is enough to recognise a format. */
+  .format-thumb-frame {
+    aspect-ratio: 2 / 1;
+  }
+
+  .format-section {
+    margin-top: var(--space-7);
+  }
+}
+
 /* A short lead-in paragraph at the top of a panel or section. */
 .section-intro {
   margin-bottom: var(--space-5);
