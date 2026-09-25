@@ -112,8 +112,15 @@ const Api = {
 
   formatSourceUrl: (formatId) => `${API_URL}/api/formats/${formatId}/source`,
 
-  searchCourseGuides: (subject) =>
-    apiFetch(`/api/course-guides?subject=${encodeURIComponent(subject || "")}`),
+  // A string searches by subject, as before; an object passes any of
+  // subject, q, grade_band, doc_type and prefer_grade_band.
+  searchCourseGuides: (params) => {
+    const query = new URLSearchParams();
+    Object.entries(typeof params === "string" || !params ? { subject: params || "" } : params)
+      .forEach(([k, v]) => { if (v) query.set(k, v); });
+    return apiFetch(`/api/course-guides?${query}`);
+  },
+  courseGuideFileUrl: (guideId) => `${API_URL}/api/course-guides/${guideId}/file`,
   uploadCourseGuide: (file, subject, title) => {
     const form = new FormData();
     form.append("file", file);

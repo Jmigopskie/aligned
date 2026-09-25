@@ -199,15 +199,23 @@ def check_guides(app, admin, student):
         rows = c.get("/api/course-guides?subject=ICT").get_json()["course_guides"]
         assert rows[0]["is_builtin"], "official guides come first"
         assert rows[-1]["id"] == own_id
+        # Official guides come in catalogue (seed) order, not by upload date.
+        titles = [g["title"] for g in c.get("/api/course-guides").get_json()["course_guides"] if g["is_builtin"]]
+        assert titles.index("[G7] TLE: ICT") < titles.index("[G9/G10] TLE: ICT - Computer Programming"), titles
 
         cp = c.get("/api/course-guides?subject=CP%20(ComProg)").get_json()["course_guides"]
         assert "[G9/G10] TLE: ICT - Computer Programming" in [g["title"] for g in cp], cp
         assert all(g["is_builtin"] for g in cp)
 
         band = c.get("/api/course-guides?grade_band=7-8").get_json()["course_guides"]
-        assert "[G7] TLE: ICT" in [g["title"] for g in band] and all(g["grade_band"] == "7-8" for g in band)
+        assert "[G7] TLE: ICT" in [g["title"] for g in band] and all("7-8" in g["grade_band"] for g in band)
         pref = c.get("/api/course-guides?prefer_grade_band=9-10").get_json()["course_guides"]
-        assert pref[0]["grade_band"] == "9-10"
+        assert "9-10" in pref[0]["grade_band"]
+        # The MATATAG curriculum guide spans Grades 4 to 10, so every JHS band
+        # filter must still find it.
+        for b in ("4-6", "7-8", "9-10"):
+            rows = c.get(f"/api/course-guides?grade_band={b}&doc_type=curriculum_guide").get_json()["course_guides"]
+            assert any(g["title"].startswith("MATATAG EPP/TLE") for g in rows), (b, rows)
         assert all(g["doc_type"] == "curriculum_guide" for g in c.get("/api/course-guides?doc_type=curriculum_guide").get_json()["course_guides"])
 
         g7 = next(g for g in official if g.builtin_key == "bow-g7-ict")

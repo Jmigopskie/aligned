@@ -5011,6 +5011,175 @@ body.auth-page::after {
   }
 }
 
+/* ---- Curriculum and course guides ---- */
+.guide-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4) var(--space-6);
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.guide-filters .field {
+  margin: 0;
+}
+
+.guide-search {
+  flex: 1 1 240px;
+  max-width: 340px;
+}
+
+.guide-type {
+  flex: 0 1 190px;
+}
+
+.guide-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.guide-filter-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  min-height: var(--control-h);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-heading);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.chip:hover {
+  border-color: var(--primary);
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #FFFFFF;
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Guides are documents, so they list like documents: one line each, what
+   it is and where it came from, and a way to open it. */
+.guide-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.guide-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+}
+
+.guide-card + .guide-card {
+  border-top: 1px solid var(--border);
+}
+
+.guide-icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-body);
+}
+
+.guide-card.is-official .guide-icon {
+  background: var(--primary-tint);
+  color: var(--primary);
+}
+
+.guide-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.guide-body {
+  min-width: 0;
+}
+
+.guide-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0;
+  overflow-wrap: break-word;
+}
+
+.guide-meta {
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  margin: 2px 0 0;
+}
+
+.badge-official {
+  background: var(--primary-tint);
+  color: var(--primary);
+}
+
+.upload-panel {
+  margin-top: var(--space-5);
+}
+
+#results-empty {
+  margin-top: var(--space-6);
+}
+
+#results-empty .btn {
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .guide-search,
+  .guide-type {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .guide-card {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .guide-card .guide-open {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
 /* A short lead-in paragraph at the top of a panel or section. */
 .section-intro {
   margin-bottom: var(--space-5);

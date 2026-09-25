@@ -43,7 +43,8 @@ def search_course_guides():
 
     subject: a generator subject value (or any text), matched with its aliases
     against subject and title. q: free text, matched the same way.
-    grade_band / doc_type: exact filters; only official guides carry them, so
+    grade_band / doc_type: filters (a guide's grade_band may list several
+    bands, comma-separated, so it matches each); only official guides carry them, so
     setting one narrows the results to official guides. prefer_grade_band:
     not a filter, it only ranks that band's guides above the rest, which is
     what the generator wants when it knows the grade but a guide for another
@@ -61,14 +62,17 @@ def search_course_guides():
     if q:
         query = query.filter(_matches(q))
     if grade_band in GRADE_BANDS:
-        query = query.filter(CourseGuide.grade_band == grade_band)
+        query = query.filter(CourseGuide.grade_band.like(f"%{grade_band}%"))
     if doc_type in DOC_TYPES:
         query = query.filter(CourseGuide.doc_type == doc_type)
 
     order = [CourseGuide.is_builtin.desc()]
     if prefer in GRADE_BANDS:
-        order.append(case((CourseGuide.grade_band == prefer, 0), else_=1))
-    order += [CourseGuide.grade_band, CourseGuide.created_at.desc()]
+        order.append(case((CourseGuide.grade_band.like(f"%{prefer}%"), 0), else_=1))
+    # Official guides keep their catalogue order (the curriculum guide, then
+    # Grade 4 upwards, as seeded); teachers' uploads stay newest first.
+    order += [case((CourseGuide.is_builtin.is_(True), CourseGuide.id), else_=None).asc(),
+              CourseGuide.created_at.desc()]
 
     guides = query.order_by(*order).limit(50).all()
     return jsonify({"status": "ok", "course_guides": [g.to_dict() for g in guides]})

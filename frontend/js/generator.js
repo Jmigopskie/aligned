@@ -765,15 +765,29 @@ cgTabsEl.querySelectorAll("button").forEach((btn) => {
   });
 });
 
+// The course guide library groups grades the way DepEd's documents do.
+function gradeBandFor() {
+  if (levelTypeSelect.value !== "k12") return "";
+  const grade = parseInt((k12GradeSelect.value || "").replace(/\D/g, ""), 10);
+  if (grade >= 4 && grade <= 6) return "4-6";
+  if (grade >= 7 && grade <= 8) return "7-8";
+  if (grade >= 9 && grade <= 10) return "9-10";
+  if (grade >= 11) return "SHS";
+  return "";
+}
+
 function renderCourseGuideResults(guides) {
   cgResultsEl.innerHTML = "";
   guides.forEach((g) => {
     const card = document.createElement("div");
     card.className = "cg-result-card";
+    const meta = g.is_builtin
+      ? `${g.doc_type === "curriculum_guide" ? "Curriculum Guide" : "Budget of Work"} &middot; ${escapeHtml(g.curriculum || "DepEd")}`
+      : `${escapeHtml(g.subject)} &middot; uploaded by ${escapeHtml(g.uploaded_by || "a teacher")}`;
     card.innerHTML = `
       <div>
         <div class="cg-title">${escapeHtml(g.title)}</div>
-        <div class="cg-meta">${escapeHtml(g.subject)} &middot; uploaded by ${escapeHtml(g.uploaded_by || "a teacher")}</div>
+        <div class="cg-meta">${g.is_builtin ? `<span class="badge badge-official">${Icons.shieldCheck}Official DepEd</span> ` : ""}${meta}</div>
       </div>
       <span class="text-sm">Select</span>
     `;
@@ -816,7 +830,9 @@ cgSearchBtn.addEventListener("click", async () => {
 
   setButtonLoading(cgSearchBtn, true, "Searching");
   try {
-    const data = await Api.searchCourseGuides(subject);
+    // The grade only ranks results, it never hides any: a guide for the next
+    // band up can still be the right reference.
+    const data = await Api.searchCourseGuides({ subject, prefer_grade_band: gradeBandFor() });
     const guides = data.course_guides || [];
     if (!guides.length) {
       cgResultsEl.innerHTML = "";

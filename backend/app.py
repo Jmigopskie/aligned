@@ -154,7 +154,7 @@ def _migrate_course_guide_builtin_columns():
         ("is_builtin", "BOOLEAN NOT NULL DEFAULT 0"),
         ("builtin_key", "VARCHAR(64)"),
         ("doc_type", "VARCHAR(20)"),
-        ("grade_band", "VARCHAR(8)"),
+        ("grade_band", "VARCHAR(20)"),
         ("grades", "VARCHAR(20)"),
         ("curriculum", "VARCHAR(20)"),
         ("source_url", "VARCHAR(500)"),

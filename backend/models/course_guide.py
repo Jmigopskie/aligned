@@ -20,7 +20,7 @@ class CourseGuide(db.Model):
     is_builtin = db.Column(db.Boolean, nullable=False, default=False)
     builtin_key = db.Column(db.String(64))
     doc_type = db.Column(db.String(20))  # "budget_of_work" or "curriculum_guide"
-    grade_band = db.Column(db.String(8))  # "4-6", "7-8", "9-10" or "SHS"
+    grade_band = db.Column(db.String(20))  # "4-6", "7-8", "9-10", "SHS", or several comma-separated
     grades = db.Column(db.String(20))  # the exact grades covered, e.g. "9-10"
     curriculum = db.Column(db.String(20))  # "MATATAG" or "K to 12"
     source_url = db.Column(db.String(500))
