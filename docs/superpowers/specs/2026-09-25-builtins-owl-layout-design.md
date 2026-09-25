@@ -159,7 +159,7 @@ Title "Create Lesson Plan". Order:
 2. "Continue where you left off", unchanged.
 3. Search, always visible.
 4. **Ready-to-use formats**: a card per built-in with thumbnail, a "Built-in"
-   badge with a lock icon, name, description, "N pages, N fields", a primary
+   badge with a lock icon, name, description, "N fields", a primary
    "Use this format" and a secondary "View original". No edit or delete menu.
 5. **My formats**: the teacher's own formats with the existing menu, then the
    "New format" tile. Empty state invites them to add one.
