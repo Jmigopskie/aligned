@@ -3911,16 +3911,22 @@ body.auth-page::after {
   --owl-chat-w: 460px;
 }
 
+/* Placed beside the docked owl by placeChat() in generator.js, which sets
+   --chat-right / --chat-bottom from where he actually is. The owl stacks
+   above it (56 vs 55) so the two can never swap, and both float above the
+   sticky top bar (50) but under modals and toasts (100). */
 .owl-chat {
   position: fixed;
-  right: 24px;
-  bottom: 20px;
-  z-index: 45;
+  right: var(--chat-right, 24px);
+  bottom: var(--chat-bottom, 20px);
+  z-index: 55;
   display: flex;
   flex-direction: column;
-  width: min(var(--owl-chat-w), calc(100vw - 32px));
-  max-height: min(760px, calc(100vh - 100px));
-  height: min(760px, calc(100vh - 100px));
+  width: min(var(--owl-chat-w), var(--chat-room, calc(100vw - 32px)));
+  /* Never taller than the space under the sticky top bar, which would
+     otherwise cover the chat's header and its Hide button. */
+  max-height: min(760px, calc(100vh - var(--chat-bottom, 20px) - var(--topbar-h) - 24px));
+  height: min(760px, calc(100vh - var(--chat-bottom, 20px) - var(--topbar-h) - 24px));
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -3928,8 +3934,95 @@ body.auth-page::after {
   overflow: hidden;
 }
 
+/* Collapsed: the panel is gone and the owl alone stands for it. */
 .owl-chat.is-collapsed {
+  display: none;
+}
+
+/* No room beside the owl: a full-width sheet above him (or below, when he
+   sits in the top half of the screen). */
+.owl-chat.is-sheet {
+  left: 16px;
+  right: 16px;
+  width: auto;
   height: auto;
+  max-height: min(70vh, calc(100vh - var(--chat-bottom, 20px) - var(--topbar-h) - 16px));
+}
+
+.owl-chat.is-sheet.is-below {
+  top: var(--chat-top, 80px);
+  bottom: auto;
+  max-height: min(70vh, calc(100vh - var(--chat-top, 80px) - 16px));
+}
+
+.owl-chat.is-sheet .owl-chat-resizer {
+  display: none;
+}
+
+/* ---- The docked owl: the chat's launcher in Guided mode ---- */
+.owl-guide.is-docked {
+  z-index: 56;
+}
+
+.owl-guide-figure {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+}
+
+.owl-guide.is-docked .owl-guide-img {
+  width: 96px;
+}
+
+.owl-guide.is-docked:focus-visible {
+  outline: none;
+}
+
+.owl-guide.is-docked:focus-visible .owl-guide-img {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+.owl-guide.is-docked .owl-guide-bubble {
+  margin-bottom: 40px;
+}
+
+/* The amber is the one colour this app reserves for "look here". */
+.owl-unread {
+  display: none;
+  position: absolute;
+  top: 8%;
+  right: 12%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 3px rgba(22, 35, 30, 0.25);
+}
+
+.owl-guide.has-unread .owl-unread {
+  display: block;
+}
+
+@media (max-width: 640px) {
+  /* The transient guide stays hidden on phones, but as the chat's launcher
+     he is the only way to open it, so the docked owl shows, smaller and
+     without his speech bubble. */
+  .owl-guide.is-docked {
+    display: flex;
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .owl-guide.is-docked .owl-guide-img {
+    width: 64px;
+  }
+
+  .owl-guide.is-docked .owl-guide-bubble {
+    display: none;
+  }
 }
 
 /* The panel is anchored to the right edge, so it grows leftwards and the
@@ -4271,18 +4364,9 @@ body.auth-page::after {
   .owl-dots i { animation: none; opacity: 0.6; }
 }
 
+/* Room for the open chat and the docked owl beside it (96px + the gap). */
 @media (min-width: 1180px) {
-  body.owl-chat-open .dash-main { padding-right: calc(var(--owl-chat-w) + 30px); }
-}
-
-@media (max-width: 640px) {
-  .owl-chat {
-    right: 8px;
-    left: 8px;
-    bottom: 8px;
-    width: auto;
-    max-height: 70vh;
-  }
+  body.owl-chat-open .dash-main { padding-right: calc(var(--owl-chat-w) + 30px + 108px); }
 }
 
 /* ---------------------------------------------------------------------------

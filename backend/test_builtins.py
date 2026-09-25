@@ -144,12 +144,23 @@ def check_export_fills_frozen_anchors(app, student):
     fmt = LessonPlanFormat.query.filter_by(builtin_key="4as-lesson-plan").one()
     by_label = {f.label: f.field_key for f in fmt.fields}
     plan = LessonPlan(user_id=student.id, format_id=fmt.id, title="Export check")
-    plan.set_values({by_label["Abstraction"]: "ABSTRACTION-TEXT-XYZ", by_label["Activity"]: "ACTIVITY-TEXT-XYZ"})
+    plan.set_values({by_label["Abstraction"]: "ABSTRACTION-TEXT-XYZ", by_label["Activity"]: "ACTIVITY-TEXT-XYZ",
+                     by_label["Review"]: "REVIEW-TEXT-XYZ",
+                     by_label["Learning Competencies and Objectives"]: "LC-TEXT-XYZ"})
     db.session.add(plan)
     db.session.commit()
     path = docx_service.export_lesson_plan(plan, fmt)
     text = "\n".join(c.text for t in Document(path).tables for r in t.rows for c in r.cells)
     assert "ABSTRACTION-TEXT-XYZ" in text and "ACTIVITY-TEXT-XYZ" in text
+    # And in the answer cell beside its label, not squeezed into the label
+    # cell: the 4A's answer cells for these rows started out holding a
+    # leftover bullet or "a." that made them look already filled.
+    for label, value in (("ABSTRACTION", "ABSTRACTION-TEXT-XYZ"), ("ACTIVITY", "ACTIVITY-TEXT-XYZ"),
+                         ("REVIEW", "REVIEW-TEXT-XYZ"), ("LEARNING COMPETENCIES", "LC-TEXT-XYZ")):
+        row = next(r for t in Document(path).tables for r in t.rows
+                   if r.cells[0].text.strip().upper().startswith(label))
+        assert value not in row.cells[0].text, (label, row.cells[0].text)
+        assert value in row.cells[-1].text, (label, [c.text for c in row.cells])
     os.remove(path)
     # The shared template itself is never written to.
     assert "XYZ" not in "\n".join(c.text for t in Document(fmt.template_docx_path).tables for r in t.rows for c in r.cells)
