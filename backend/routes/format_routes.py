@@ -67,6 +67,18 @@ def _build_format_fields(format_id, fields_payload):
         ))
     return rows
 
+def _reject_if_builtin(fmt):
+    """The ready-made formats are shared by everyone and seeded from files in
+    the repository, so nobody may change them, not even the admin account
+    that nominally owns them. Checked before ownership so the answer is the
+    same for every user. Returns an error response, or None to carry on."""
+    if fmt.is_builtin:
+        return jsonify({
+            "status": "error",
+            "message": "Built-in formats are read-only. Make your own with New format to change a layout.",
+        }), 403
+    return None
+
 def _tmp_dir():
     path = os.path.join(current_app.config["UPLOAD_FOLDER"], "tmp")
     os.makedirs(path, exist_ok=True)
@@ -283,6 +295,9 @@ def get_format(format_id):
 def update_format(format_id):
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
+    locked = _reject_if_builtin(fmt)
+    if locked:
+        return locked
 
     if fmt.owner_id != user.id:
         return jsonify({"status": "error", "message": "Only the teacher who created this format can edit it."}), 403
@@ -324,6 +339,9 @@ def update_format(format_id):
 def delete_format(format_id):
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
+    locked = _reject_if_builtin(fmt)
+    if locked:
+        return locked
 
     if fmt.owner_id != user.id:
         return jsonify({"status": "error", "message": "Only the teacher who created this format can delete it."}), 403
@@ -417,6 +435,9 @@ def edit_format_content(format_id):
     detection create_format() runs when the format is first saved."""
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
+    locked = _reject_if_builtin(fmt)
+    if locked:
+        return locked
 
     if fmt.owner_id != user.id:
         return jsonify({"status": "error", "message": "Only the teacher who created this format can edit its document."}), 403
@@ -476,6 +497,9 @@ def set_field_roles(format_id):
     """
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
+    locked = _reject_if_builtin(fmt)
+    if locked:
+        return locked
     if fmt.owner_id != user.id:
         return jsonify({"status": "error", "message": "You don't have access to this format."}), 403
 
@@ -587,4 +611,6 @@ def download_format_source(format_id):
             "status": "error",
             "message": "No reference file is on record for this format — it may have been created without one.",
         }), 404
-    return send_file(path, as_attachment=True)
+    # ?inline=1 opens the file in a browser tab (the PDF viewer) instead of
+    # downloading it.
+    return send_file(path, as_attachment=request.args.get("inline") != "1")

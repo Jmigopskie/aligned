@@ -16,6 +16,13 @@ class LessonPlanFormat(db.Model):
     # template layout even though the original upload wasn't an editable
     # Word document. Left blank when source_file_path is already .docx/.dotx.
     template_docx_path = db.Column(db.String(255))
+    # One of the ready-made formats shipped in backend/builtin/formats and
+    # seeded on startup (services/builtins). Every user sees it and nobody,
+    # the admin who nominally owns it included, can change or delete it.
+    is_builtin = db.Column(db.Boolean, nullable=False, default=False)
+    # The manifest key a built-in is seeded under; null for teachers' formats.
+    builtin_key = db.Column(db.String(64))
+    description = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     fields = db.relationship(
@@ -37,6 +44,10 @@ class LessonPlanFormat(db.Model):
             "source_file_path": self.source_file_path,
             "has_source_file": bool(self.source_file_path),
             "has_template_docx": bool(self.template_docx_path),
+            "is_builtin": bool(self.is_builtin),
+            "description": self.description,
+            "field_count": len(self.fields),
+            "thumbnail": f"img/formats/{self.builtin_key}.webp" if self.is_builtin and self.builtin_key else None,
             "created_at": iso_utc(self.created_at),
         }
         if include_fields:
