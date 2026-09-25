@@ -63,6 +63,11 @@
             <p class="page-subtitle">Pick the format your school uses. Every plan you make follows its layout, from the header table to the procedure.</p>
           </div>
           <div class="page-actions">
+            <div class="format-search" id="format-search-row" role="search">
+              <span data-icon="search" class="format-search-icon"></span>
+              <label for="format-search" class="sr-only">Search formats</label>
+              <input type="search" id="format-search" placeholder="Search formats" autocomplete="off" />
+            </div>
             <button id="new-format-btn" class="btn btn-primary"><span data-icon="plus"></span>New format</button>
           </div>
         </div>
@@ -79,13 +84,6 @@
           </div>
           <div id="drafts-list" class="drafts-list"></div>
         </section>
-
-        <div class="filter-bar" id="format-search-row">
-          <div class="field field-wide">
-            <label for="format-search">Search formats</label>
-            <input type="search" id="format-search" placeholder="e.g. DLP, 4A's, SDLP" autocomplete="off" />
-          </div>
-        </div>
 
         <div id="loading-state" class="card-grid">
           <div class="format-card format-card-skeleton skeleton"></div>

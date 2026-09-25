@@ -281,7 +281,7 @@ function addOwlTyping() {
   return row;
 }
 
-function addOwlMessage(text, choices = [], { error = false } = {}) {
+function addOwlMessage(text, choices = [], { error = false, unread = true } = {}) {
   // Only the latest set of choices stays tappable, so an old suggestion
   // isn't applied to a field it was never written for.
   owlChatLog.querySelectorAll(".owl-choice:not(.is-used)").forEach((b) => { b.disabled = true; });
@@ -322,7 +322,7 @@ function addOwlMessage(text, choices = [], { error = false } = {}) {
   owlChatLog.appendChild(row);
   scrollChatToEnd();
   // A reply the teacher can't see yet shows as a dot on the owl.
-  if (!owlChat.hidden && owlChat.classList.contains("is-collapsed")) OwlGuide.setUnread(true);
+  if (unread && !owlChat.hidden && owlChat.classList.contains("is-collapsed")) setChatUnread(true);
 }
 
 // Draw a saved thread back into the log. Restored owl turns carry no choice
@@ -335,7 +335,7 @@ function renderThread(key, note) {
   if (note && thread.length) addChatNote(note);
   thread.forEach((turn) => {
     if (turn.role === "teacher") addTeacherMessage(turn.text);
-    else addOwlMessage(turn.text, []);
+    else addOwlMessage(turn.text, [], { unread: false });
   });
   return thread.length;
 }
@@ -355,7 +355,7 @@ function introduceFieldInChat() {
   if (hadTurns) {
     scrollChatToEnd();
   } else {
-    addOwlMessage(`I can help with "${field.label}". Ask a question or tap an option.`, OWL_STARTERS);
+    addOwlMessage(`I can help with "${field.label}". Ask a question or tap an option.`, OWL_STARTERS, { unread: false });
   }
 }
 
@@ -446,6 +446,9 @@ function updateChatRoom() {
   // On wide screens the page makes room for the open chat, so it never
   // covers the document the teacher is writing in.
   document.body.classList.toggle("owl-chat-open", !owlChat.hidden && !owlChat.classList.contains("is-collapsed"));
+  // Even collapsed, the bar and the owl float over the bottom of the page,
+  // so the page gets room to scroll its last buttons clear of them.
+  document.body.classList.toggle("owl-chat-shown", !owlChat.hidden);
 }
 
 // Collapsed means the panel is gone and only the owl is left, as the button
@@ -462,10 +465,21 @@ function chatWasOpen() {
   }
 }
 
+// Collapsed, the chat shrinks to its header bar with an Open button; open, the
+// same button reads Hide. A reply that arrives while collapsed puts a dot on
+// that button.
+function setChatUnread(unread) {
+  owlChatToggle.classList.toggle("has-unread", !!unread);
+  // The button's own text names it; only a waiting reply needs saying.
+  if (unread) owlChatToggle.setAttribute("aria-label", "Open, new reply");
+  else owlChatToggle.removeAttribute("aria-label");
+}
+
 function setOwlChatCollapsed(collapsed, { remember = true } = {}) {
   owlChat.classList.toggle("is-collapsed", collapsed);
   owlChatToggle.setAttribute("aria-expanded", String(!collapsed));
-  OwlGuide.setExpanded(!collapsed);
+  owlChatToggle.textContent = collapsed ? "Open" : "Hide";
+  if (!collapsed) setChatUnread(false);
   if (remember) {
     try {
       sessionStorage.setItem(CHAT_OPEN_KEY, collapsed ? "0" : "1");
@@ -474,27 +488,28 @@ function setOwlChatCollapsed(collapsed, { remember = true } = {}) {
     }
   }
   updateChatRoom();
-  if (!collapsed) {
-    placeChat();
-    scrollChatToEnd();
-  }
+  placeChat();
+  if (!collapsed) scrollChatToEnd();
 }
 
 // ---- Chat placement: beside the owl, never over him ----
 // Desktop: the panel's right edge sits a gap to the owl's left, bottoms
-// aligned. When there isn't room for the narrowest panel there (a phone, or
-// the owl dragged to the left edge) it becomes a full-width sheet above the
-// owl, or below him when he sits in the top half of the screen.
+// aligned. When there isn't room there (a phone, or the owl dragged to the
+// left edge) the open panel becomes a full-width sheet above the owl, or
+// below him when he sits in the top half of the screen. The collapsed bar is
+// narrow enough to stay beside him even on a phone.
 const OWL_GAP = 12;
 const EDGE = 16;
+const CHAT_BAR_MIN = 200;
 
 function placeChat() {
-  if (owlChat.hidden || owlChat.classList.contains("is-collapsed")) return;
+  if (owlChat.hidden) return;
   const owl = OwlGuide.rect();
   if (!owl) return;
   const s = owlChat.style;
+  const collapsed = owlChat.classList.contains("is-collapsed");
   const room = owl.left - OWL_GAP - EDGE;
-  const sheet = room < CHAT_W_MIN || window.innerWidth <= 640;
+  const sheet = collapsed ? room < CHAT_BAR_MIN : room < CHAT_W_MIN || window.innerWidth <= 640;
   owlChat.classList.toggle("is-sheet", sheet);
   owlChat.classList.remove("is-below");
   if (!sheet) {
@@ -684,9 +699,9 @@ function showOwlChat(visible) {
   const opening = visible && owlChat.hidden;
   owlChat.hidden = !visible;
   if (visible) {
-    // The owl stays through Guided mode as the chat's launcher, rather than
-    // stepping aside for a panel that then covered his corner.
-    OwlGuide.dock({ onToggle: toggleOwlChat });
+    // The owl stays through Guided mode beside the chat, rather than stepping
+    // aside for a panel that then covered his corner.
+    OwlGuide.dock();
     if (opening) setOwlChatCollapsed(!chatWasOpen(), { remember: false });
     showChatHistory(false);
     introduceFieldInChat();
@@ -700,10 +715,13 @@ owlChatForm.addEventListener("submit", (e) => {
   e.preventDefault();
   sendToOwl(owlChatInput.value);
 });
-owlChatToggle.addEventListener("click", () => {
-  setOwlChatCollapsed(true);
-  // The panel that had focus is gone; the owl is how to get it back.
-  OwlGuide.focus();
+owlChatToggle.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleOwlChat();
+});
+// The collapsed bar is one big target: a click anywhere on it opens the chat.
+owlChat.querySelector(".owl-chat-head").addEventListener("click", (e) => {
+  if (owlChat.classList.contains("is-collapsed") && !e.target.closest("button")) setOwlChatCollapsed(false);
 });
 
 function setOwlState(state, message) {

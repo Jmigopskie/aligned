@@ -264,7 +264,9 @@ button {
 .page-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
+  flex-shrink: 0;
 }
 
 @media (max-width: 640px) {
@@ -3934,8 +3936,23 @@ body.auth-page::after {
   overflow: hidden;
 }
 
-/* Collapsed: the panel is gone and the owl alone stands for it. */
+/* Collapsed: just the header bar, with its Open button, sitting beside the
+   owl. A compact width, since it only has to carry its title. */
 .owl-chat.is-collapsed {
+  height: auto;
+  width: min(300px, var(--chat-room, calc(100vw - 32px)));
+}
+
+.owl-chat.is-collapsed .owl-chat-head {
+  padding: 8px 10px 8px 8px;
+}
+
+.owl-chat.is-collapsed .owl-chat-avatar {
+  width: 32px;
+  height: 32px;
+}
+
+.owl-chat.is-collapsed #owl-chat-history-btn {
   display: none;
 }
 
@@ -3959,7 +3976,29 @@ body.auth-page::after {
   display: none;
 }
 
-/* ---- The docked owl: the chat's launcher in Guided mode ---- */
+/* A reply waiting behind the collapsed bar: an amber dot on Open, the one
+   colour this app reserves for "look here". */
+.owl-chat-toggle {
+  position: relative;
+}
+
+.owl-chat-toggle.has-unread::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--primary);
+}
+
+body.owl-chat-shown .dash-main {
+  padding-bottom: 140px;
+}
+
+/* ---- The docked owl: a companion beside the chat in Guided mode ---- */
 .owl-guide.is-docked {
   z-index: 56;
 }
@@ -3974,42 +4013,9 @@ body.auth-page::after {
   width: 96px;
 }
 
-.owl-guide.is-docked:focus-visible {
-  outline: none;
-}
-
-.owl-guide.is-docked:focus-visible .owl-guide-img {
-  outline: 2px solid var(--primary);
-  outline-offset: 4px;
-  border-radius: 12px;
-}
-
-.owl-guide.is-docked .owl-guide-bubble {
-  margin-bottom: 40px;
-}
-
-/* The amber is the one colour this app reserves for "look here". */
-.owl-unread {
-  display: none;
-  position: absolute;
-  top: 8%;
-  right: 12%;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 2px solid var(--surface);
-  box-shadow: 0 1px 3px rgba(22, 35, 30, 0.25);
-}
-
-.owl-guide.has-unread .owl-unread {
-  display: block;
-}
-
 @media (max-width: 640px) {
-  /* The transient guide stays hidden on phones, but as the chat's launcher
-     he is the only way to open it, so the docked owl shows, smaller and
-     without his speech bubble. */
+  /* The transient guide stays hidden on phones; in Guided mode he sits
+     beside the chat bar, smaller. */
   .owl-guide.is-docked {
     display: flex;
     right: 12px;
@@ -4018,10 +4024,6 @@ body.auth-page::after {
 
   .owl-guide.is-docked .owl-guide-img {
     width: 64px;
-  }
-
-  .owl-guide.is-docked .owl-guide-bubble {
-    display: none;
   }
 }
 
@@ -4112,9 +4114,19 @@ body.auth-page::after {
   color: #FFFFFF;
   border-radius: 999px;
   padding: 4px 12px;
+  min-height: 32px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Open is the collapsed bar's one action, so it reads as a button. */
+.owl-chat.is-collapsed .owl-chat-toggle {
+  background: #FFFFFF;
+  color: var(--primary);
+  border-color: #FFFFFF;
+  padding: 4px 16px;
 }
 
 .owl-chat-toggle:hover { background: rgba(255, 255, 255, 0.14); }
@@ -4952,16 +4964,15 @@ body.auth-page::after {
 
 /* ---- Create Lesson Plan: three shelves of formats ---- */
 .format-section {
-  margin-top: var(--space-8);
+  margin-top: var(--space-7);
 }
 
-.format-section:first-of-type,
-.drafts-strip + .filter-bar + .card-grid + .empty-state + .format-section {
-  margin-top: var(--space-6);
+.format-section:first-of-type {
+  margin-top: var(--space-5);
 }
 
 .format-section-head {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .section-title {
@@ -4979,33 +4990,61 @@ body.auth-page::after {
   max-width: 640px;
 }
 
-.format-grid-builtin {
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--space-5);
+/* Search sits in the header beside New format rather than on a row of its
+   own, so the formats start higher up the page. */
+.format-search {
+  position: relative;
+  flex: 0 0 auto;
+  width: 260px;
 }
 
-/* A built-in reads as the sheet itself: the top of page one, sitting on the
-   paper-coloured page like a handout on a desk, cropped where the fold
-   would be. */
+.format-search input {
+  min-height: var(--control-h);
+  padding-left: 36px;
+}
+
+.format-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: var(--text-body);
+  pointer-events: none;
+}
+
+.format-search-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Built-ins are compact rows, two to a line on a desktop: the top of page
+   one as a small sheet beside the name, so all five fit on one screen. */
+.format-grid-builtin {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+  gap: var(--space-4);
+}
+
 .format-card.is-builtin {
+  flex-direction: row;
+  align-items: stretch;
   padding: 0;
   gap: 0;
   overflow: hidden;
 }
 
-.format-thumb-wrap {
-  position: relative;
-}
-
+/* A button centres its content; the sheet has to hang from the top edge so
+   the header table of page one is what shows. */
 .format-thumb-frame {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  padding: var(--space-4) var(--space-6) 0;
+  flex: 0 0 124px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-3) var(--space-3) 0;
   overflow: hidden;
   background: var(--bg);
   border: 0;
-  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   cursor: pointer;
 }
 
@@ -5014,34 +5053,39 @@ body.auth-page::after {
   width: 100%;
   height: auto;
   background: #FFFFFF;
-  border-radius: 3px 3px 0 0;
-  box-shadow: 0 2px 10px rgba(22, 35, 30, 0.12);
+  border-radius: 2px 2px 0 0;
+  box-shadow: 0 1px 6px rgba(22, 35, 30, 0.12);
   transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .format-card.is-builtin:hover .format-thumb {
-  transform: translateY(-3px);
-}
-
-.badge-lock {
-  position: absolute;
-  top: var(--space-3);
-  left: var(--space-3);
-  background: var(--surface);
-  color: var(--text-heading);
-  border-color: var(--border);
-  box-shadow: 0 1px 3px rgba(22, 35, 30, 0.1);
+  transform: translateY(-2px);
 }
 
 .format-card-body {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-4) var(--space-5) 0;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
 }
 
-.format-card-body h3 {
+.format-card-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.format-card-title-row h3 {
   margin: 0;
+}
+
+.badge-lock {
+  background: var(--bg);
+  color: var(--text-heading);
+  border-color: var(--border);
 }
 
 .format-card-desc {
@@ -5049,29 +5093,36 @@ body.auth-page::after {
   line-height: 1.5;
   color: var(--text-body);
   margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.format-card-body .format-card-meta {
-  margin: var(--space-1) 0 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.format-card-actions {
+/* The same footer on every format card: what it holds on the left, its
+   actions on the right. */
+.format-card-foot {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
-  padding: var(--space-4) var(--space-5) var(--space-5);
   margin-top: auto;
+  padding-top: var(--space-1);
 }
 
-.format-card-actions .btn {
-  flex: 1 1 100%;
+.format-card-foot .format-card-meta {
+  margin: 0 auto 0 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .new-format-tile-icon svg {
   width: 22px;
   height: 22px;
   color: var(--primary);
+}
+
+.new-format-tile {
+  min-height: 112px;
 }
 
 .empty-state-compact {
@@ -5091,18 +5142,22 @@ body.auth-page::after {
 }
 
 @media (max-width: 640px) {
-  .new-format-tile {
-    min-height: 96px;
+  .format-search {
+    flex: 1 1 100%;
+    width: auto;
   }
 
-  /* Five full-width sheets make a long scroll; the header table at the top
-     of page one is enough to recognise a format. */
   .format-thumb-frame {
-    aspect-ratio: 2 / 1;
+    flex-basis: 88px;
+    padding: var(--space-2) var(--space-2) 0;
   }
 
-  .format-section {
-    margin-top: var(--space-7);
+  .format-card-body {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .new-format-tile {
+    min-height: 88px;
   }
 }
 
@@ -5516,7 +5571,8 @@ body.auth-page::after {
   .btn-sm,
   .icon-btn,
   .password-toggle-btn,
-  .announcement-banner-close {
+  .announcement-banner-close,
+  .owl-chat-toggle {
     min-width: 44px;
     min-height: 44px;
   }

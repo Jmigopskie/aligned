@@ -58,21 +58,23 @@ function openOriginal(fmt) {
 function builtinCard(fmt) {
   const card = document.createElement("article");
   card.className = "format-card is-builtin";
+  // A compact row: the top of page one as a small thumbnail beside the name,
+  // so five formats fit on a screen instead of five screens.
   card.innerHTML = `
-    <div class="format-thumb-wrap">
-      <button type="button" class="format-thumb-frame" data-action="use" tabindex="-1" aria-hidden="true">
-        <img class="format-thumb" src="${fmt.thumbnail}" alt="" loading="lazy" width="480" height="679" />
-      </button>
-      <span class="badge badge-lock" title="Built-in formats can't be edited or deleted">${Icons.lock}Built-in</span>
-    </div>
+    <button type="button" class="format-thumb-frame" data-action="use" tabindex="-1" aria-hidden="true">
+      <img class="format-thumb" src="${fmt.thumbnail}" alt="" loading="lazy" width="480" height="679" />
+    </button>
     <div class="format-card-body">
-      <h3></h3>
+      <div class="format-card-title-row">
+        <h3></h3>
+        <span class="badge badge-lock" title="Built-in formats can't be edited or deleted">${Icons.lock}Built-in</span>
+      </div>
       <p class="format-card-desc"></p>
-      <p class="format-card-meta">${fmt.field_count} fields</p>
-    </div>
-    <div class="format-card-actions">
-      <button class="btn btn-primary" type="button" data-action="use">Use this format</button>
-      <button class="btn btn-secondary" type="button" data-action="source"><span data-icon="externalLink"></span>View original</button>
+      <div class="format-card-foot">
+        <span class="format-card-meta">${fmt.field_count} fields</span>
+        <button class="btn btn-ghost btn-sm" type="button" data-action="source"><span data-icon="externalLink"></span>View original</button>
+        <button class="btn btn-primary btn-sm" type="button" data-action="use">Use this format</button>
+      </div>
     </div>`;
   card.querySelector("h3").textContent = fmt.name;
   card.querySelector(".format-card-desc").textContent = fmt.description || "";
@@ -106,10 +108,12 @@ function teacherCard(fmt) {
           : ""
       }
     </div>
-    <p class="format-card-meta">${fmt.field_count} fields &middot; added ${fmtAdded(fmt.created_at)}${
-      isOwner ? "" : ` &middot; by ${escapeHtml(fmt.owner_name || "another teacher")}`
-    }</p>
-    <button class="btn btn-primary btn-block format-card-cta" type="button" data-action="use">Use this format</button>`;
+    <div class="format-card-foot">
+      <span class="format-card-meta">${fmt.field_count} fields &middot; added ${fmtAdded(fmt.created_at)}${
+        isOwner ? "" : ` &middot; by ${escapeHtml(fmt.owner_name || "another teacher")}`
+      }</span>
+      <button class="btn btn-primary btn-sm" type="button" data-action="use">Use this format</button>
+    </div>`;
   card.querySelector("h3").textContent = fmt.name;
   card.querySelector('[data-action="use"]').addEventListener("click", () => useFormat(fmt));
 

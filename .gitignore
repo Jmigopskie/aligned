@@ -13,3 +13,6 @@ backend/aligned.db
 backend/instance/
 backend/uploads/
 backend/generated/
+
+# Impeccable design hook scratch cache
+.impeccable/hook.cache.json

@@ -731,11 +731,9 @@ const OwlGuide = {
   // it for the rest of the page, instead of springing back each time.
   _pos: { x: 0, y: 0 },
   VISIBLE_MS: 5000,
-  // Docked: during Guided mode the owl stays put as the chat's launcher
+  // Docked: during Guided mode the owl stays on screen beside the chat
   // instead of leaving after one line. See dock().
   _docked: false,
-  _onToggle: null,
-  _expanded: false,
   _moveListeners: [],
 
   _build() {
@@ -753,7 +751,6 @@ const OwlGuide = {
       </div>
       <span class="owl-guide-figure">
         <img class="owl-guide-img" id="owl-guide-img" src="img/owl/alan-idle.png" alt="" />
-        <span class="owl-unread" aria-hidden="true"></span>
       </span>`;
     document.body.appendChild(el);
 
@@ -817,12 +814,8 @@ const OwlGuide = {
       // sits on top of whatever is beneath him — often the page's primary
       // button, since he rests in the bottom-right corner. If this turned out
       // to be a click rather than a drag, pass it on to whatever the pointer
-      // was really over, so he never silently eats one. Docked, he is the
-      // chat's button, so a click is his own.
-      if (!dragged) {
-        if (this._docked && this._onToggle) this._onToggle();
-        else this._passClickThrough(e);
-      }
+      // was really over, so he never silently eats one.
+      if (!dragged) this._passClickThrough(e);
       try {
         if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
       } catch (err) {
@@ -843,11 +836,6 @@ const OwlGuide = {
       };
       if (e.key === "Escape") {
         this.hide();
-        return;
-      }
-      if (this._docked && (e.key === "Enter" || e.key === " ") && e.target === el) {
-        e.preventDefault();
-        if (this._onToggle) this._onToggle();
         return;
       }
       if (!moves[e.key]) return;
@@ -914,15 +902,15 @@ const OwlGuide = {
     this._cancelLeave();
     el.classList.remove("is-leaving");
     el.hidden = false;
-    // While the chat is open it is the owl's voice, so the line only changes
-    // his pose; the bubble would sit on top of the conversation.
-    this._bubble().hidden = this._docked && this._expanded;
+    // Docked beside the chat, the chat is his voice: a line only changes his
+    // pose, since a bubble would sit on top of the chat bar.
+    this._bubble().hidden = this._docked;
     this._moveTo(this._pos.x, this._pos.y);
     this._arm();
   },
 
-  // Docked, only the speech bubble goes away; the owl himself stays, because
-  // he is how the chat is opened again.
+  // Docked, only the speech bubble goes away; the owl himself stays for as
+  // long as Guided mode lasts.
   hide() {
     this._pause();
     if (!this._el || this._el.hidden) return;
@@ -946,63 +934,29 @@ const OwlGuide = {
     this._leaveTimer = null;
   },
 
-  // Guided mode: the owl becomes the chat's launcher. He stays on screen,
-  // a click (not a drag), Enter or Space calls onToggle, and he is announced
-  // as the button that opens the chat.
-  dock({ onToggle }) {
+  // Guided mode: the owl stays on screen next to the chat (which has its own
+  // Open and Hide button) instead of leaving after five seconds. He is still
+  // only a companion: dragging moves him and the chat follows, but clicking
+  // him does nothing to the chat.
+  dock() {
     const el = this._el || this._build();
-    this._onToggle = onToggle;
     this._cancelLeave();
     el.classList.remove("is-leaving");
     el.hidden = false;
     if (this._docked) return;
     this._docked = true;
     el.classList.add("is-docked");
-    el.classList.remove("is-leaving");
-    el.setAttribute("role", "button");
-    el.setAttribute("aria-controls", "owl-chat");
-    el.setAttribute("aria-expanded", String(this._expanded));
-    el.setAttribute("aria-label", "Chat with the owl");
     this._bubble().hidden = true;
-    el.hidden = false;
     this._pause();
     this._moveTo(this._pos.x, this._pos.y);
   },
 
   undock() {
     if (!this._docked) return;
-    const el = this._el;
     this._docked = false;
-    this._onToggle = null;
-    this._expanded = false;
-    el.classList.remove("is-docked", "is-expanded", "has-unread");
-    el.setAttribute("role", "group");
-    el.setAttribute("aria-label", "Guide");
-    el.removeAttribute("aria-controls");
-    el.removeAttribute("aria-expanded");
+    this._el.classList.remove("is-docked");
     this._bubble().hidden = false;
     this.hide();
-  },
-
-  setExpanded(expanded) {
-    this._expanded = !!expanded;
-    if (!this._el || !this._docked) return;
-    this._el.classList.toggle("is-expanded", this._expanded);
-    this._el.setAttribute("aria-expanded", String(this._expanded));
-    if (this._expanded) {
-      this._bubble().hidden = true;
-      this.setUnread(false);
-    }
-  },
-
-  setUnread(unread) {
-    if (!this._el || !this._docked) return;
-    this._el.classList.toggle("has-unread", !!unread);
-    this._el.setAttribute("aria-label", unread ? "Chat with the owl, new reply" : "Chat with the owl");
-  },
-
-  focus() {
-    if (this._el && !this._el.hidden) this._el.focus();
   },
 
   // Where the owl is drawn right now, for placing the chat beside him.
