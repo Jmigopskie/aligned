@@ -141,9 +141,19 @@ def _seed_guides(folder, owner_id):
             guide = CourseGuide(builtin_key=key, uploader_id=owner_id)
             db.session.add(guide)
 
-        if guide.file_hash != file_hash or not guide.extracted_text:
+        # Only a new or changed file gets its text read. The text ships beside
+        # the PDF as <name>.txt, extracted once when the guide was added:
+        # extracting a 184-page PDF inside every gunicorn worker's startup
+        # could outlast the worker timeout. An empty or failed extraction is
+        # kept as it is rather than retried on every boot.
+        if guide.file_hash != file_hash:
+            cached = os.path.splitext(path)[0] + ".txt"
             try:
-                guide.extracted_text = text_extract.extract_text(path)
+                if os.path.isfile(cached):
+                    with open(cached, encoding="utf-8") as fh:
+                        guide.extracted_text = fh.read()
+                else:
+                    guide.extracted_text = text_extract.extract_text(path)
             except Exception:
                 _log.exception("Text extraction failed for built-in guide %s", key)
                 guide.extracted_text = ""

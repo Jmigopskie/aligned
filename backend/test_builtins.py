@@ -290,6 +290,64 @@ def check_upgrade_from_old_schema():
     print("  upgrade from old schema OK")
 
 
+def check_guide_text_is_precomputed(app):
+    """Boot must not spend minutes in PDF text extraction: every gunicorn
+    worker seeds while loading, so a guide ships its text beside it as
+    <name>.txt and the seeder reads that. A guide without one is extracted
+    once; an empty or failed extraction is not retried on every boot."""
+    from services import text_extract
+
+    tmp = tempfile.mkdtemp()
+    real = text_extract.extract_text
+    calls = []
+
+    def fake(path):
+        calls.append(os.path.basename(path))
+        return ""
+
+    try:
+        folder = os.path.join(tmp, "course_guides")
+        os.makedirs(folder)
+        _guide_docx(os.path.join(folder, "cached.docx"), "ignored body")
+        with open(os.path.join(folder, "cached.txt"), "w", encoding="utf-8") as fh:
+            fh.write("PRECOMPUTED TEXT")
+        _guide_docx(os.path.join(folder, "scanned.docx"), "")
+        json.dump([
+            {"key": "t-cached", "title": "Cached", "subject": "ICT", "file": "cached.docx"},
+            {"key": "t-scanned", "title": "Scanned", "subject": "ICT", "file": "scanned.docx"},
+        ], open(os.path.join(folder, "guides.json"), "w", encoding="utf-8"))
+
+        text_extract.extract_text = fake
+        builtins.seed_builtins(tmp)
+        builtins.seed_builtins(tmp)
+    finally:
+        text_extract.extract_text = real
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    cached = CourseGuide.query.filter_by(builtin_key="t-cached").one()
+    assert cached.extracted_text == "PRECOMPUTED TEXT", cached.extracted_text
+    assert "cached.docx" not in calls, calls
+    assert calls.count("scanned.docx") == 1, calls
+    # Every shipped official guide has its text beside it.
+    folder = os.path.join(builtins.BUILTIN_DIR, "course_guides")
+    for entry in json.load(open(os.path.join(folder, "guides.json"), encoding="utf-8")):
+        txt = os.path.join(folder, os.path.splitext(entry["file"])[0] + ".txt")
+        assert os.path.isfile(txt) and os.path.getsize(txt) > 1000, txt
+    print("  guide text precomputed OK")
+
+
+def check_admin_owning_builtins_can_be_deleted(app, first_admin):
+    """The first admin owns the seeded built-ins. Another admin must still be
+    able to delete that account; the built-ins move to the acting admin."""
+    second = make_user("Second Admin", "second.admin@example.test", "admin")
+    res = client_for(app, second).delete(f"/api/admin/users/{first_admin.id}")
+    assert res.status_code == 200, (res.status_code, res.get_json())
+    db.session.expire_all()
+    assert all(f.owner_id == second.id for f in builtin_formats())
+    assert all(g.uploader_id == second.id for g in CourseGuide.query.filter_by(is_builtin=True))
+    print("  deleting the admin who owns built-ins OK")
+
+
 def main():
     check_upgrade_from_old_schema()
     app = create_app()
@@ -304,6 +362,8 @@ def main():
         check_visibility(app, student)
         check_export_fills_frozen_anchors(app, student)
         check_guides(app, admin, student)
+        check_guide_text_is_precomputed(app)
+        check_admin_owning_builtins_can_be_deleted(app, admin)
     print("builtins OK")
 
 

@@ -5431,15 +5431,20 @@ body.auth-page::after {
     margin-bottom: var(--space-3);
   }
 
+  /* Each value sits in a flex row beside its label, where a long unbroken
+     email would keep its full width and push the card sideways; in this
+     one-column card breaking anywhere is the right trade. */
   .data-table td,
   .data-table tr:last-child td {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
+    min-width: 0;
     padding: var(--space-1) 0;
     border: 0;
     text-align: right;
+    overflow-wrap: anywhere;
   }
 
   .data-table td[data-label]::before {
