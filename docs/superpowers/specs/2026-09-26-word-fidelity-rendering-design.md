@@ -192,7 +192,10 @@ Side-by-side renders (LibreOffice vs app) of that file and the five built-ins sh
   inner vs outer borders; cell margins; row minimum height; `vAlign`; list
   counters ("1.", "2.", "a.", "•"); inline picture as data URI; floating picture
   as float; `Type3` → Arial. Plus checks on the T1W7 sample: page 936pt wide, two
-  logos, the first objective carries "1.". The existing 13 backend tests and the
+  logos, the first objective carries "1.". And for every built-in, the rendered
+  view contains exactly as many `<img>` pictures as its source PDF's first page
+  (DLP 2, SNHS 2, ILAW 2), each with a non-empty data URI, so a missing logo
+  fails the test. The existing 13 backend tests and the
   weekly-field tests keep passing.
 - **Visual check**: side-by-side images at the same scale, app at 100% against
   the source PDF for the five built-ins and against LibreOffice's rendering for
