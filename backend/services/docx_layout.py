@@ -40,6 +40,7 @@ _HIGHLIGHT = {"yellow": "#FFFF00", "green": "#00FF00", "cyan": "#00FFFF", "magen
 _UNDERLINE_STYLE = {"double": "double", "dotted": "dotted", "dash": "dashed", "wave": "wavy"}
 _ALIGN = {"center": "center", "right": "right", "end": "right", "both": "justify", "distribute": "justify"}
 _OFF = {"0", "false", "off"}
+_BROWSER_IMAGES = {"image/png", "image/jpeg", "image/gif", "image/bmp", "image/webp", "image/svg+xml"}
 
 
 def _pt(value):
@@ -585,4 +586,57 @@ class Layout:
     # -- pictures ------------------------------------------------------------
 
     def pictures(self, r_el):
-        return ""  # Task 4
+        """<img> tags for the pictures in a run ("" for none). A picture the
+        browser can't show (EMF/WMF) or can't be read is left out."""
+        out = []
+        for drawing in r_el.findall(qn("w:drawing")):
+            for frame in drawing:
+                if not isinstance(frame.tag, str):
+                    continue
+                try:
+                    out.append(self._picture(frame))
+                except Exception:
+                    _log.debug("Picture unreadable; left out.", exc_info=True)
+        return "".join(out)
+
+    def _picture(self, frame):
+        extent = frame.find(f"{{{_WP}}}extent")
+        blip = frame.find(f".//{{{_A}}}blip")
+        if extent is None or blip is None:
+            return ""
+        part = self.doc.part.related_parts.get(blip.get(_R_EMBED))
+        if part is None or part.content_type not in _BROWSER_IMAGES:
+            return ""
+        css = ["width:" + _pt(_num(extent.get("cx"), 0) / _EMU_PER_PT),
+               "height:" + _pt(_num(extent.get("cy"), 0) / _EMU_PER_PT)]
+        css += self._anchor_css(frame) if _local(frame) == "anchor" else ["vertical-align:bottom"]
+        src = "data:%s;base64,%s" % (part.content_type, base64.b64encode(part.blob).decode("ascii"))
+        return '<img src="%s" alt="" style="%s">' % (src, ";".join(css))
+
+    def _anchor_css(self, frame):
+        """Where a floating picture sits, and how text wraps around it."""
+        def position(axis):
+            pos = frame.find(f"{{{_WP}}}position{axis}")
+            if pos is None:
+                return None, 0.0, None
+            offset = pos.find(f"{{{_WP}}}posOffset")
+            align = pos.find(f"{{{_WP}}}align")
+            return (pos.get("relativeFrom"),
+                    _num(offset.text, 0) / _EMU_PER_PT if offset is not None else 0.0,
+                    align.text if align is not None else None)
+
+        h_from, h_offset, h_align = position("H")
+        _v_from, v_offset, _v_align = position("V")
+        wrap = next((_local(c) for c in frame if isinstance(c.tag, str) and _local(c).startswith("wrap")),
+                    "wrapNone")
+        # An offset from the page or its margins can't be placed inside a cell
+        # or paragraph; one from the column or the text itself can.
+        x = h_offset if h_from in ("column", "character") else 0.0
+        y = max(v_offset, 0.0)
+        if frame.get("behindDoc") in ("1", "true") or wrap == "wrapNone":
+            return ["position:absolute", "left:" + _pt(x), "top:" + _pt(y)]
+        if wrap == "wrapTopAndBottom":
+            return ["display:block", "margin-left:" + _pt(x), "margin-top:" + _pt(y)]
+        side = "right" if h_align == "right" else "left"
+        return ["float:" + side, "margin-left:" + _pt(x), "margin-top:" + _pt(y),
+                "margin-right:" + _pt(_num(frame.get("distR"), 0) / _EMU_PER_PT)]

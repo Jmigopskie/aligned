@@ -167,11 +167,54 @@ def check_lists():
     print("  lists OK")
 
 
+def _png():
+    """A valid one-pixel PNG, built here so the test carries no binary file."""
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(b"\x00\xff\x00\x00")) + chunk(b"IEND", b""))
+
+
+def _make_floating(r_el):
+    """Turn an inline picture into a square-wrapped one, 1pt from its column."""
+    inline = r_el.find(".//" + qn("wp:inline"))
+    anchor = parse_xml(
+        '<wp:anchor %s distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="1" '
+        'behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/>'
+        '<wp:positionH relativeFrom="column"><wp:posOffset>12700</wp:posOffset></wp:positionH>'
+        '<wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>'
+        '</wp:anchor>' % nsdecls("wp"))
+    for child in list(inline):
+        anchor.append(child)
+        if child.tag == qn("wp:extent"):
+            anchor.append(parse_xml('<wp:wrapSquare %s wrapText="bothSides"/>' % nsdecls("wp")))
+    inline.getparent().replace(inline, anchor)
+
+
+def check_pictures():
+    doc = Document()
+    doc.add_picture(io.BytesIO(_png()), width=Pt(40), height=Pt(20))
+    floating = doc.add_paragraph().add_run()
+    floating.add_picture(io.BytesIO(_png()), width=Pt(30), height=Pt(30))
+    _make_floating(floating._r)
+    broken = doc.add_paragraph().add_run()
+    broken.add_picture(io.BytesIO(_png()), width=Pt(10), height=Pt(10))
+    broken._r.find(".//" + qn("a:blip")).set(qn("r:embed"), "rIdMissing")
+    html = _render(doc)
+    styles = re.findall(r'<img src="data:image/png;base64,[A-Za-z0-9+/=]+" alt="" style="([^"]*)">', html)
+    # The unreadable picture is left out and the page still renders.
+    assert len(styles) == 2, styles
+    assert styles[0].startswith("width:40pt;height:20pt"), styles
+    assert "float:left" in styles[1] and "margin-left:1pt" in styles[1] and "margin-right:9pt" in styles[1], styles
+    print("  pictures OK")
+
+
 def main():
     check_page()
     check_text_cascade()
     check_tables()
     check_lists()
+    check_pictures()
     print("render fidelity OK")
 
 
