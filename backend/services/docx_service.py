@@ -23,6 +23,9 @@ _SIGNATURE_RE = re.compile(r"^(prepared|checked|noted)\s+by\b", re.IGNORECASE)
 _STOPWORDS = {"the", "a", "an", "of", "for", "by", "and", "or", "to", "in", "on"}
 _PREAMBLE_MATCH_WINDOW = 1
 _LABEL_MAX_CHARS = 100
+# "Label: instructions..." in one paragraph. The label may wrap over lines in a
+# narrow cell ("Opportunities for\nintegration and\ncontextualization:").
+_LONG_LABEL_RE = re.compile(r"^\s*([^:]{2,90}?)\s*:\s*\S", re.S)
 
 def export_lesson_plan(plan, fmt) -> str:
     template_path = resolve_template_path(fmt)
@@ -274,7 +277,8 @@ def render_template_html(fmt):
             "unmatched_fields": [f.field_key for f in fields_sorted],
         }
 
-    slots, cell_value_targets = _plan_html_slots(doc, items, anchors)
+    weekly_keys = {f.field_key for f in fields_sorted if f.field_type == "weekly"}
+    slots, cell_value_targets = _plan_html_slots(doc, items, anchors, weekly_keys)
     html = _render_doc_body_html(doc, items, slots, cell_value_targets)
 
     return {
@@ -331,10 +335,11 @@ def candidate_label_lines(source_path):
         return None
 
     items = _iter_items(doc)
+    header = _day_header(doc)
     lines = []
     for idx, item in enumerate(items):
         text = _element_text(doc, item["el"])
-        if not text or len(text) > _LABEL_MAX_CHARS:
+        if not text:
             continue
 
         # A table cell's second and later lines are typically explanatory
@@ -345,8 +350,30 @@ def candidate_label_lines(source_path):
         if item["cell"] is not None and not _is_first_textual_line_in_cell(doc, items, idx):
             continue
 
+        # A line that starts mid-sentence is the tail of text cut at a page
+        # break when a PDF was converted ("guidance or support throughout each
+        # session."), never a label. A weekday is a column header.
+        if text[:1].islower() or text.lower() in _WEEKDAY_NAMES:
+            continue
+
+        # DepEd templates often put the label and its instructions in one
+        # paragraph ("Flow: Describe the activities that you can implement...").
+        # Too long to be a label as a whole, but the part before the colon is.
+        if len(text) > _LABEL_MAX_CHARS:
+            match = _LONG_LABEL_RE.match(text)
+            label = " ".join(match.group(1).split()) if match else ""
+            if not label or len(label) > 60:
+                continue
+            text = label + ":"
+
         if _looks_like_label(text) or _has_fillable_slot(doc, items, idx):
-            lines.append({"index": idx, "text": text})
+            entry = {"index": idx, "text": text}
+            if item["cell"] is not None:
+                cells = _weekly_cells(item)
+                entry["blank_cells"] = len(cells)
+                if len(cells) >= 2:
+                    entry["parts"] = weekly_part_labels(doc, cells, header)
+            lines.append(entry)
 
     return lines
 
@@ -382,7 +409,7 @@ def _render_doc_body_html(doc, items, slots, cell_value_targets):
     body_html = _render_block_children(doc, doc.element.body, slots, cell_value_targets, index_by_el_id)
     return '<div class="lp-doc">' + body_html + "</div>"
 
-def _plan_html_slots(doc, items, anchors):
+def _plan_html_slots(doc, items, anchors, weekly_keys=frozenset()):
     """Decide, for each matched field, where its editable value slot goes in the
     HTML — mirroring the same priority order the real .docx fill uses (an empty
     sibling cell in the same row, then appending within the same cell, then
@@ -391,8 +418,9 @@ def _plan_html_slots(doc, items, anchors):
 
     Returns:
       slots: {id(anchor_paragraph_el): (field_key, "inline" | "same_cell" | "block")}
-      cell_value_targets: {id(cell._tc): field_key} -- cells that themselves ARE
-        the value slot for a field labeled earlier in the same row.
+      cell_value_targets: {id(cell._tc): (field_key, part)} -- cells that
+        themselves ARE the value slot for a field labeled earlier in the same
+        row; part is the day index of a weekly field, None otherwise.
     """
     slots = {}
     cell_value_targets = {}
@@ -408,10 +436,18 @@ def _plan_html_slots(doc, items, anchors):
         row_cells = item["row_cells"]
         col_idx = item["col_idx"]
 
+        if field_key in weekly_keys:
+            day_cells = [c for c in _weekly_cells(item) if id(c[0]) not in claimed_cells]
+            if day_cells:
+                for part, (tc, _start, _span) in enumerate(day_cells):
+                    cell_value_targets[id(tc)] = (field_key, part)
+                    claimed_cells.add(id(tc))
+                continue
+
         if cell is not None and row_cells and col_idx is not None:
             sibling = _find_empty_sibling_cell(row_cells, cell, col_idx, claimed_cells)
             if sibling is not None:
-                cell_value_targets[id(sibling._tc)] = field_key
+                cell_value_targets[id(sibling._tc)] = (field_key, None)
                 claimed_cells.add(id(sibling._tc))
                 continue
 
@@ -652,14 +688,17 @@ def _render_html_cell(doc, cell, slots, cell_value_targets, default_borders, col
     style_attr = f' style="{style}"' if style else ""
     span_attr = (f' colspan="{colspan}"' if colspan > 1 else "") + (f' rowspan="{rowspan}"' if rowspan > 1 else "")
 
-    field_key = cell_value_targets.get(id(cell._tc))
-    if field_key:
+    target = cell_value_targets.get(id(cell._tc))
+    if target:
         # This cell IS the (originally empty) value slot for a label earlier in
         # the same row — replace its near-empty content with one editable slot
-        # instead of rendering its blank paragraphs.
+        # instead of rendering its blank paragraphs. A weekly field's day cells
+        # each carry which part (day) they hold.
+        field_key, part = target
+        part_attr = f' data-part="{part}"' if part is not None else ""
         return (
             f'<td class="lp-td lp-td-value"{span_attr}{style_attr}>'
-            f'<div class="lp-field lp-field-cell" data-field-key="{field_key}" '
+            f'<div class="lp-field lp-field-cell" data-field-key="{field_key}"{part_attr} '
             f'contenteditable="true"></div></td>'
         )
 
@@ -876,6 +915,10 @@ def _has_fillable_slot(doc, items, idx):
         if _find_empty_sibling_cell(row_cells, cell, col_idx) is not None:
             return True
 
+    # A merged header label whose blank answer cells are in the row below.
+    if cell is not None and _weekly_cells(item):
+        return True
+
     if cell is not None:
         cell_paragraphs = cell.paragraphs
         anchor_pos = next((i for i, p in enumerate(cell_paragraphs) if p._p is item["el"]), None)
@@ -915,6 +958,138 @@ def _find_empty_sibling_cell(row_cells, cell, col_idx, claimed=None):
         if _cell_is_empty(candidate):
             return candidate
     return None
+
+# ---- Weekly fields: one answer per day, each in its own cell ----
+# A weekly lesson plan (ILAW) answers most rows once per day, under a
+# MONDAY..FRIDAY header, so one field has several blank cells rather than one.
+
+_WEEKDAY_NAMES = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
+
+def _tc_text(tc):
+    return "".join(t.text or "" for t in tc.iter(qn("w:t"))).strip()
+
+
+def _row_grid(tr):
+    """[(tc, start_col, span), ...] for one table row, in grid columns, so cells
+    in different rows (or tables built on the same grid) can be lined up."""
+    col = 0
+    trpr = tr.find(qn("w:trPr"))
+    if trpr is not None:
+        before = trpr.find(qn("w:gridBefore"))
+        if before is not None:
+            col = int(before.get(qn("w:val")) or 0)
+    out = []
+    for tc in tr.findall(qn("w:tc")):
+        span = _cell_grid_span(tc)
+        out.append((tc, col, span))
+        col += span
+    return out
+
+
+def _table_grid_width(tbl):
+    return len(tbl.findall(qn("w:tblGrid") + "/" + qn("w:gridCol")))
+
+
+def _day_header(doc):
+    """The document's day header: ({grid_col: "Monday", ...}, table grid width)
+    from the first table row naming at least three weekdays, or (None, None)."""
+    for tbl in doc.element.body.iter(qn("w:tbl")):
+        for tr in tbl.findall(qn("w:tr")):
+            labels = {}
+            for tc, start, _span in _row_grid(tr):
+                text = _tc_text(tc).lower()
+                if text in _WEEKDAY_NAMES:
+                    labels[start] = text.capitalize()
+            if len(labels) >= 3:
+                return labels, _table_grid_width(tbl)
+    return None, None
+
+
+def _weekly_cells(item):
+    """Where a weekly field's parts go, left to right, as [(tc, start_col, span)]:
+    the run of blank cells right after the label in its own row or, when the
+    label is the last cell of a merged header row ("Performance Standards:"
+    spanning the week), the blank cells directly under it in the next row."""
+    cell = item.get("cell")
+    if cell is None:
+        return []
+    label_tc = cell._tc
+    tr = label_tc.getparent()
+    if tr is None or tr.tag != qn("w:tr"):
+        return []
+    grid = _row_grid(tr)
+    pos = next((i for i, g in enumerate(grid) if g[0] is label_tc), None)
+    if pos is None:
+        return []
+
+    beside = []
+    for tc, start, span in grid[pos + 1:]:
+        if _tc_text(tc):
+            break
+        beside.append((tc, start, span))
+    if beside or pos + 1 < len(grid):
+        return beside
+
+    _tc, label_start, label_span = grid[pos]
+    below_tr = tr.getnext()
+    while below_tr is not None and below_tr.tag != qn("w:tr"):
+        below_tr = below_tr.getnext()
+    if below_tr is None:
+        return []
+    below = [(tc, start, span) for tc, start, span in _row_grid(below_tr)
+             if start >= label_start and start + span <= label_start + label_span]
+    if len(below) >= 2 and all(not _tc_text(tc) for tc, _s, _sp in below):
+        return below
+    return []
+
+
+def weekly_part_labels(doc, cells, header=None):
+    """A name for each weekly part: the day(s) above its column in the day
+    header when the document has one ("Monday", or "Monday to Tuesday" for a
+    cell spanning two days), otherwise "Column 1", "Column 2"..."""
+    labels, width = header if header is not None else _day_header(doc)
+    fallback = [f"Column {i}" for i in range(1, len(cells) + 1)]
+    if not labels or not cells:
+        return fallback
+    tbl = cells[0][0].getparent().getparent()
+    if tbl is not None and _table_grid_width(tbl) == width:
+        names = []
+        for _tc, start, span in cells:
+            covered = [labels[c] for c in range(start, start + span) if c in labels]
+            if not covered:
+                return fallback
+            names.append(covered[0] if len(covered) == 1 else f"{covered[0]} to {covered[-1]}")
+        return names
+    ordered = [labels[c] for c in sorted(labels)]
+    return ordered if len(ordered) == len(cells) else fallback
+
+
+def _weekly_parts(value, count):
+    """A weekly value as exactly `count` strings. Older saves or a model that
+    answered with one string still land, in the first part."""
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, (list, tuple)):
+        value = []
+    parts = ["" if v is None else str(v) for v in value][:count]
+    return parts + [""] * (count - len(parts))
+
+
+def _fill_weekly(doc, items, idx, value, rich, claimed_cells):
+    """Write each part of a weekly value into its own cell, leaving a part with
+    nothing in it blank rather than borrowing another day's text."""
+    cells = [c for c in _weekly_cells(items[idx]) if id(c[0]) not in claimed_cells]
+    parts = _weekly_parts(value, len(cells))
+    rich_parts = list(rich) if isinstance(rich, (list, tuple)) else []
+    for i, (tc, _start, _span) in enumerate(cells):
+        claimed_cells.add(id(tc))
+        paragraphs = [Paragraph(p, None) for p in tc.findall(qn("w:p"))]
+        rich_html = rich_parts[i] if i < len(rich_parts) else ""
+        if rich_html:
+            _fill_paragraphs_rich(doc, paragraphs, parse_rich_value(rich_html))
+        elif parts[i].strip():
+            _fill_paragraphs(doc, paragraphs, parts[i])
 
 def _fill_paragraphs(doc, paragraphs, value):
     """Write value's lines into an existing run of (assumed blank) paragraphs,
@@ -1216,7 +1391,9 @@ def _export_from_template(plan, fmt, template_path) -> str:
     # document the teacher actually edited.
     apply_doc_edits(doc, items, plan.get_doc_edits())
 
-    consumed = _fill_labeled_blanks(doc, items, fields_sorted, anchors, values)
+    # Weekly fields always fill their own day cells, never an inline blank.
+    consumed = _fill_labeled_blanks(
+        doc, items, [f for f in fields_sorted if f.field_type != "weekly"], anchors, values)
 
     other_anchor_els = {
         id(items[anchors[f.field_key]]["el"])
@@ -1240,6 +1417,11 @@ def _export_from_template(plan, fmt, template_path) -> str:
     for field in cell_fields:
         idx = anchors[field.field_key]
         rich_html = rich_values.get(field.field_key)
+        if field.field_type == "weekly" and _weekly_cells(items[idx]):
+            _fill_weekly(doc, items, idx, values.get(field.field_key), rich_html, claimed_cells)
+            continue
+        if isinstance(rich_html, list):
+            rich_html = "<br>".join(part for part in rich_html if part)
         if rich_html:
             _fill_cell_value_rich(doc, items, idx, parse_rich_value(rich_html), claimed_cells)
         else:
@@ -1595,6 +1777,20 @@ def _add_field_value(doc, field, value, style):
         run = para.add_run(text)
         _apply_style(run, style, bold_override=False)
         return para
+
+    # A weekly value, outside its day cells, reads as one labelled line per day.
+    if field.field_type == "weekly" and isinstance(value, list):
+        names = field.parts_list or []
+        written = False
+        for i, part in enumerate(value):
+            text = " ".join(str(part or "").split())
+            if text:
+                name = names[i] if i < len(names) else f"Part {i + 1}"
+                _line(f"{name}: {text}")
+                written = True
+        if not written:
+            _line("-")
+        return
 
     if isinstance(value, list):
         items = [str(v).strip() for v in value if str(v).strip()]

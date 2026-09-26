@@ -73,7 +73,8 @@ def _seed_each(entries, seed_one, kind):
 
 
 def _field_signature(fields):
-    return [(f["label"], f.get("field_type", "textarea"), f.get("anchor_index"), bool(f.get("is_required", True)))
+    return [(f["label"], f.get("field_type", "textarea"), f.get("anchor_index"),
+             bool(f.get("is_required", True)), f.get("ai_hint") or None, f.get("parts") or None)
             for f in fields]
 
 
@@ -108,7 +109,8 @@ def _seed_formats(folder, owner_id):
         db.session.flush()
 
         current = [{"label": f.label, "field_type": f.field_type, "anchor_index": f.anchor_index,
-                    "is_required": f.is_required} for f in fmt.fields]
+                    "is_required": f.is_required, "ai_hint": f.ai_hint, "parts": f.parts_list}
+                   for f in fmt.fields]
         if _field_signature(current) != _field_signature(fields):
             for existing in list(fmt.fields):
                 db.session.delete(existing)

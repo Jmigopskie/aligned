@@ -316,118 +316,275 @@
   {
     "key": "ilaw-lesson-plan",
     "name": "ILAW Lesson Plan",
-    "description": "Weekly plan by session, with pre-lesson, learning resources and coaching support.",
+    "description": "Weekly plan with an answer for each day: intentions, learning experience, assessment and ways forward.",
     "source": "ilaw-lesson-plan.pdf",
     "template": "ilaw-lesson-plan.docx",
     "pages": 5,
     "fields": [
       {
-        "label": "School",
-        "field_type": "text",
-        "anchor_index": 4,
-        "is_required": true
-      },
-      {
         "label": "Grade Level & Section",
         "field_type": "text",
         "anchor_index": 6,
-        "is_required": true
+        "is_required": true,
+        "ai_hint": "Grade level and section(s), e.g. 8 - Felipe, Evangelista, Rizal."
       },
       {
         "label": "Teacher",
         "field_type": "text",
         "anchor_index": 8,
-        "is_required": true
+        "is_required": true,
+        "ai_hint": "The teacher's full name."
       },
       {
         "label": "Learning Area",
         "field_type": "text",
         "anchor_index": 10,
-        "is_required": true
+        "is_required": true,
+        "ai_hint": "The learning area and components, e.g. TLE - AFA / ICT."
       },
       {
         "label": "Week / Teaching Dates and Time",
         "field_type": "text",
         "anchor_index": 12,
-        "is_required": true
+        "is_required": true,
+        "ai_hint": "Week number, the week's dates and the class times, e.g. Week 7 | July 27-31, 2026, 12:40pm-1:25pm."
       },
       {
         "label": "Term",
         "field_type": "text",
         "anchor_index": 14,
-        "is_required": true
+        "is_required": true,
+        "ai_hint": "The term number only, e.g. 1."
       },
       {
         "label": "Name of Teachers",
         "field_type": "text",
         "anchor_index": 17,
-        "is_required": false
+        "is_required": true,
+        "ai_hint": "Every teacher who will use this plan, separated by commas."
       },
       {
         "label": "Lesson Title",
-        "field_type": "text",
+        "field_type": "weekly",
         "anchor_index": 25,
-        "is_required": true
+        "is_required": true,
+        "ai_hint": "That day's lesson title: a short topic name in capitals, e.g. WATER PARAMETERS.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
       },
       {
         "label": "Session No.",
-        "field_type": "text",
+        "field_type": "weekly",
         "anchor_index": 31,
-        "is_required": true
+        "is_required": true,
+        "ai_hint": "That day's session number in the term, a number only.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
       },
       {
-        "label": "References (books, websites, toolkits, etc.)",
-        "field_type": "textarea",
+        "label": "References",
+        "field_type": "weekly",
         "anchor_index": 37,
-        "is_required": false
+        "is_required": true,
+        "ai_hint": "The references for that day, e.g. Lesson Exemplar (LE), textbook and slide deck. Usually the same every day.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
       },
       {
-        "label": "Declaration of AI use",
-        "field_type": "textarea",
+        "label": "Declaration of AI Use",
+        "field_type": "weekly",
         "anchor_index": 43,
-        "is_required": false
+        "is_required": true,
+        "ai_hint": "One sentence on how AI tools were used to prepare that day's lesson (DO 003 s.2026, Annex A). Usually the same every day.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
       },
       {
         "label": "Performance Standards",
-        "field_type": "textarea",
+        "field_type": "weekly",
         "anchor_index": 54,
-        "is_required": true
+        "is_required": true,
+        "ai_hint": "The curriculum performance standard for that day's component, starting 'The learners...'.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
       },
       {
         "label": "Content Standards",
-        "field_type": "textarea",
+        "field_type": "weekly",
         "anchor_index": 60,
-        "is_required": true
+        "is_required": true,
+        "ai_hint": "The curriculum content standard, starting 'The learners demonstrate an understanding of...'.",
+        "parts": [
+          "Monday to Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
       },
       {
         "label": "Learning Competencies",
-        "field_type": "textarea",
+        "field_type": "weekly",
         "anchor_index": 65,
-        "is_required": true
+        "is_required": true,
+        "ai_hint": "The curriculum competency targeted that day, one line starting with a verb.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
+      },
+      {
+        "label": "Learning Objectives",
+        "field_type": "weekly",
+        "anchor_index": 82,
+        "is_required": true,
+        "ai_hint": "'At the end of the lesson, the learners are expected to:' followed by two or three numbered objectives covering knowledge, skill and attitude.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
+      },
+      {
+        "label": "Learner Context",
+        "field_type": "weekly",
+        "anchor_index": 88,
+        "is_required": true,
+        "ai_hint": "Observations of these learners: how they engage and perform in this topic, and what support they need.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
       },
       {
         "label": "Pre-Lesson",
-        "field_type": "textarea",
+        "field_type": "weekly",
         "anchor_index": 97,
-        "is_required": true
+        "is_required": true,
+        "ai_hint": "The classroom routine (prayer, greetings, attendance, cleanliness and wellness check), then a review of the previous lesson.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
+      },
+      {
+        "label": "Flow",
+        "field_type": "weekly",
+        "anchor_index": 103,
+        "is_required": true,
+        "ai_hint": "That day's activities in order, each under its heading: Introduction, Guided Practice, Collaborative or Independent Practice, Generalization.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
       },
       {
         "label": "Learning Resources",
-        "field_type": "textarea",
+        "field_type": "weekly",
         "anchor_index": 121,
-        "is_required": false
+        "is_required": true,
+        "ai_hint": "The lesson exemplar (lesson, week and pages), textbook, slide deck and materials used that day.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
       },
       {
-        "label": "Guidance or Support",
-        "field_type": "textarea",
-        "anchor_index": 148,
-        "is_required": false
+        "label": "Opportunities for Integration and Contextualization",
+        "field_type": "weekly",
+        "anchor_index": 129,
+        "is_required": true,
+        "ai_hint": "Links to other learning areas (e.g. Science, Mathematics) and to the learners' own community or context.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
       },
       {
-        "label": "Instructional Coach Support Requested",
-        "field_type": "textarea",
-        "anchor_index": 175,
-        "is_required": false
+        "label": "Formative Assessment",
+        "field_type": "weekly",
+        "anchor_index": 138,
+        "is_required": true,
+        "ai_hint": "A task or guided questions to check learning during the session, and how feedback is given.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
+      },
+      {
+        "label": "Extended Learning Opportunities",
+        "field_type": "weekly",
+        "anchor_index": 158,
+        "is_required": true,
+        "ai_hint": "Something learners can do outside class to extend that day's lesson, e.g. a visit, a video or practice at home.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
+      },
+      {
+        "label": "Reflections",
+        "field_type": "weekly",
+        "anchor_index": 164,
+        "is_required": false,
+        "ai_hint": "The teacher's notes after the session on what to change next time. Usually written after teaching.",
+        "parts": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ]
       }
     ]
   },

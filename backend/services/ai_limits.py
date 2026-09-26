@@ -129,6 +129,24 @@ def clean_value(value, field_type: str = "text", *, max_items: int, max_item_wor
     return _clip_words(text, max_prose_words)
 
 
+def weekly_parts(value, names) -> list:
+    """A weekly field's answer as one entry per part, in part order, whatever
+    shape the model sent: a list, an object keyed by day name, or a single
+    string (which becomes the first part rather than being lost)."""
+    count = len(names) or 1
+    if isinstance(value, dict):
+        lowered = {str(k).strip().lower(): v for k, v in value.items()}
+        parts = [lowered.get(str(name).strip().lower(), "") for name in names]
+    elif isinstance(value, (list, tuple)):
+        parts = list(value)
+    elif value is None:
+        parts = []
+    else:
+        parts = [value]
+    parts = ["" if p is None else p for p in parts][:count]
+    return parts + [""] * (count - len(parts))
+
+
 def enforce_limits(values: dict, fields, *, max_items: int, max_item_words: int,
                    max_sentences: int, max_prose_words: int) -> dict:
     """Trim every value the model returned, keyed by field_key.
@@ -138,9 +156,17 @@ def enforce_limits(values: dict, fields, *, max_items: int, max_item_words: int,
     the plan with nowhere to show it.
     """
     types_by_key = {f.field_key: (f.field_type or "text") for f in fields}
+    parts_by_key = {f.field_key: (getattr(f, "parts_list", None) or []) for f in fields}
     out = {}
     for key, value in (values or {}).items():
         if key not in types_by_key:
+            continue
+        if types_by_key[key] == "weekly":
+            out[key] = [
+                clean_value(part, "textarea", max_items=max_items, max_item_words=max_item_words,
+                            max_sentences=max_sentences, max_prose_words=max_prose_words)
+                for part in weekly_parts(value, parts_by_key[key])
+            ]
             continue
         out[key] = clean_value(
             value,

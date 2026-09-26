@@ -196,6 +196,8 @@ def _migrate_format_field_columns():
     editor) to databases created before this feature existed."""
     _add_column("format_fields", "anchor_index", "INTEGER")
     _add_column("format_fields", "role", "VARCHAR(10)")
+    # The day names of a weekly field; see FormatField.parts.
+    _add_column("format_fields", "parts", "TEXT")
 
 
 def _migrate_section_columns():

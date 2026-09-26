@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import uuid
@@ -53,17 +54,27 @@ def _build_format_fields(format_id, fields_payload):
         if role not in ("heavy", "easy"):
             role = None
 
+        field_type = f.get("field_type", "textarea")
+        # A weekly field keeps the names of its parts (days); anything else,
+        # or a malformed list, carries none.
+        parts = f.get("parts")
+        if field_type == "weekly" and isinstance(parts, list) and parts:
+            parts = json.dumps([str(p).strip()[:40] for p in parts[:10]])
+        else:
+            parts = None
+
         rows.append(FormatField(
             format_id=format_id,
             field_key=final_key,
             label=label,
-            field_type=f.get("field_type", "textarea"),
+            field_type=field_type,
             section_group=f.get("section_group"),
             sort_order=f.get("sort_order", i),
             is_required=bool(f.get("is_required", True)),
             ai_hint=f.get("ai_hint"),
             anchor_index=anchor_index,
             role=role,
+            parts=parts,
         ))
     return rows
 
@@ -111,6 +122,7 @@ def _suggest_fields(renderable_path):
         return [], "AI couldn't suggest fields automatically — define them by clicking the document below."
 
     valid_indices = {l["index"] for l in lines}
+    line_by_index = {l["index"]: l for l in lines}
     fields = []
     for s in raw:
         if not isinstance(s, dict):
@@ -124,12 +136,20 @@ def _suggest_fields(renderable_path):
         label = (s.get("label") or "").strip()
         if not label:
             continue
-        fields.append({
+        field = {
             "anchor_index": idx,
             "label": label,
             "field_type": s.get("field_type") if s.get("field_type") in ("text", "textarea", "list", "table") else "textarea",
             "is_required": bool(s.get("is_required", True)),
-        })
+        }
+        # A label with a row of blank cells (one per day in a weekly plan) is a
+        # weekly field. That comes from the document's structure, so it is set
+        # here rather than left to the model to notice.
+        parts = line_by_index[idx].get("parts")
+        if parts:
+            field["field_type"] = "weekly"
+            field["parts"] = parts
+        fields.append(field)
     return fields, None
 
 @format_bp.post("/formats/scan")

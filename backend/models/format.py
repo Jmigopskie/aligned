@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from extensions import db, iso_utc
@@ -79,6 +80,20 @@ class FormatField(db.Model):
     # writes it when asked, "easy" means the reverse. NULL (the default for
     # every field) leaves the decision to the keywords.
     role = db.Column(db.String(10))
+    # A weekly field (field_type "weekly") answers once per day in its own
+    # cell; this is the JSON list naming those parts ("Monday", ...). Null for
+    # every other field type.
+    parts = db.Column(db.Text)
+
+    @property
+    def parts_list(self):
+        if self.field_type != "weekly" or not self.parts:
+            return None
+        try:
+            names = json.loads(self.parts)
+        except (TypeError, ValueError):
+            return None
+        return [str(n) for n in names] if isinstance(names, list) and names else None
 
     def to_dict(self):
         return {
@@ -99,4 +114,5 @@ class FormatField(db.Model):
             # needs to tell "decide automatically" apart from an explicit choice
             # that happens to match what the keywords would have picked.
             "role_override": self.role,
+            "parts": self.parts_list,
         }
