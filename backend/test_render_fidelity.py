@@ -131,10 +131,47 @@ def check_tables():
     print("  tables OK")
 
 
+def check_lists():
+    doc = Document()
+    numbering = doc.part.numbering_part.element
+    numbering.append(parse_xml(
+        '<w:abstractNum %s w:abstractNumId="90">'
+        '<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%%1."/>'
+        '<w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl>'
+        '<w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="lowerLetter"/><w:lvlText w:val="%%2."/>'
+        '<w:pPr><w:ind w:left="1440" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum>' % nsdecls("w")))
+    numbering.append(parse_xml(
+        '<w:abstractNum %s w:abstractNumId="91"><w:lvl w:ilvl="0"><w:start w:val="1"/>'
+        '<w:numFmt w:val="bullet"/><w:lvlText w:val=""/></w:lvl></w:abstractNum>' % nsdecls("w")))
+    numbering.append(parse_xml('<w:num %s w:numId="90"><w:abstractNumId w:val="90"/></w:num>' % nsdecls("w")))
+    numbering.append(parse_xml('<w:num %s w:numId="91"><w:abstractNumId w:val="91"/></w:num>' % nsdecls("w")))
+
+    def listed(text, num_id, ilvl=0):
+        p = doc.add_paragraph(text)
+        p._p.get_or_add_pPr().append(parse_xml(
+            '<w:numPr %s><w:ilvl w:val="%d"/><w:numId w:val="%s"/></w:numPr>' % (nsdecls("w"), ilvl, num_id)))
+
+    for text, ilvl in (("one", 0), ("sub a", 1), ("sub b", 1), ("two", 0), ("sub again", 1)):
+        listed(text, "90", ilvl)
+    listed("dot", "91")
+    html = _render(doc)
+
+    # A bullet with no hanging indent keeps a space for Word's tab after it.
+    assert re.findall(r'data-marker="([^"]*)"', html) == ["1.", "a.", "b.", "2.", "a.", "• "], \
+        re.findall(r'data-marker="([^"]*)"', html)
+    # The marker hangs in the indent and is not text in the paragraph, so an
+    # editor reading the paragraph back never saves "1." into the document.
+    first = re.search(r'<p class="lp-p" style="([^"]*)" data-marker="1\."[^>]*>(.*?)</p>', html)
+    assert first and "--lp-marker-w:18pt" in first.group(1) and "text-indent:-18pt" in first.group(1), html[:800]
+    assert not re.sub(r"<[^>]+>", "", first.group(2)).startswith("1."), first.group(2)
+    print("  lists OK")
+
+
 def main():
     check_page()
     check_text_cascade()
     check_tables()
+    check_lists()
     print("render fidelity OK")
 
 

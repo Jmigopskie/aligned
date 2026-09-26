@@ -117,6 +117,35 @@ def _border_css(el):
     return "%s %s %s" % (_pt(max(size, 0.5)), style, color)
 
 
+# Symbol and Wingdings bullets are stored as private-use code points that only
+# mean something in those fonts; this is what they draw, in Unicode.
+_BULLET_GLYPHS = {"": "•", "": "▪", "": "➢", "": "❖",
+                  "": "✓", "": "■", "": "□"}
+
+
+def _roman(n):
+    out = ""
+    for value, symbol in ((1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"),
+                          (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I")):
+        while n >= value:
+            out += symbol
+            n -= value
+    return out
+
+
+def _format_number(n, fmt):
+    if fmt in ("lowerLetter", "upperLetter"):
+        letters = chr(ord("a") + (n - 1) % 26) * ((n - 1) // 26 + 1)  # Word: a..z, aa, bb
+        return letters.upper() if fmt == "upperLetter" else letters
+    if fmt in ("lowerRoman", "upperRoman"):
+        return _roman(n) if fmt == "upperRoman" else _roman(n).lower()
+    if fmt == "decimalZero":
+        return f"{n:02d}"
+    if fmt == "none":
+        return ""
+    return str(n)  # decimal, and any format this view doesn't draw
+
+
 class Layout:
     """Word's layout for one document. Build once per render: it caches the
     styles, theme and numbering, and list counters advance as paragraphs are
@@ -157,8 +186,30 @@ class Layout:
         return fonts
 
     def _read_numbering(self):
-        """{numId: ({ilvl: lvl element}, {ilvl: start override})}."""
-        return {}  # Task 3
+        """{numId: ({ilvl: lvl element}, {ilvl: start override})}, with each
+        list instance's level overrides applied."""
+        try:
+            root = self.doc.part.numbering_part.element
+        except Exception:
+            return {}
+        abstracts = {
+            a.get(qn("w:abstractNumId")): {lvl.get(qn("w:ilvl")): lvl for lvl in a.findall(qn("w:lvl"))}
+            for a in root.findall(qn("w:abstractNum"))
+        }
+        out = {}
+        for num in root.findall(qn("w:num")):
+            levels = dict(abstracts.get(_val(num.find(qn("w:abstractNumId"))), {}))
+            starts = {}
+            for override in num.findall(qn("w:lvlOverride")):
+                ilvl = override.get(qn("w:ilvl"))
+                lvl = override.find(qn("w:lvl"))
+                if lvl is not None:
+                    levels[ilvl] = lvl
+                start = _num(_val(override.find(qn("w:startOverride"))))
+                if start is not None:
+                    starts[ilvl] = int(start)
+            out[num.get(qn("w:numId"))] = (levels, starts)
+        return out
 
     # -- style chains --------------------------------------------------------
 
@@ -226,7 +277,18 @@ class Layout:
         return None
 
     def _list_level(self, ppr_chain):
-        return None  # Task 3
+        """(lvl element, numId, ilvl, starts) when the paragraph is in a list."""
+        num_id, ilvl = None, "0"
+        for ppr in ppr_chain:
+            num_pr = ppr.find(qn("w:numPr"))
+            if num_pr is not None:
+                num_id = _val(num_pr.find(qn("w:numId"))) or num_id
+                ilvl = _val(num_pr.find(qn("w:ilvl"))) or ilvl
+        if not num_id or num_id == "0" or num_id not in self._numbering:
+            return None
+        levels, starts = self._numbering[num_id]
+        lvl = levels.get(ilvl)
+        return None if lvl is None else (lvl, num_id, int(ilvl), starts)
 
     # -- text ----------------------------------------------------------------
 
@@ -377,7 +439,36 @@ class Layout:
         return ";".join(css), self._marker(chain, hanging)
 
     def _marker(self, chain, hanging):
-        return None  # Task 3
+        level = self._list_level(chain)
+        if level is None:
+            return None
+        lvl, num_id, ilvl, starts = level
+        # ponytail: counters are per list instance (numId); Word also continues
+        # numbering across instances of one abstract list, rare in these files.
+        counts = self._counters.setdefault(num_id, {})
+        start = starts.get(str(ilvl), int(_num(_val(lvl.find(qn("w:start"))), 1)))
+        counts[ilvl] = counts.get(ilvl, start - 1) + 1
+        for deeper in [k for k in counts if k > ilvl]:
+            del counts[deeper]
+
+        fmt = _val(lvl.find(qn("w:numFmt"))) or "decimal"
+        pattern = _val(lvl.find(qn("w:lvlText"))) or ""
+        if fmt == "bullet":
+            text = "".join(_BULLET_GLYPHS.get(ch, "•" if "" <= ch <= "" else ch) for ch in pattern)
+        else:
+            levels = self._numbering[num_id][0]
+
+            def number(match):
+                n = int(match.group(1)) - 1
+                other = levels.get(str(n))
+                other_fmt = (_val(other.find(qn("w:numFmt"))) if other is not None else None) or "decimal"
+                return _format_number(counts.get(n, 1), other_fmt)
+
+            text = re.sub(r"%([1-9])", number, pattern)
+        suffix = _val(lvl.find(qn("w:suff"))) or "tab"
+        if suffix == "space" or (suffix == "tab" and not hanging):
+            text += " "
+        return {"text": text, "width": hanging if suffix == "tab" else 0}
 
     # -- page ----------------------------------------------------------------
 
