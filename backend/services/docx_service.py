@@ -583,8 +583,6 @@ def _render_html_paragraph(doc, p_el, slots, index_by_el_id, layout):
         f'contenteditable="true"></div>'
     )
 
-_BORDER_SIDES = ("top", "left", "bottom", "right")
-
 def _tc_pr(tc):
     return tc.find(qn("w:tcPr"))
 
@@ -600,75 +598,8 @@ def _cell_grid_span(tc):
     except (TypeError, ValueError):
         return 1
 
-def _border_side_css(side_el):
-    val = side_el.get(qn("w:val")) or "single"
-    if val in ("none", "nil"):
-        return "none"
-    try:
-        sz = int(side_el.get(qn("w:sz")))
-    except (TypeError, ValueError):
-        sz = 4
-    width_px = max(1, round(sz / 8 * 1.333))
-    color = (side_el.get(qn("w:color")) or "").strip()
-    if not color or color.lower() == "auto":
-        color = "000000"
-    style = {"double": "double", "dashed": "dashed", "dotted": "dotted"}.get(val, "solid")
-    return f"{width_px}px {style} #{color}"
-
-def _borders_from_element(borders_el):
-    if borders_el is None:
-        return {}
-    out = {}
-    for side in _BORDER_SIDES:
-        side_el = borders_el.find(qn(f"w:{side}"))
-        if side_el is not None:
-            out[side] = _border_side_css(side_el)
-    return out
-
-def _table_default_borders(tbl_el):
-    tblPr = tbl_el.find(qn("w:tblPr"))
-    if tblPr is None:
-        return {}
-    return _borders_from_element(tblPr.find(qn("w:tblBorders")))
-
-def _cell_border_style(tc, default_borders):
-    tcPr = _tc_pr(tc)
-    cell_borders = _borders_from_element(tcPr.find(qn("w:tcBorders"))) if tcPr is not None else {}
-    merged = {**default_borders, **cell_borders}
-    # Only emit sides we actually found real data for — an unspecified side
-    # falls through to the CSS default grid instead of being forced blank.
-    return "".join(f"border-{side}:{css};" for side, css in merged.items())
-
-def _cell_shading_css(tc):
-    tcPr = _tc_pr(tc)
-    if tcPr is None:
-        return ""
-    shd = tcPr.find(qn("w:shd"))
-    if shd is None:
-        return ""
-    fill = (shd.get(qn("w:fill")) or "").strip()
-    if not fill or fill.lower() in ("auto", "ffffff"):
-        return ""
-    return f"background-color:#{fill};"
-
-def _table_col_widths_pct(tbl_el):
-    grid = tbl_el.find(qn("w:tblGrid"))
-    if grid is None:
-        return None
-    widths = []
-    for col in grid.findall(qn("w:gridCol")):
-        try:
-            widths.append(int(col.get(qn("w:w"))))
-        except (TypeError, ValueError):
-            widths.append(0)
-    total = sum(widths)
-    if not widths or total <= 0:
-        return None
-    return [w / total * 100 for w in widths]
-
-def _render_html_cell(doc, cell, slots, cell_value_targets, default_borders, colspan=1, rowspan=1, index_by_el_id=None, layout=None):
-    style = _cell_border_style(cell._tc, default_borders) + _cell_shading_css(cell._tc)
-    style_attr = f' style="{style}"' if style else ""
+def _render_html_cell(doc, cell, slots, cell_value_targets, cell_css, colspan, rowspan, index_by_el_id, layout):
+    style_attr = f' style="{cell_css}"' if cell_css else ""
     span_attr = (f' colspan="{colspan}"' if colspan > 1 else "") + (f' rowspan="{rowspan}"' if rowspan > 1 else "")
 
     target = cell_value_targets.get(id(cell._tc))
@@ -676,12 +607,16 @@ def _render_html_cell(doc, cell, slots, cell_value_targets, default_borders, col
         # This cell IS the (originally empty) value slot for a label earlier in
         # the same row — replace its near-empty content with one editable slot
         # instead of rendering its blank paragraphs. A weekly field's day cells
-        # each carry which part (day) they hold.
+        # each carry which part (day) they hold. The slot takes the style Word
+        # gives text typed into this cell.
         field_key, part = target
         part_attr = f' data-part="{part}"' if part is not None else ""
+        first_p = cell._tc.find(qn("w:p"))
+        slot_css = layout.slot_css(first_p) if first_p is not None else ""
+        slot_style = f' style="{slot_css}"' if slot_css else ""
         return (
             f'<td class="lp-td lp-td-value"{span_attr}{style_attr}>'
-            f'<div class="lp-field lp-field-cell" data-field-key="{field_key}"{part_attr} '
+            f'<div class="lp-field lp-field-cell" data-field-key="{field_key}"{part_attr}{slot_style} '
             f'contenteditable="true"></div></td>'
         )
 
@@ -729,16 +664,17 @@ def _vmerge_rowspans(rows_cells):
 
     return origin_rowspan, skip
 
-def _render_html_table(doc, table, slots, cell_value_targets, index_by_el_id=None, layout=None):
+def _render_html_table(doc, table, slots, cell_value_targets, index_by_el_id, layout):
     tbl_el = table._tbl
-    default_borders = _table_default_borders(tbl_el)
-    col_widths = _table_col_widths_pct(tbl_el)
-
-    rows_cells = [row.cells for row in table.rows]
+    table_css, grid = layout.table(tbl_el)
+    rows = list(table.rows)
+    rows_cells = [row.cells for row in rows]
     origin_rowspan, vmerge_skip = _vmerge_rowspans(rows_cells)
+    n_rows = len(rows_cells)
+    n_cols = len(grid) or max((len(rc) for rc in rows_cells), default=0)
 
     rows_html = []
-    for row_idx, row_cells in enumerate(rows_cells):
+    for row_idx, (row, row_cells) in enumerate(zip(rows, rows_cells)):
         seen_tc_ids = set()
         cells_html = []
         for col_idx, cell in enumerate(row_cells):
@@ -752,16 +688,20 @@ def _render_html_table(doc, table, slots, cell_value_targets, index_by_el_id=Non
             seen_tc_ids.add(tc_id)
             colspan = _cell_grid_span(cell._tc)
             rowspan = origin_rowspan.get((row_idx, col_idx), 1)
+            cell_css = layout.cell(cell._tc, tbl_el, top=row_idx == 0, bottom=row_idx + rowspan >= n_rows,
+                                   left=col_idx == 0, right=col_idx + colspan >= n_cols)
             cells_html.append(_render_html_cell(
-                doc, cell, slots, cell_value_targets, default_borders, colspan, rowspan, index_by_el_id, layout
+                doc, cell, slots, cell_value_targets, cell_css, colspan, rowspan, index_by_el_id, layout
             ))
-        rows_html.append(f"<tr>{''.join(cells_html)}</tr>")
+        row_css = layout.row(row._tr)
+        row_attr = f' style="{row_css}"' if row_css else ""
+        rows_html.append(f"<tr{row_attr}>{''.join(cells_html)}</tr>")
 
     colgroup = ""
-    if col_widths:
-        colgroup = "<colgroup>" + "".join(f'<col style="width:{w:.3f}%">' for w in col_widths) + "</colgroup>"
-
-    return f'<table class="lp-table">{colgroup}{"".join(rows_html)}</table>'
+    if grid:
+        colgroup = "<colgroup>" + "".join(f'<col style="width:{round(w, 2):g}pt">' for w in grid) + "</colgroup>"
+    style_attr = f' style="{table_css}"' if table_css else ""
+    return f'<table class="lp-table"{style_attr}>{colgroup}{"".join(rows_html)}</table>'
 
 def resolve_source_path(fmt):
     raw = (fmt.source_file_path or "").strip()

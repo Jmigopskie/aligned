@@ -98,6 +98,25 @@ def _font_css(name):
     return "font-family:'%s',%s" % (name.replace("'", ""), generic)
 
 
+_VALIGN = {"center": "middle", "bottom": "bottom", "top": "top"}
+_BORDER_STYLE = {"double": "double", "dashed": "dashed", "dotted": "dotted", "dashSmallGap": "dashed",
+                 "dotDash": "dashed", "dotDotDash": "dotted"}
+_SIDE = {"start": "left", "end": "right"}
+
+
+def _border_css(el):
+    val = _val(el)
+    if not val or val in ("none", "nil"):
+        return "none"
+    size = _num(_val(el, "sz"), 4) / 8  # eighths of a point
+    color = (_val(el, "color") or "").strip()
+    color = "#000000" if not color or color.lower() == "auto" else "#" + color
+    style = _BORDER_STYLE.get(val, "solid")
+    if style == "double":
+        size = max(size * 3, 2.25)  # both lines and the gap between them
+    return "%s %s %s" % (_pt(max(size, 0.5)), style, color)
+
+
 class Layout:
     """Word's layout for one document. Build once per render: it caches the
     styles, theme and numbering, and list counters advance as paragraphs are
@@ -380,6 +399,97 @@ class Layout:
         except Exception:
             _log.debug("Page layout unreadable; default page drawn.", exc_info=True)
         return ";".join(css), width
+
+    # -- tables --------------------------------------------------------------
+
+    def _tbl_pr_chain(self, tbl_el):
+        tbl_pr = tbl_el.find(qn("w:tblPr"))
+        chain = [s.find(qn("w:tblPr")) for s in self._table_styles(tbl_el)] + [tbl_pr]
+        return [el for el in chain if el is not None]
+
+    def table(self, tbl_el):
+        """(css, column widths in pt) for a table."""
+        try:
+            chain = self._tbl_pr_chain(tbl_el)
+            grid = [(_num(col.get(qn("w:w")), 0) or 0) / 20
+                    for col in tbl_el.findall(qn("w:tblGrid") + "/" + qn("w:gridCol"))]
+            fixed = bool(grid) and all(grid)
+            css = ["table-layout:fixed"] if fixed else []
+            width = _merged(chain, "tblW")
+            if width.get("type") == "pct":
+                raw = width.get("w", "")
+                pct = _num(raw.rstrip("%")) if raw.endswith("%") else _num(raw, 0) / 50
+                if pct:
+                    css.append("width:%g%%" % round(pct, 2))
+            elif width.get("type") == "dxa" and _num(width.get("w")):
+                css.append("width:" + _pt(_num(width.get("w")) / 20))
+            elif fixed:
+                css.append("width:" + _pt(sum(grid)))
+            jc = _val(_last(chain, "jc"))
+            indent = _num(_merged(chain, "tblInd").get("w"), 0) / 20
+            if jc == "center":
+                css.append("margin-left:auto;margin-right:auto")
+            elif jc in ("right", "end"):
+                css.append("margin-left:auto")
+            elif indent:
+                css.append("margin-left:" + _pt(indent))
+            return ";".join(css), grid if fixed else []
+        except Exception:
+            _log.debug("Table layout unreadable; drawn plain.", exc_info=True)
+            return "", []
+
+    def row(self, tr_el):
+        # An "exact" height is shown as a minimum too: on screen a row has to
+        # grow while a teacher types into it.
+        height = _num(_val(tr_el.find(qn("w:trPr") + "/" + qn("w:trHeight"))), 0) / 20
+        return "height:" + _pt(height) if height else ""
+
+    def cell(self, tc_el, tbl_el, top, bottom, left, right):
+        """CSS for one cell. top/bottom/left/right say whether each side lies on
+        the table's outer edge (Word draws tblBorders there, insideH/insideV
+        between cells)."""
+        try:
+            chain = self._tbl_pr_chain(tbl_el)
+            tc_pr = tc_el.find(qn("w:tcPr"))
+
+            table_borders = {}
+            for el in chain:
+                borders = el.find(qn("w:tblBorders"))
+                for side in (borders if borders is not None else []):
+                    if isinstance(side.tag, str):
+                        table_borders[_SIDE.get(_local(side), _local(side))] = side
+            pick = {"top": "top" if top else "insideH", "bottom": "bottom" if bottom else "insideH",
+                    "left": "left" if left else "insideV", "right": "right" if right else "insideV"}
+            sides = {side: table_borders.get(source) for side, source in pick.items()}
+            cell_borders = tc_pr.find(qn("w:tcBorders")) if tc_pr is not None else None
+            for el in (cell_borders if cell_borders is not None else []):
+                if isinstance(el.tag, str) and _SIDE.get(_local(el), _local(el)) in sides:
+                    sides[_SIDE.get(_local(el), _local(el))] = el
+            css = ["border-%s:%s" % (side, _border_css(el)) for side, el in sides.items()]
+
+            margins = {"top": 0.0, "right": 5.4, "bottom": 0.0, "left": 5.4}
+            sources = [el.find(qn("w:tblCellMar")) for el in chain]
+            sources.append(tc_pr.find(qn("w:tcMar")) if tc_pr is not None else None)
+            for mar in sources:
+                for side in (mar if mar is not None else []):
+                    if not isinstance(side.tag, str):
+                        continue
+                    name = _SIDE.get(_local(side), _local(side))
+                    if name in margins and (side.get(qn("w:type")) or "dxa") == "dxa":
+                        margins[name] = _num(side.get(qn("w:w")), 0) / 20
+            css.append("padding:" + " ".join(_pt(margins[s]) for s in ("top", "right", "bottom", "left")))
+
+            if tc_pr is not None:
+                fill = _val(tc_pr.find(qn("w:shd")), "fill")
+                if fill and fill.lower() != "auto":
+                    css.append("background-color:#" + fill)
+                valign = _VALIGN.get(_val(tc_pr.find(qn("w:vAlign"))) or "")
+                if valign:
+                    css.append("vertical-align:" + valign)
+            return ";".join(css)
+        except Exception:
+            _log.debug("Cell layout unreadable; drawn plain.", exc_info=True)
+            return ""
 
     # -- pictures ------------------------------------------------------------
 

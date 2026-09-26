@@ -98,9 +98,43 @@ def check_text_cascade():
     print("  text cascade OK")
 
 
+def check_tables():
+    doc = Document()
+    grid = doc.add_table(rows=2, cols=2)
+    grid.style = doc.styles["Table Grid"]
+    grid.cell(0, 0).text = "A"
+    tc_pr = grid.cell(1, 1)._tc.get_or_add_tcPr()
+    tc_pr.append(parse_xml('<w:tcMar %s><w:top w:w="100" w:type="dxa"/></w:tcMar>' % nsdecls("w")))
+    tc_pr.append(parse_xml('<w:vAlign %s w:val="center"/>' % nsdecls("w")))
+    grid.rows[0]._tr.get_or_add_trPr().append(
+        parse_xml('<w:trHeight %s w:val="400" w:hRule="exact"/>' % nsdecls("w")))
+    plain = doc.add_table(rows=1, cols=1)
+    plain.cell(0, 0).text = "B"
+    # Converted files write indents like "730.0"; still read, not dropped.
+    plain._tbl.tblPr.append(parse_xml('<w:tblInd %s w:w="730.0" w:type="dxa"/>' % nsdecls("w")))
+    html = _render(doc)
+    tables = re.findall(r"<table.*?</table>", html, re.S)
+    cells = re.findall(r'<td class="lp-td" style="([^"]*)"', tables[0])
+
+    # Table Grid: outer borders on the table's edge, insideH/insideV between.
+    assert "border-top:0.5pt solid #000000" in cells[0] and "border-right:0.5pt solid #000000" in cells[0], cells[0]
+    # Word's default cell margins (Normal Table: 0.075in left and right).
+    assert "padding:0pt 5.4pt 0pt 5.4pt" in cells[0], cells[0]
+    # An exact row height is a minimum on screen, so typing can grow the row.
+    assert '<tr style="height:20pt">' in tables[0], tables[0][:300]
+    assert "padding:5pt 5.4pt 0pt 5.4pt" in cells[-1] and "vertical-align:middle" in cells[-1], cells[-1]
+    assert re.search(r'<col style="width:[0-9.]+pt">', tables[0]), tables[0][:300]
+    # No border in the file: none drawn (no fallback grid).
+    plain_cell = re.search(r'<td class="lp-td" style="([^"]*)"', tables[1]).group(1)
+    assert "border-top:none" in plain_cell and "border-left:none" in plain_cell, plain_cell
+    assert "margin-left:36.5pt" in tables[1], tables[1][:300]
+    print("  tables OK")
+
+
 def main():
     check_page()
     check_text_cascade()
+    check_tables()
     print("render fidelity OK")
 
 
