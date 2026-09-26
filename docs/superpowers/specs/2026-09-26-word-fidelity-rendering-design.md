@@ -38,8 +38,15 @@ Side-by-side renders (LibreOffice vs app) of that file and the five built-ins sh
   orientation; no page breaks.
 - **Phones**: the same page, fitted to the screen width; zoom (buttons or pinch)
   enlarges it and the panel scrolls both ways.
-- **Renderer only.** The built-in ILAW keeps its PDF-converted template. Its junk
-  font names (`Type3 (8 0 R)`) are shown as Arial, the font of the source PDF.
+- **Built-ins match their original PDFs.** The user's reference for a built-in is
+  its source PDF (`backend/builtin/formats/*.pdf`), e.g. the TUP DLP header with
+  both logos and centred Arial lines. The converted .docx files themselves drift
+  from those PDFs (lost fonts, wrong column widths, squeezed headers, lost list
+  markers and link, tables past the page edge), so a faithful renderer alone
+  can't match them. The five templates are **repaired against their PDFs**
+  (section 5), keeping their structure so every field stays pinned. The earlier
+  choice to keep the ILAW converted template stands: it is repaired, not replaced
+  by the teacher's T1W7 file.
 
 ## Success criteria
 
@@ -47,7 +54,10 @@ Side-by-side renders (LibreOffice vs app) of that file and the five built-ins sh
   the app: 936pt-wide landscape page, both logos at the top of the title cell,
   Arial / Arial Narrow at the file's sizes, grey label cells, centred and
   bottom-aligned cells, numbered objectives, the same column widths and borders.
-- Each of the five built-ins matches its own file's rendering the same way.
+- Each of the five built-ins, in the app and in its export, matches its source
+  PDF: the same fonts, column widths, header layout and logos, list markers and
+  text, with every table inside the page. The DLP header looks like the PDF's
+  (logo left, certification logo right, the six centred lines between them).
 - Fields, weekly day cells, anchors, detection and export behave exactly as today;
   all existing backend tests pass.
 - Known ceiling: browsers measure text a hair differently from Word, so a line can
@@ -184,16 +194,54 @@ Side-by-side renders (LibreOffice vs app) of that file and the five built-ins sh
   as float; `Type3` → Arial. Plus checks on the T1W7 sample: page 936pt wide, two
   logos, the first objective carries "1.". The existing 13 backend tests and the
   weekly-field tests keep passing.
-- **Visual check**: side-by-side images at the same scale (LibreOffice vs app at
-  100%) for the five built-ins and the T1W7 sample, saved under
+- **Visual check**: side-by-side images at the same scale, app at 100% against
+  the source PDF for the five built-ins and against LibreOffice's rendering for
+  the T1W7 sample, saved under
   `docs/superpowers/screenshots/2026-09-26/fidelity/`; generator and format
   builder checked in the browser at 1440 and 390px with Fit.
 - **Deploy**: backup, then the usual archive deploy to the VPS; verify health and
   a rendered ILAW view.
 
+### 5. Repairing the five built-in templates
+
+Side-by-side renders of each source PDF against its converted .docx showed:
+
+| Format | Drift in the converted .docx |
+|---|---|
+| DLP (TUP) | header squeezed into a narrow middle column; Calibri lost; "A. / B." spacing lost; `www.tup.edu.ph` link text dropped |
+| 4A's | Century Gothic lost (falls back to a serif); header column widths wrong; "•", "1.", "a." markers lost |
+| SNHS DLP | label column twice the PDF's width; lettered items run together ("A.Content Standards"); stray tab gaps |
+| PAL3 SDLP | table wider than the page (last column cut off); label column too wide |
+| ILAW | PDF uses only unnamed `Type3` fonts; exact rows; table past the right edge |
+
+- **One-off repair script**, run once and not committed (like the earlier guide
+  sourcing). It reads each source PDF with PyMuPDF (text spans with font, size
+  and position; vector table rules; image rectangles) and writes corrected,
+  frozen .docx files over the current ones in `backend/builtin/formats/`.
+- **Fonts**: each run gets the font of the PDF span that drew its text, with the
+  subset prefix and PostScript suffixes stripped (`CenturyGothic-Bold` → Century
+  Gothic + bold, `ArialMT` → Arial, `ArialNarrow` → Arial Narrow, `Calibri-Bold`
+  → Calibri + bold). ILAW's `Type3` spans get Arial.
+- **Column widths**: `gridCol` and `tcW` from the x-positions of each table's
+  vertical rules in the PDF; every table fits inside the page width.
+- **Headers**: the DLP and SNHS header tables and the 4A's title take the PDF's
+  column split, and pictures take the PDF image sizes, so the TUP header centres
+  its six lines between the two logos as in the PDF.
+- **Lost text**: list markers ("•", "1.", "a.", "A.") and the DLP's
+  `www.tup.edu.ph` hyperlink are restored where the PDF shows them, as literal
+  text in the same paragraph (no new paragraphs).
+- **Row heights**: `hRule="exact"` becomes `atLeast` with the same height. A blank
+  template looks identical; a filled plan's row grows instead of clipping its
+  text in Word, fixing the export clipping seen on a real ILAW export.
+- **Guard**: paragraph and cell structure is unchanged: `_iter_items` yields the
+  same count, and a new check in `backend/test_builtins.py` asserts every field in
+  `formats.json` still anchors to a paragraph containing its label. No
+  `formats.json` field changes; the seeder serves the new files on next boot.
+- **Check**: side-by-side images (source PDF vs app view at 100%) for all five,
+  saved with the fidelity screenshots; plus one export of each rendered through
+  LibreOffice to confirm nothing clips.
+
 ## Out of scope
 
-- Exported plans clip text in the built-ins' `exact`-height rows (seen on a real
-  export). A separate export bug, raised with the user after this work.
 - Pagination and page breaks; headers, footers and text boxes (none of the six
   files use them); custom tab stops; right-to-left text.
