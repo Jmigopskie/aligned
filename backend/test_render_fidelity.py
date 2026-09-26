@@ -209,12 +209,51 @@ def check_pictures():
     print("  pictures OK")
 
 
+def check_slot_takes_the_cell_style():
+    doc = Document()
+    table = doc.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = "School:"
+    table.cell(0, 1).paragraphs[0]._p.get_or_add_pPr().append(parse_xml(
+        '<w:rPr %s><w:rFonts w:ascii="Century Gothic" w:hAnsi="Century Gothic"/><w:sz w:val="20"/></w:rPr>'
+        % nsdecls("w")))
+    path = _save(doc)
+    try:
+        doc = Document(path)
+        items = docx_service._iter_items(doc)
+        idx = next(i for i, it in enumerate(items) if docx_service._element_text(doc, it["el"]) == "School:")
+        slots, targets = docx_service._plan_html_slots(doc, items, {"school": idx})
+        html = docx_service._render_doc_body_html(doc, items, slots, targets)
+    finally:
+        os.remove(path)
+    # Typed text looks the way Word (and the export) will set it in that cell.
+    assert re.search(r'data-field-key="school" style="font-family:\'Century Gothic\',sans-serif;font-size:10pt',
+                     html), html
+    print("  field slot takes the cell's style OK")
+
+
+def check_teacher_sample():
+    """The teacher's own ILAW plan: the look the user asked for."""
+    if not os.path.isfile(SAMPLE):
+        print("  teacher sample not in backend/uploads; skipped")
+        return
+    html = docx_service.render_reference_html(SAMPLE)["html"]
+    assert 'data-page-width="936"' in html
+    assert len(re.findall(r"<img ", html)) == 2, "both logos"
+    assert "'Arial Narrow'" in html
+    # Its numbered list has no hanging indent, so the marker keeps its tab's space.
+    assert re.search(r'data-marker="1\. ?"', html), "numbered list"
+    assert html.count('data-marker="•"') > 10, "bullets"
+    print("  teacher sample OK")
+
+
 def main():
     check_page()
     check_text_cascade()
     check_tables()
     check_lists()
     check_pictures()
+    check_slot_takes_the_cell_style()
+    check_teacher_sample()
     print("render fidelity OK")
 
 
