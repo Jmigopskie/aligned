@@ -6,6 +6,8 @@ const previewOverlay = document.getElementById("preview-overlay");
 const previewBody = document.getElementById("preview-body");
 const previewClose = document.getElementById("preview-close");
 const tabSwitch = document.getElementById("plans-tab-switch");
+const statusFilter = document.getElementById("status-filter");
+const statusFilterField = document.getElementById("status-filter-field");
 
 const submitOverlay = document.getElementById("submit-overlay");
 const submitForm = document.getElementById("submit-form");
@@ -39,6 +41,28 @@ function scoreTone(score) {
   if (score >= 75) return "score-good";
   if (score >= 50) return "score-ok";
   return "score-low";
+}
+
+// How much of a draft is filled in, so its row says what is left to do rather
+// than only when it was last touched.
+function draftProgress(plan) {
+  const values = plan.field_values || {};
+  const filled = Object.values(values).filter((v) => {
+    if (Array.isArray(v)) return v.some((item) => String(item).trim());
+    return String(v == null ? "" : v).trim();
+  }).length;
+  const total = Object.keys(values).length;
+  // Editing the document body is real work on the plan, so a row must not
+  // report "nothing filled in yet" over it. It counts separately from the AI
+  // fields because the two are different kinds of progress.
+  const edits = (plan.doc_edits || []).length;
+  const editNote = edits ? `${edits} document edit${edits === 1 ? "" : "s"}` : "";
+
+  if (!total) return editNote || "Nothing filled in yet";
+  const fieldNote = filled === total
+    ? `All ${total} fields filled in`
+    : `${filled} of ${total} fields filled in`;
+  return editNote ? `${fieldNote}, ${editNote}` : fieldNote;
 }
 
 function sortPlans(plans, sortBy) {
@@ -87,8 +111,11 @@ function renderPlans(plans) {
         <td>
           <div class="plan-title-cell">
             <span class="file-ico">${Icons.file}</span>
-            <span>${escapeHtml(p.title)}</span>
-            ${isMineTab && p.is_public ? `<span class="badge" style="margin-left:8px;">Public</span>` : ""}
+            <span class="plan-title-text">
+              <span>${escapeHtml(p.title)}</span>
+              ${isMineTab && p.status === "draft" ? `<span class="plan-progress">${escapeHtml(draftProgress(p))}</span>` : ""}
+            </span>
+            ${isMineTab && p.is_public ? `<span class="badge">Public</span>` : ""}
           </div>
         </td>
         <td>${escapeHtml(p.subject || "\u2013")}</td>
@@ -99,6 +126,13 @@ function renderPlans(plans) {
         <td>${fmtDate(p.updated_at)}</td>
         <td>
           <div class="row-actions">
+            ${
+              // Only a draft can still be changed: the server locks a plan once
+              // it is submitted, so those get Preview instead.
+              isMineTab && p.status === "draft"
+                ? `<a class="btn btn-secondary btn-sm row-continue" href="generator.html?plan_id=${p.id}"><span data-icon="edit"></span>Continue</a>`
+                : ""
+            }
             <button class="row-action-btn" type="button" data-action="preview" data-plan="${p.id}" title="Preview" aria-label="Preview">${Icons.eye}</button>
             <button class="row-action-btn" type="button" data-action="export" data-plan="${p.id}" title="Download" aria-label="Download">${Icons.download}</button>
             ${
@@ -114,6 +148,7 @@ function renderPlans(plans) {
     )
     .join("");
 
+  hydrateIcons(plansBody);
   wireRowActions();
 }
 
@@ -376,20 +411,27 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !previewOverlay.hidden) closePreview();
 });
 
+// Status only means something on a student's own plans (a teacher's plans are
+// never submitted), so that is the only place the filter shows.
+function statusFilterApplies() {
+  return activeTab === "mine" && currentUser && currentUser.role === "student";
+}
+
 function applyFilter() {
   const q = searchInput.value.trim().toLowerCase();
-  const filtered = !q
-    ? allPlans
-    : allPlans.filter(
-        (p) =>
-          (p.title || "").toLowerCase().includes(q) ||
-          (p.subject || "").toLowerCase().includes(q)
-      );
+  statusFilterField.hidden = !statusFilterApplies();
+  const status = statusFilterApplies() ? statusFilter.value : "";
+  const filtered = allPlans.filter(
+    (p) =>
+      (!status || p.status === status) &&
+      (!q || (p.title || "").toLowerCase().includes(q) || (p.subject || "").toLowerCase().includes(q))
+  );
   renderPlans(sortPlans(filtered, sortSelect.value));
 }
 
 searchInput.addEventListener("input", applyFilter);
 sortSelect.addEventListener("change", applyFilter);
+statusFilter.addEventListener("change", applyFilter);
 
 async function loadActiveTab() {
   errorBox.hidden = true;

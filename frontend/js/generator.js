@@ -2787,11 +2787,17 @@ async function init() {
   updateGate();
 
   // Two ways in: ?format_id= starts a new plan, ?plan_id= reopens one already
-  // saved (what the "continue where you left off" cards link to). A reopened
+  // saved (what Continue in the list of lesson plans links to). A reopened
   // plan supplies its own format, so the format id doesn't have to be passed
   // alongside it.
   const params = new URLSearchParams(window.location.search);
   const requestedPlanId = params.get("plan_id");
+  if (requestedPlanId) {
+    // A reopened plan came from the list, so that is where Back goes.
+    const back = document.querySelector(".back-link");
+    back.href = "lesson-plan-list.html";
+    back.lastChild.textContent = "Back to List of Lesson Plans";
+  }
   let formatId = params.get("format_id");
   let openedPlan = null;
 
