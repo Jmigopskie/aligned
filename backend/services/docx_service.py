@@ -366,16 +366,44 @@ def candidate_label_lines(source_path):
                 continue
             text = label + ":"
 
+        cells = _weekly_cells(item) if item["cell"] is not None else []
+        # A table label whose next cell already holds text, with no blank of
+        # its own beside, under or inside it, is either answered in the
+        # template ("School: | EMMANUEL ... IHS") or a heading over the real
+        # fields ("Learning Competency and Curriculum Standards:"). As a field
+        # it would only steal a neighbour's blank cell.
+        if (item["cell"] is not None and not cells and _next_cell_has_text(item)
+                and not _blank_lines_after_in_cell(item)):
+            continue
+
         if _looks_like_label(text) or _has_fillable_slot(doc, items, idx):
             entry = {"index": idx, "text": text}
             if item["cell"] is not None:
-                cells = _weekly_cells(item)
                 entry["blank_cells"] = len(cells)
                 if len(cells) >= 2:
                     entry["parts"] = weekly_part_labels(doc, cells, header)
             lines.append(entry)
 
     return lines
+
+def _next_cell_has_text(item):
+    """Whether the cell right after this one in its row already holds text."""
+    row_cells, col_idx, cell = item["row_cells"], item["col_idx"], item["cell"]
+    if not row_cells or col_idx is None:
+        return False
+    for other in row_cells[col_idx + 1:]:
+        if other._tc is cell._tc:
+            continue  # the same merged cell repeated by python-docx
+        return bool(other.text.strip())
+    return False
+
+
+def _blank_lines_after_in_cell(item):
+    """Whether the label's own cell has blank lines under it to write into."""
+    paragraphs = item["cell"].paragraphs
+    pos = next((i for i, p in enumerate(paragraphs) if p._p is item["el"]), None)
+    return pos is not None and any(not p.text.strip() for p in paragraphs[pos + 1:])
+
 
 def _is_first_textual_line_in_cell(doc, items, idx):
     cell = items[idx]["cell"]

@@ -5341,6 +5341,28 @@ body.owl-chat-shown .dash-main {
   margin-bottom: var(--space-4);
 }
 
+/* A weekly field in the plain form view: one labelled box per day. */
+.weekly-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
+  gap: var(--space-2);
+}
+
+.weekly-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-weight: 400;
+}
+
+.weekly-part-name {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-body);
+}
+
 /* A short lead-in paragraph at the top of a panel or section. */
 .section-intro {
   margin-bottom: var(--space-5);

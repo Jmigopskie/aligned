@@ -404,24 +404,35 @@ function insertIntoActiveField(text) {
   if (!field) return;
   syncActiveStepValue();
   const addition = field.field_type === "text" ? text.replace(/\s*\n\s*/g, " ").trim() : formatGeneratedValue(text);
-  const current = String(fieldValues[key] || "").trim();
+  const root = docTemplateData ? liveDocWrap.querySelector(".lp-doc") : resultsEl;
+  const slots = slotsFor(key, root);
+
+  // A weekly field takes a suggestion one day at a time: into the day the
+  // teacher is on, else the first day still empty, else Monday.
+  let target = slots[0] || null;
+  if (partCount(key) && slots.length) {
+    const focused = slots.find((el) => el === document.activeElement || el.contains(document.activeElement));
+    target = focused || slots.find((el) => !valueForSlot(el).trim()) || slots[0];
+  }
+
+  const current = target ? valueForSlot(target).trim() : String(fieldValues[key] || "").trim();
   // A short text field is replaced; a multi-line field keeps what the
   // teacher already wrote and gains the new lines below it.
   const value = field.field_type !== "text" && current ? `${current}\n${addition}` : addition;
-  fieldValues[key] = value;
 
-  if (docTemplateData) {
-    const canvas = liveDocWrap.querySelector(".lp-doc");
-    const el = canvas && canvas.querySelector(`[data-field-key="${key}"]`);
-    if (el) {
-      el.textContent = value;
-      delete fieldRichValues[key];
-      el.classList.add("lp-filled");
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (target) {
+    storeSlot(target, value);
+    if (Array.isArray(fieldRichValues[key])) fieldRichValues[key][slotPart(target)] = "";
+    else delete fieldRichValues[key];
+    if (docTemplateData) {
+      target.textContent = value;
+      target.classList.add("lp-filled");
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      target.value = value;
     }
   } else {
-    const el = resultsEl.querySelector(`[data-field-key="${key}"]`);
-    if (el) el.value = value;
+    fieldValues[key] = value;
   }
   markDirty();
   renderStepFieldNav();
@@ -1024,6 +1035,88 @@ function fieldByKey(key) {
   return (fmt.fields || []).find((f) => f.field_key === key);
 }
 
+// ---- Weekly fields: one answer per day, each in its own slot ----
+// A weekly field (ILAW's day columns) is one field whose value is a list with
+// one entry per day, rendered as one slot per day carrying data-part. Every
+// place that reads or writes a slot goes through these, so a plain field keeps
+// working exactly as before.
+
+function partCount(key) {
+  const field = fieldByKey(key);
+  return field && field.field_type === "weekly" && field.parts ? field.parts.length : 0;
+}
+
+function weeklyArray(value, count) {
+  let parts;
+  if (Array.isArray(value)) parts = value.slice();
+  else if (value == null || String(value) === "") parts = [];
+  else parts = [String(value)];
+  parts = parts.slice(0, count).map((v) => (v == null ? "" : String(v)));
+  while (parts.length < count) parts.push("");
+  return parts;
+}
+
+function slotPart(el) {
+  return el.dataset.part === undefined ? null : parseInt(el.dataset.part, 10);
+}
+
+// The text one slot shows: its day's entry for a weekly field, the whole value
+// otherwise.
+function valueForSlot(el) {
+  const key = el.dataset.fieldKey;
+  const value = fieldValues[key];
+  const part = slotPart(el);
+  if (part !== null) return weeklyArray(value, partCount(key))[part] || "";
+  return Array.isArray(value) ? value.join("\n") : (value || "");
+}
+
+function richForSlot(el) {
+  const rich = fieldRichValues[el.dataset.fieldKey];
+  const part = slotPart(el);
+  if (part !== null) return Array.isArray(rich) ? (rich[part] || "") : "";
+  return Array.isArray(rich) ? "" : (rich || "");
+}
+
+// Writes one slot's text (and, when given, its styled HTML) back into the
+// value maps, touching only that day's entry for a weekly field.
+function storeSlot(el, text, html) {
+  const key = el.dataset.fieldKey;
+  const part = slotPart(el);
+  if (part === null) {
+    fieldValues[key] = text;
+    if (html !== undefined) fieldRichValues[key] = html;
+    return;
+  }
+  const count = partCount(key);
+  const parts = weeklyArray(fieldValues[key], count);
+  parts[part] = text;
+  fieldValues[key] = parts;
+  if (html !== undefined) {
+    const rich = weeklyArray(Array.isArray(fieldRichValues[key]) ? fieldRichValues[key] : [], count);
+    rich[part] = html;
+    fieldRichValues[key] = rich;
+  }
+}
+
+function slotsFor(key, root) {
+  return root ? Array.from(root.querySelectorAll(`[data-field-key="${CSS.escape(key)}"]`)) : [];
+}
+
+// A value as the plain preview lists it: a weekly field reads "Monday: ..."
+// line by line, leaving out days with nothing in them.
+function previewValue(key) {
+  const count = partCount(key);
+  if (!count) return fieldValues[key];
+  const names = fieldByKey(key).parts;
+  return weeklyArray(fieldValues[key], count)
+    .map((text, i) => (String(text).trim() ? `${names[i]}: ${text}` : ""))
+    .filter(Boolean);
+}
+
+function hasValue(value) {
+  return Array.isArray(value) ? value.some((v) => String(v == null ? "" : v).trim()) : !!String(value == null ? "" : value).trim();
+}
+
 // Which thinking-heavy fields the teacher wants written for them. Remembered per
 // format, because a teacher who always writes their own Flow should only have to
 // say so once. Ticked by default so a teacher who never opens this panel gets
@@ -1105,8 +1198,7 @@ function selectedGenerateKeys() {
 }
 
 function isFieldComplete(key) {
-  const v = fieldValues[key];
-  return Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim());
+  return hasValue(fieldValues[key]);
 }
 
 // stepFieldKeys is heavy-only, so finishing the walkthrough does not mean the
@@ -1186,23 +1278,24 @@ function applyStepLocks() {
       // Only the walkthrough's own fields are locked or unlocked here. Anything
       // outside it keeps the editability the document was rendered with.
       stepFieldKeys.forEach((key, i) => {
-        const el = canvas.querySelector(`[data-field-key="${key}"]`);
-        if (!el) return;
-        el.classList.remove("step-locked", "step-active");
-        if (i === stepIndex) {
-          el.contentEditable = "true";
-          el.classList.add("step-active");
-          activeEl = el;
-        } else if (i > stepIndex) {
-          el.contentEditable = "false";
-          el.classList.add("step-locked");
-        } else {
-          // A field the teacher has already answered stays theirs to correct.
-          // It used to be set read-only with no lock styling at all, so it
-          // looked perfectly editable and silently swallowed typing, which is
-          // what "I can't edit the fields" was.
-          el.contentEditable = "true";
-        }
+        // Every slot of the field: a weekly field has one per day.
+        slotsFor(key, canvas).forEach((el) => {
+          el.classList.remove("step-locked", "step-active");
+          if (i === stepIndex) {
+            el.contentEditable = "true";
+            el.classList.add("step-active");
+            if (!activeEl) activeEl = el;
+          } else if (i > stepIndex) {
+            el.contentEditable = "false";
+            el.classList.add("step-locked");
+          } else {
+            // A field the teacher has already answered stays theirs to correct.
+            // It used to be set read-only with no lock styling at all, so it
+            // looked perfectly editable and silently swallowed typing, which is
+            // what "I can't edit the fields" was.
+            el.contentEditable = "true";
+          }
+        });
       });
       if (activeEl) {
         activeEl.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1249,11 +1342,9 @@ function syncActiveStepValue() {
   if (!key) return;
   if (docTemplateData) {
     const canvas = liveDocWrap.querySelector(".lp-doc");
-    const el = canvas && canvas.querySelector(`[data-field-key="${key}"]`);
-    if (el) fieldValues[key] = el.textContent;
+    slotsFor(key, canvas).forEach((el) => storeSlot(el, el.textContent));
   } else {
-    const el = resultsEl.querySelector(`[data-field-key="${key}"]`);
-    if (el) fieldValues[key] = el.value;
+    slotsFor(key, resultsEl).forEach((el) => storeSlot(el, el.value));
   }
 }
 
@@ -1300,7 +1391,9 @@ function formatGeneratedValue(raw) {
 function formatGeneratedValues(values) {
   const out = {};
   Object.entries(values || {}).forEach(([key, val]) => {
-    out[key] = formatGeneratedValue(val);
+    // A weekly field stays one entry per day, each formatted on its own.
+    const count = partCount(key);
+    out[key] = count ? weeklyArray(val, count).map(formatGeneratedValue) : formatGeneratedValue(val);
   });
   return out;
 }
@@ -1314,9 +1407,28 @@ function isBulletedValue(value) {
 }
 
 function fieldInputMarkup(field) {
-  const value = fieldValues[field.field_key] || "";
   const requiredMark = field.is_required ? " *" : "";
   const hint = field.ai_hint ? `<p class="hint">${escapeHtml(field.ai_hint)}</p>` : "";
+
+  // A weekly field: one labelled box per day.
+  if (field.field_type === "weekly" && field.parts && field.parts.length) {
+    const parts = weeklyArray(fieldValues[field.field_key], field.parts.length);
+    return `
+      <div class="field">
+        <label>${escapeHtml(field.label)}${requiredMark}</label>
+        <div class="weekly-parts">
+          ${field.parts.map((name, i) => `
+            <label class="weekly-part">
+              <span class="weekly-part-name">${escapeHtml(name)}</span>
+              <textarea data-field-key="${field.field_key}" data-part="${i}" rows="3" placeholder="Not generated yet">${escapeHtml(parts[i])}</textarea>
+            </label>`).join("")}
+        </div>
+        ${hint}
+      </div>
+    `;
+  }
+
+  const value = fieldValues[field.field_key] || "";
   const bulleted = isBulletedValue(value) || field.field_type === "list" || field.field_type === "table";
 
   const lineCount = String(value).split("\n").length;
@@ -1351,7 +1463,7 @@ function renderResults() {
 
   resultsEl.querySelectorAll("[data-field-key]").forEach((el) => {
     el.addEventListener("input", () => {
-      fieldValues[el.dataset.fieldKey] = el.value;
+      storeSlot(el, el.value);
       markDirty();
       if (mode === "step") renderStepFieldNav();
     });
@@ -1434,8 +1546,7 @@ function sanitizeRichValueHtml(node) {
 }
 
 function syncFieldFromEl(el) {
-  fieldValues[el.dataset.fieldKey] = el.textContent;
-  fieldRichValues[el.dataset.fieldKey] = sanitizeRichValueHtml(el);
+  storeSlot(el, el.textContent, sanitizeRichValueHtml(el));
   el.classList.toggle("lp-filled", !!el.textContent.trim());
 }
 
@@ -1445,7 +1556,7 @@ function syncFieldFromEl(el) {
 // since its checkmark now reflects real completeness rather than position,
 // and clearing a field the teacher already stepped past has to un-tick it.
 function clearFieldState(key) {
-  fieldValues[key] = "";
+  fieldValues[key] = partCount(key) ? weeklyArray([], partCount(key)) : "";
   delete fieldRichValues[key];
   markDirty();
   if (mode === "step") renderStepFieldNav();
@@ -1456,8 +1567,12 @@ function clearFieldState(key) {
 // otherwise the old styled HTML would come back on the next render.
 function clearField(el) {
   const key = el.dataset.fieldKey;
-  el.innerHTML = "";
-  el.classList.remove("lp-filled", "field-needs-answer");
+  // Every slot of the field: a weekly field is cleared for the whole week.
+  const root = el.closest(".lp-doc") || el.parentElement;
+  (slotsFor(key, root).length ? slotsFor(key, root) : [el]).forEach((slot) => {
+    slot.innerHTML = "";
+    slot.classList.remove("lp-filled", "field-needs-answer");
+  });
   clearFieldState(key);
 }
 
@@ -1757,20 +1872,21 @@ async function revealFieldsInLiveDoc(keys) {
   const canvas = liveDocWrap.querySelector(".lp-doc");
   if (!canvas) return;
   for (const key of keys) {
-    const el = canvas.querySelector(`[data-field-key="${key}"]`);
-    if (el) {
-      const value = fieldValues[key];
-      el.textContent = Array.isArray(value) ? value.join("\n") : (value || "");
+    const slots = slotsFor(key, canvas);
+    if (slots.length) {
       delete fieldRichValues[key]; // fresh AI text replaces any earlier manual styling
-      el.classList.add("lp-filled");
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      slots.forEach((el) => {
+        el.textContent = valueForSlot(el);
+        el.classList.toggle("lp-filled", !!el.textContent.trim());
+      });
+      slots[0].scrollIntoView({ behavior: "smooth", block: "center" });
     }
     await sleep(220);
   }
 }
 
 function hasAnyValue() {
-  return Object.values(fieldValues).some((v) => v && v.trim());
+  return Object.values(fieldValues).some(hasValue);
 }
 
 // The live document view always shows every field already (there's no
@@ -2016,10 +2132,8 @@ function paintRestoredValues(blankMissing = false) {
   const canvas = liveDocWrap.querySelector(".lp-doc");
   if (canvas) {
     canvas.querySelectorAll("[data-field-key]").forEach((el) => {
-      const key = el.dataset.fieldKey;
-      const rich = fieldRichValues[key];
-      const value = fieldValues[key];
-      const text = Array.isArray(value) ? value.join("\n") : (value || "");
+      const rich = richForSlot(el);
+      const text = valueForSlot(el);
       if (rich) {
         el.innerHTML = rich;
         el.classList.add("lp-filled");
@@ -2545,7 +2659,7 @@ function renderPlainFieldList() {
       sectionsHtml += `
         <div class="preview-field">
           <div class="preview-field-label">${escapeHtml(field.label)}</div>
-          ${renderPreviewValue(fieldValues[field.field_key])}
+          ${renderPreviewValue(previewValue(field.field_key))}
         </div>`;
     });
   });
@@ -2564,7 +2678,7 @@ function renderUnmatchedFieldList(keys) {
       return `
         <div class="preview-field">
           <div class="preview-field-label">${escapeHtml(label)}</div>
-          ${renderPreviewValue(fieldValues[key])}
+          ${renderPreviewValue(previewValue(key))}
         </div>`;
     })
     .join("");
@@ -2580,8 +2694,7 @@ function fillDocCanvas() {
   if (!canvas) return;
   let filled = 0;
   canvas.querySelectorAll("[data-field-key]").forEach((el) => {
-    const value = fieldValues[el.dataset.fieldKey];
-    const text = Array.isArray(value) ? value.join("\n") : (value || "");
+    const text = valueForSlot(el);
     if (!text.trim()) return;
     el.textContent = text;
     el.classList.add("lp-filled");
@@ -2599,7 +2712,7 @@ function wireDocCanvasEditing() {
   canvas.querySelectorAll("[data-field-key]").forEach((el) => {
     el.setAttribute("data-placeholder", "Not generated yet");
     el.addEventListener("input", () => {
-      fieldValues[el.dataset.fieldKey] = el.textContent;
+      storeSlot(el, el.textContent);
       el.classList.toggle("lp-filled", !!el.textContent.trim());
       markDirty();
       renderResults();

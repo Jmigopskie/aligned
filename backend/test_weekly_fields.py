@@ -68,6 +68,10 @@ def check_detection():
         assert any(t.startswith(label) for t in texts), (label, texts)
     # Page-break spill-overs start mid-sentence, in lowercase.
     assert not any(t[:1].islower() for t in texts), texts
+    # Already answered in the template (School), or a heading over its real
+    # fields (the standards section): neither is a field.
+    for skipped in ("School", "Learning Competency and Curriculum Standards", "MONDAY"):
+        assert not any(t.startswith(skipped) for t in texts), (skipped, texts)
 
     flow = _line(lines, "Flow")
     assert flow["blank_cells"] == 5 and flow["parts"] == DAYS, flow
