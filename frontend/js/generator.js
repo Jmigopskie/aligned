@@ -2754,6 +2754,7 @@ function renderPreviewModal(templateData, docAvailable) {
   }
 
   previewBody.innerHTML = renderPreviewMeta() + toolbar + warning + content;
+  previewBody.querySelectorAll(".lp-doc-wrap").forEach(fitDocPage);
 
   previewBody.querySelectorAll(".doc-view-btn").forEach((btn) => {
     btn.addEventListener("click", () => {

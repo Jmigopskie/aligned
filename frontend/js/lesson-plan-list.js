@@ -355,6 +355,7 @@ function renderPlanPreviewModal(fmt, plan, templateData, docAvailable) {
   }
 
   previewBody.innerHTML = meta + toolbar + warning + content;
+  previewBody.querySelectorAll(".lp-doc-wrap").forEach(fitDocPage);
 
   previewBody.querySelectorAll(".doc-view-btn").forEach((btn) => {
     btn.addEventListener("click", () => {

@@ -1043,6 +1043,29 @@ if (document.readyState === "loading") {
 // column's header as data-label, which the CSS prints beside the value. Rows
 // are rendered by each page's own script, at different times, so this
 // watches for them rather than asking every page to call it.
+// The scale that fits a document page to its panel's width, never past its
+// true size. The page's width comes from the .docx, in points.
+function docFitScale(wrapEl) {
+  const page = wrapEl.querySelector(".lp-doc[data-page-width]");
+  if (!page) return 1;
+  const pageWidth = (parseFloat(page.dataset.pageWidth) * 96) / 72;
+  const cs = getComputedStyle(wrapEl);
+  const available = wrapEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  if (!(pageWidth > 0) || !(available > 0)) return 1;
+  return Math.min(1, available / pageWidth);
+}
+
+// Fits a read-only document preview (no zoom toolbar) to its panel, and keeps
+// it fitted when the panel resizes or first becomes visible in a modal.
+function fitDocPage(wrapEl) {
+  const apply = () => wrapEl.style.setProperty("--doc-zoom", String(docFitScale(wrapEl)));
+  apply();
+  if (window.ResizeObserver && !wrapEl._docFitObserver) {
+    wrapEl._docFitObserver = new ResizeObserver(apply);
+    wrapEl._docFitObserver.observe(wrapEl);
+  }
+}
+
 function labelTableCells(root = document) {
   root.querySelectorAll("table.data-table").forEach((table) => {
     // Pages hide whole columns per tab with the hidden attribute, on the th
