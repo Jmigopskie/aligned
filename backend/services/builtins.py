@@ -73,8 +73,13 @@ def _seed_each(entries, seed_one, kind):
 
 
 def _field_signature(fields):
-    return [(f["label"], f.get("field_type", "textarea"), f.get("anchor_index"),
-             bool(f.get("is_required", True)), f.get("ai_hint") or None, f.get("parts") or None)
+    # The key counts too: a manifest may pin a field's key so plans saved
+    # under an older label keep their answers attached to it.
+    from routes.format_routes import _slugify
+
+    return [(f.get("field_key") or _slugify(f["label"]), f["label"], f.get("field_type", "textarea"),
+             f.get("anchor_index"), bool(f.get("is_required", True)), f.get("ai_hint") or None,
+             f.get("parts") or None)
             for f in fields]
 
 
@@ -108,7 +113,7 @@ def _seed_formats(folder, owner_id):
         fmt.template_docx_path = template
         db.session.flush()
 
-        current = [{"label": f.label, "field_type": f.field_type, "anchor_index": f.anchor_index,
+        current = [{"field_key": f.field_key, "label": f.label, "field_type": f.field_type, "anchor_index": f.anchor_index,
                     "is_required": f.is_required, "ai_hint": f.ai_hint, "parts": f.parts_list}
                    for f in fmt.fields]
         if _field_signature(current) != _field_signature(fields):

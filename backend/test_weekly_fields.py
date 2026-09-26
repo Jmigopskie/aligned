@@ -202,8 +202,25 @@ def check_seeded_ilaw(app):
         else:
             assert d["parts"] is None
 
-    # Every weekly field lands in its own day cells on export.
+    # References keeps the key plans saved before this change already use.
+    refs = next(f for f in fmt.fields if f.label == "References")
+    assert refs.field_key == "references_books_websites_toolkits_etc", refs.field_key
+
     user = User.query.filter_by(role="admin").first()
+
+    # A plan saved when these fields were plain text still exports: its old
+    # single answer goes into the first day's cell.
+    legacy = LessonPlan(user_id=user.id, format_id=fmt.id, title="Legacy ILAW")
+    legacy.set_values({"lesson_title": "OLD SINGLE TITLE", refs.field_key: "OLD REFERENCES"})
+    db.session.add(legacy)
+    db.session.commit()
+    out = docx_service.export_lesson_plan(legacy, fmt)
+    title_row = next(r for t in Document(out).tables for r in t.rows if r.cells[0].text.strip() == "Lesson Title")
+    assert title_row.cells[1].text == "OLD SINGLE TITLE" and title_row.cells[2].text == "", [c.text for c in title_row.cells]
+    assert "OLD REFERENCES" in "\n".join(c.text for t in Document(out).tables for r in t.rows for c in r.cells)
+    os.remove(out)
+
+    # Every weekly field lands in its own day cells on export.
     values = {}
     for f in fmt.fields:
         if f.field_type == "weekly":

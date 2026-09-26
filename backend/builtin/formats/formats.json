@@ -403,7 +403,8 @@
           "Wednesday",
           "Thursday",
           "Friday"
-        ]
+        ],
+        "field_key": "references_books_websites_toolkits_etc"
       },
       {
         "label": "Declaration of AI Use",
