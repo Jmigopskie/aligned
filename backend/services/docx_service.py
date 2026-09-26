@@ -15,6 +15,7 @@ from docx.text.hyperlink import Hyperlink
 from docx.text.paragraph import Paragraph
 
 from config import Config
+from services import docx_layout
 
 _log = logging.getLogger(__name__)
 
@@ -415,7 +416,7 @@ def _is_first_textual_line_in_cell(doc, items, idx):
             return False
     return True
 
-def _render_block_children(doc, parent_el, slots, cell_value_targets, index_by_el_id):
+def _render_block_children(doc, parent_el, slots, cell_value_targets, index_by_el_id, layout):
     """Render the paragraph/table children of any container element, in
     document order. Used for both the document body and a table cell's
     contents — a table nested inside another table's cell (a common way to
@@ -426,16 +427,20 @@ def _render_block_children(doc, parent_el, slots, cell_value_targets, index_by_e
     parts = []
     for child in parent_el:
         if child.tag == qn("w:p"):
-            parts.append(_render_html_paragraph(doc, child, slots, index_by_el_id))
+            parts.append(_render_html_paragraph(doc, child, slots, index_by_el_id, layout))
         elif child.tag == qn("w:tbl"):
-            parts.append(_render_html_table(doc, Table(child, doc), slots, cell_value_targets, index_by_el_id))
+            parts.append(_render_html_table(doc, Table(child, doc), slots, cell_value_targets, index_by_el_id, layout))
         # w:tcPr / w:sectPr and anything else is layout metadata, not content.
     return "".join(parts)
 
 def _render_doc_body_html(doc, items, slots, cell_value_targets):
+    # One Layout per render: it resolves Word's styles once, and its list
+    # counters advance as paragraphs are drawn in document order.
+    layout = docx_layout.Layout(doc)
     index_by_el_id = {id(item["el"]): idx for idx, item in enumerate(items)}
-    body_html = _render_block_children(doc, doc.element.body, slots, cell_value_targets, index_by_el_id)
-    return '<div class="lp-doc">' + body_html + "</div>"
+    body_html = _render_block_children(doc, doc.element.body, slots, cell_value_targets, index_by_el_id, layout)
+    page_css, page_width = layout.page()
+    return f'<div class="lp-doc" style="{page_css}" data-page-width="{page_width:g}">' + body_html + "</div>"
 
 def _plan_html_slots(doc, items, anchors, weekly_keys=frozenset()):
     """Decide, for each matched field, where its editable value slot goes in the
@@ -494,83 +499,16 @@ def _html_escape(text):
     # would otherwise be able to break out of href="..." and inject markup.
     return html_lib.escape(text or "")
 
-def _paragraph_html_classes(para, text):
-    classes = ["lp-p"]
-    if para.runs and para.runs[0].bold:
-        classes.append("lp-bold")
-    if _HEADING_RE.match(text) or (para.runs and para.runs[0].bold and len(text) < 60):
-        classes.append("lp-heading")
-    return " ".join(classes)
-
-_ALIGN_CSS = {
-    WD_ALIGN_PARAGRAPH.CENTER: "center",
-    WD_ALIGN_PARAGRAPH.RIGHT: "right",
-    WD_ALIGN_PARAGRAPH.JUSTIFY: "justify",
-    WD_ALIGN_PARAGRAPH.DISTRIBUTE: "justify",
-    WD_ALIGN_PARAGRAPH.JUSTIFY_LOW: "justify",
-    WD_ALIGN_PARAGRAPH.JUSTIFY_MED: "justify",
-    WD_ALIGN_PARAGRAPH.JUSTIFY_HI: "justify",
-}
-
-def _paragraph_align_style(para):
-    try:
-        align = para.alignment
-    except Exception:
-        return ""
-    css = _ALIGN_CSS.get(align)
-    return f" text-align:{css};" if css else ""
-
-# Word's highlight enum back to a CSS colour, so a highlighted run in the file
-# still looks highlighted in the canvas.
-_HIGHLIGHT_CSS = {
-    WD_COLOR_INDEX.YELLOW: "#FDE68A",
-    WD_COLOR_INDEX.BRIGHT_GREEN: "#BBF7D0",
-    WD_COLOR_INDEX.TURQUOISE: "#A5F3FC",
-}
-
-
-def _run_style_css(run):
-    parts = []
-    if run.bold:
-        parts.append("font-weight:700")
-    if run.italic:
-        parts.append("font-style:italic")
-    if run.underline:
-        parts.append("text-decoration:underline")
-
-    # Read back with a try/except throughout: a run whose font properties are
-    # inherited from a style rather than set directly raises instead of
-    # returning None on some documents, and a canvas that renders is worth more
-    # than one that reports the exact colour.
-    try:
-        if run.font.size is not None:
-            parts.append(f"font-size:{run.font.size.pt:.0f}pt")
-    except Exception:
-        pass
-    try:
-        rgb = run.font.color.rgb if run.font.color is not None else None
-        if rgb is not None:
-            parts.append(f"color:#{rgb}")
-    except Exception:
-        pass
-    try:
-        css = _HIGHLIGHT_CSS.get(run.font.highlight_color)
-        if css:
-            parts.append(f"background-color:{css}")
-    except Exception:
-        pass
-
-    return ";".join(parts)
-
-def _run_html(run):
+def _run_html(run, layout, p_el):
+    pictures = layout.pictures(run._r)
     text = run.text
     if not text:
-        return ""
+        return pictures
+    style = layout.run_css(run._r, p_el)
     escaped = _html_escape(text)
-    style = _run_style_css(run)
-    return f'<span style="{style}">{escaped}</span>' if style else escaped
+    return pictures + (f'<span style="{style}">{escaped}</span>' if style else escaped)
 
-def _render_runs_html(para):
+def _render_runs_html(para, layout):
     """Render each run as its own span so mixed formatting within one
     paragraph (e.g. a bold label followed by a plain colon) survives in the
     HTML instead of being collapsed to a single paragraph-wide guess.
@@ -580,27 +518,40 @@ def _render_runs_html(para):
     .runs at all, so relying on .runs alone would silently drop it even
     though para.text (used for anchor/heading detection) does include it.
     """
+    p_el = para._p
     out = []
     for item in para.iter_inner_content():
         if isinstance(item, Hyperlink):
-            inner = "".join(_run_html(r) for r in item.runs)
+            inner = "".join(_run_html(r, layout, p_el) for r in item.runs)
             if not inner:
                 continue
             href = _html_escape(item.address or "")
             out.append(f'<a href="{href}" target="_blank" rel="noopener">{inner}</a>' if href else inner)
         else:
-            out.append(_run_html(item))
+            out.append(_run_html(item, layout, p_el))
     return "".join(out)
 
-def _render_html_paragraph(doc, p_el, slots, index_by_el_id=None):
+def _render_html_paragraph(doc, p_el, slots, index_by_el_id, layout):
     para = Paragraph(p_el, doc)
     text = para.text
-    classes = _paragraph_html_classes(para, text)
-    if _looks_like_label(text):
-        classes += " lp-candidate"
-    style_attr = _paragraph_align_style(para)
-    style_attr = f' style="{style_attr.strip()}"' if style_attr else ""
-    inner = _render_runs_html(para) if text.strip() else "&nbsp;"
+    classes = "lp-p lp-candidate" if _looks_like_label(text) else "lp-p"
+
+    # Everything visual comes from the file (docx_layout). A list number is an
+    # attribute drawn by CSS ::before, never text in the paragraph: both editors
+    # read a paragraph's text back from the page, and a marker in it would be
+    # saved into the document as typed text.
+    style, marker = layout.paragraph(p_el)
+    marker_attr = ""
+    if marker:
+        marker_attr = f' data-marker="{_html_escape(marker["text"])}"'
+        if marker["width"]:
+            width = f"--lp-marker-w:{marker['width']:g}pt"
+            style = f"{style};{width}" if style else width
+    style_attr = f' style="{style}"' if style else ""
+
+    inner = _render_runs_html(para, layout)
+    if "<img" not in inner and not text.strip():
+        inner = "&nbsp;"
 
     anchor_attr = ""
     if index_by_el_id is not None:
@@ -608,23 +559,27 @@ def _render_html_paragraph(doc, p_el, slots, index_by_el_id=None):
         if idx is not None:
             anchor_attr = f' data-anchor-index="{idx}"'
 
+    open_tag = f'<p class="{classes}"{style_attr}{marker_attr}{anchor_attr}>'
     slot = slots.get(id(p_el))
     if not slot:
-        return f'<p class="{classes}"{style_attr}{anchor_attr}>{inner}</p>'
+        return f"{open_tag}{inner}</p>"
 
     field_key, kind = slot
     if kind == "inline":
         return (
-            f'<p class="{classes}"{style_attr}{anchor_attr}>{inner} '
+            f'{open_tag}{inner} '
             f'<span class="lp-field lp-field-inline" data-field-key="{field_key}" '
             f'contenteditable="true"></span></p>'
         )
 
     # "block" or "same_cell" — label paragraph stays read-only, the value gets
-    # its own editable block right after it (inside the same cell, if any).
+    # its own editable block right after it (inside the same cell, if any),
+    # in the style Word would give text typed there.
+    slot_css = layout.slot_css(p_el)
+    slot_style = f' style="{slot_css}"' if slot_css else ""
     return (
-        f'<p class="{classes}"{style_attr}{anchor_attr}>{inner}</p>'
-        f'<div class="lp-field lp-field-block" data-field-key="{field_key}" '
+        f'{open_tag}{inner}</p>'
+        f'<div class="lp-field lp-field-block" data-field-key="{field_key}"{slot_style} '
         f'contenteditable="true"></div>'
     )
 
@@ -711,7 +666,7 @@ def _table_col_widths_pct(tbl_el):
         return None
     return [w / total * 100 for w in widths]
 
-def _render_html_cell(doc, cell, slots, cell_value_targets, default_borders, colspan=1, rowspan=1, index_by_el_id=None):
+def _render_html_cell(doc, cell, slots, cell_value_targets, default_borders, colspan=1, rowspan=1, index_by_el_id=None, layout=None):
     style = _cell_border_style(cell._tc, default_borders) + _cell_shading_css(cell._tc)
     style_attr = f' style="{style}"' if style else ""
     span_attr = (f' colspan="{colspan}"' if colspan > 1 else "") + (f' rowspan="{rowspan}"' if rowspan > 1 else "")
@@ -730,7 +685,7 @@ def _render_html_cell(doc, cell, slots, cell_value_targets, default_borders, col
             f'contenteditable="true"></div></td>'
         )
 
-    inner = _render_block_children(doc, cell._tc, slots, cell_value_targets, index_by_el_id)
+    inner = _render_block_children(doc, cell._tc, slots, cell_value_targets, index_by_el_id, layout)
     return f'<td class="lp-td"{span_attr}{style_attr}>{inner or "&nbsp;"}</td>'
 
 def _vmerge_rowspans(rows_cells):
@@ -774,7 +729,7 @@ def _vmerge_rowspans(rows_cells):
 
     return origin_rowspan, skip
 
-def _render_html_table(doc, table, slots, cell_value_targets, index_by_el_id=None):
+def _render_html_table(doc, table, slots, cell_value_targets, index_by_el_id=None, layout=None):
     tbl_el = table._tbl
     default_borders = _table_default_borders(tbl_el)
     col_widths = _table_col_widths_pct(tbl_el)
@@ -798,7 +753,7 @@ def _render_html_table(doc, table, slots, cell_value_targets, index_by_el_id=Non
             colspan = _cell_grid_span(cell._tc)
             rowspan = origin_rowspan.get((row_idx, col_idx), 1)
             cells_html.append(_render_html_cell(
-                doc, cell, slots, cell_value_targets, default_borders, colspan, rowspan, index_by_el_id
+                doc, cell, slots, cell_value_targets, default_borders, colspan, rowspan, index_by_el_id, layout
             ))
         rows_html.append(f"<tr>{''.join(cells_html)}</tr>")
 
