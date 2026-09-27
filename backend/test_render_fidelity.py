@@ -110,6 +110,11 @@ def check_tables():
         parse_xml('<w:trHeight %s w:val="400" w:hRule="exact"/>' % nsdecls("w")))
     plain = doc.add_table(rows=1, cols=1)
     plain.cell(0, 0).text = "B"
+    converted = doc.add_table(rows=1, cols=1)
+    converted.cell(0, 0).text = "C"
+    # PDF-converted files write colours with a "#" and sizes as "8.0".
+    converted.cell(0, 0)._tc.get_or_add_tcPr().append(parse_xml(
+        '<w:tcBorders %s><w:top w:val="single" w:sz="8.0" w:color="#1F4E79"/></w:tcBorders>' % nsdecls("w")))
     # Converted files write indents like "730.0"; still read, not dropped.
     plain._tbl.tblPr.append(parse_xml('<w:tblInd %s w:w="730.0" w:type="dxa"/>' % nsdecls("w")))
     html = _render(doc)
@@ -128,6 +133,8 @@ def check_tables():
     plain_cell = re.search(r'<td class="lp-td" style="([^"]*)"', tables[1]).group(1)
     assert "border-top:none" in plain_cell and "border-left:none" in plain_cell, plain_cell
     assert "margin-left:36.5pt" in tables[1], tables[1][:300]
+    converted_cell = re.search(r'<td class="lp-td" style="([^"]*)"', tables[2]).group(1)
+    assert "border-top:1pt solid #1F4E79" in converted_cell, converted_cell
     print("  tables OK")
 
 

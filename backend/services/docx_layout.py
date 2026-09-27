@@ -65,6 +65,11 @@ def _on(el):
     return el is not None and (_val(el) or "true").lower() not in _OFF
 
 
+def _hex(value):
+    """A CSS colour from a Word one. Converted files write "#1F4E79"; Word "1F4E79"."""
+    return "#" + value.strip().lstrip("#")
+
+
 def _local(el):
     return etree.QName(el).localname
 
@@ -111,7 +116,7 @@ def _border_css(el):
         return "none"
     size = _num(_val(el, "sz"), 4) / 8  # eighths of a point
     color = (_val(el, "color") or "").strip()
-    color = "#000000" if not color or color.lower() == "auto" else "#" + color
+    color = "#000000" if not color or color.lower() == "auto" else _hex(color)
     style = _BORDER_STYLE.get(val, "solid")
     if style == "double":
         size = max(size * 3, 2.25)  # both lines and the gap between them
@@ -335,13 +340,13 @@ class Layout:
             css.append("font-variant:small-caps")
         color = _val(_last(chain, "color"))
         if color and color.lower() != "auto":
-            css.append("color:#" + color)
+            css.append("color:" + _hex(color))
         highlight = _HIGHLIGHT.get(_val(_last(chain, "highlight")) or "")
         fill = _val(_last(chain, "shd"), "fill")
         if highlight:
             css.append("background-color:" + highlight)
         elif fill and fill.lower() != "auto":
-            css.append("background-color:#" + fill)
+            css.append("background-color:" + _hex(fill))
         if _on(_last(chain, "vanish")):
             css.append("display:none")
         return css
@@ -574,7 +579,7 @@ class Layout:
             if tc_pr is not None:
                 fill = _val(tc_pr.find(qn("w:shd")), "fill")
                 if fill and fill.lower() != "auto":
-                    css.append("background-color:#" + fill)
+                    css.append("background-color:" + _hex(fill))
                 valign = _VALIGN.get(_val(tc_pr.find(qn("w:vAlign"))) or "")
                 if valign:
                     css.append("vertical-align:" + valign)
