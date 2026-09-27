@@ -1457,51 +1457,6 @@ body.auth-page::after {
   }
 }
 
-.source-choice {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 4px;
-}
-
-.source-option {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 22px 18px;
-  text-align: left;
-  background: var(--surface);
-  cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.source-option:hover {
-  border-color: var(--primary);
-}
-
-.source-option .icon {
-  color: var(--primary);
-  margin-bottom: 14px;
-}
-
-.source-option .icon svg {
-  width: 26px;
-  height: 26px;
-}
-
-.source-option h3,
-.source-option-title {
-  display: block;
-  font-family: var(--font-display);
-  font-weight: 600;
-  color: var(--text-heading);
-  font-size: 15px;
-  margin-bottom: 4px;
-}
-
-.source-option p {
-  font-size: 13px;
-}
-
 .scan-status {
   display: flex;
   align-items: center;
@@ -1743,8 +1698,7 @@ body.auth-page::after {
 @media (max-width: 640px) {
   .advanced-group-grid,
   .field-row-grid,
-  .intake-grid,
-  .source-choice {
+  .intake-grid {
     grid-template-columns: 1fr;
   }
 

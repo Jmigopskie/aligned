@@ -10,9 +10,6 @@ const step2 = document.getElementById("step-2");
 const stepIndicator1 = document.getElementById("step-indicator-1");
 const stepIndicator2 = document.getElementById("step-indicator-2");
 
-const chooseUploadBtn = document.getElementById("choose-upload");
-const chooseBlankBtn = document.getElementById("choose-blank");
-const uploadArea = document.getElementById("upload-area");
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("file-input");
 const scanStatus = document.getElementById("scan-status");
@@ -140,21 +137,6 @@ function showError(message) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-chooseUploadBtn.addEventListener("click", () => {
-  uploadArea.hidden = false;
-  fileInput.click();
-});
-
-chooseBlankBtn.addEventListener("click", () => {
-  sourceTempToken = null;
-  sourceFilename = null;
-  manualFieldEditor.hidden = false;
-  docFieldEditor.hidden = true;
-  fieldRowsEl.innerHTML = "";
-  addFieldRow();
-  goToStep2();
-});
-
 dropzone.addEventListener("click", () => fileInput.click());
 dropzone.addEventListener("dragover", (e) => {
   e.preventDefault();
@@ -195,14 +177,13 @@ async function handleFileSelected(file) {
       updateFieldCount();
       showToast(`Loaded "${file.name}". Clean it up below, then save. AlignED works out the fields for you.`);
     } else {
-      // Couldn't render this file as a real document (e.g. a scanned/image PDF)
-      // — the file is still attached as the reference, but fields must be
-      // typed manually since there's no live layout for AI to read.
-      manualFieldEditor.hidden = false;
-      docFieldEditor.hidden = true;
-      fieldRowsEl.innerHTML = "";
-      addFieldRow();
-      if (data.scan_error) showError(data.scan_error);
+      // Couldn't render this file as a real document (e.g. a scanned/image
+      // PDF). Formats are only made from a readable file, never typed by hand.
+      sourceTempToken = null;
+      sourceFilename = null;
+      showError(data.scan_error ||
+        "AlignED couldn't read that file. Upload a .docx copy of your format, or a PDF that has real text rather than a scan.");
+      return;
     }
 
     goToStep2();

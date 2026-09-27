@@ -187,7 +187,7 @@ def scan_format():
             scan_error = (
                 "Couldn't convert this PDF into an editable layout. If it's a scanned PDF "
                 "(a photo or image of a page rather than real text), export/print it from "
-                "Word instead, or start from a blank sheet."
+                "Word as a .docx instead."
             )
 
     preview = None
@@ -201,7 +201,7 @@ def scan_format():
     if preview is None and scan_error is None:
         scan_error = (
             "No content could be found in this file to build a template from. "
-            "Try a different file, or start from a blank sheet instead."
+            "Try a different file, such as a .docx copy of the format."
         )
 
     return jsonify({
@@ -258,7 +258,7 @@ def create_format():
             return jsonify({
                 "status": "error",
                 "message": ai_error or "Couldn't find any fillable fields in this document. "
-                                       "Try cleaning it up further, or start from a blank sheet instead.",
+                                       "Check that the labels you fill in are still in it, then save again.",
             }), 400
         field_rows = _build_format_fields(fmt.id, detected_fields)
     else:

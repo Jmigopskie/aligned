@@ -717,7 +717,7 @@ const OWL_GUIDE_STEPS = {
   "plan-saved": { pose: "celebrate", text: "Saved. You can export it as a Word file whenever you need a copy." },
 
   // Lesson plan format making
-  "format-source": { pose: "wave", text: "A format is the layout your plans are printed in. Upload a blank copy of yours, or start from an empty sheet." },
+  "format-source": { pose: "wave", text: "A format is the layout your plans are printed in. Upload a blank copy of yours and AlignED finds the fields." },
   "format-cleanup": { pose: "check", text: "This is a live copy of your document. Fix any typos and delete what you do not need. The fillable fields are worked out for you when you save." },
   "format-blank": { pose: "point", text: "Add a row for each field your format needs, in the order they appear on the page." },
 };
