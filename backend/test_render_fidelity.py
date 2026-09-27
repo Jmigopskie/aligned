@@ -256,6 +256,51 @@ def check_slot_takes_the_cell_style():
     print("  field slot takes the cell's style OK")
 
 
+def check_hostile_file():
+    """A format's .docx is uploaded by one teacher and viewed by others: no
+    value in it may break out of an attribute, inject CSS, run a link as
+    script, or blow the page up."""
+    doc = Document()
+    p = doc.add_paragraph()
+    run = p.add_run("font")
+    run._r.get_or_add_rPr().append(parse_xml(
+        '<w:rFonts %s w:ascii="X&quot;&gt;&lt;img src=x onerror=alert(1)&gt;"/>' % nsdecls("w")))
+    run = p.add_run("colour")
+    run._r.get_or_add_rPr().append(parse_xml(
+        '<w:color %s w:val="000&quot; onmouseover=&quot;alert(2)"/>' % nsdecls("w")))
+    run = p.add_run("shade")
+    run._r.get_or_add_rPr().append(parse_xml(
+        '<w:shd %s w:val="clear" w:fill="fff;background:url(//evil/x)"/>' % nsdecls("w")))
+    cell = doc.add_table(rows=1, cols=1).cell(0, 0)
+    cell.text = "cell"
+    cell._tc.get_or_add_tcPr().append(parse_xml(
+        '<w:tcBorders %s><w:top w:val="single" w:sz="4" w:color="000&quot;&gt;&lt;b"/></w:tcBorders>'
+        % nsdecls("w")))
+    cell._tc.get_or_add_tcPr().append(parse_xml(
+        '<w:shd %s w:val="clear" w:fill="abc&quot; onclick=&quot;x"/>' % nsdecls("w")))
+    link_p = doc.add_paragraph()
+    r_id = doc.part.relate_to("javascript:alert(3)",
+                              "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+                              is_external=True)
+    link_p._p.append(parse_xml('<w:hyperlink %s r:id="%s"><w:r><w:t>click</w:t></w:r></w:hyperlink>'
+                               % (nsdecls("w", "r"), r_id)))
+    numbering = doc.part.numbering_part.element
+    numbering.append(parse_xml(
+        '<w:abstractNum %s w:abstractNumId="95"><w:lvl w:ilvl="0"><w:start w:val="2000000000"/>'
+        '<w:numFmt w:val="lowerLetter"/><w:lvlText w:val="%%1."/></w:lvl></w:abstractNum>' % nsdecls("w")))
+    numbering.append(parse_xml('<w:num %s w:numId="95"><w:abstractNumId w:val="95"/></w:num>' % nsdecls("w")))
+    for _ in range(3):
+        doc.add_paragraph("item")._p.get_or_add_pPr().append(parse_xml(
+            '<w:numPr %s><w:ilvl w:val="0"/><w:numId w:val="95"/></w:numPr>' % nsdecls("w")))
+    html = _render(doc)
+    # Neutralised text may remain ("Ximg srcx onerroralert1" as a font name);
+    # what must never appear is a working attribute, tag, CSS url or script link.
+    for bad in ("onerror=", "onmouseover=", "onclick=", "<img src=x", "url(", "javascript:", "<b"):
+        assert bad not in html, (bad, html[:1500])
+    assert len(html) < 20000, len(html)
+    print("  hostile file OK")
+
+
 def check_teacher_sample():
     """The teacher's own ILAW plan: the look the user asked for."""
     if not os.path.isfile(SAMPLE):
@@ -278,6 +323,7 @@ def main():
     check_lists()
     check_pictures()
     check_slot_takes_the_cell_style()
+    check_hostile_file()
     check_teacher_sample()
     print("render fidelity OK")
 

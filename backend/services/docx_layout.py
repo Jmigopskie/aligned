@@ -65,9 +65,15 @@ def _on(el):
     return el is not None and (_val(el) or "true").lower() not in _OFF
 
 
+_HEX_RE = re.compile(r"#?([0-9A-Fa-f]{6})")
+
+
 def _hex(value):
-    """A CSS colour from a Word one. Converted files write "#1F4E79"; Word "1F4E79"."""
-    return "#" + value.strip().lstrip("#")
+    """A CSS colour from a Word one ("1F4E79", or "#1F4E79" in converted files),
+    or None for "auto" and anything else. The file is untrusted: a value that
+    isn't a colour must never reach a style attribute."""
+    match = _HEX_RE.fullmatch((value or "").strip())
+    return "#" + match.group(1) if match else None
 
 
 def _local(el):
@@ -100,8 +106,10 @@ def _font_css(name):
     # fonts the PDF drew without naming; the source PDFs set that text in Arial.
     if not name or name.startswith("Type3"):
         name = "Arial"
+    # The file is untrusted: a font name keeps only characters real names use.
+    name = re.sub(r"[^\w .\-]", "", name).strip() or "Arial"
     generic = "serif" if name.lower() in _SERIF else "sans-serif"
-    return "font-family:'%s',%s" % (name.replace("'", ""), generic)
+    return "font-family:'%s',%s" % (name, generic)
 
 
 _VALIGN = {"center": "middle", "bottom": "bottom", "top": "top"}
@@ -115,8 +123,7 @@ def _border_css(el):
     if not val or val in ("none", "nil"):
         return "none"
     size = _num(_val(el, "sz"), 4) / 8  # eighths of a point
-    color = (_val(el, "color") or "").strip()
-    color = "#000000" if not color or color.lower() == "auto" else _hex(color)
+    color = _hex(_val(el, "color")) or "#000000"
     style = _BORDER_STYLE.get(val, "solid")
     if style == "double":
         size = max(size * 3, 2.25)  # both lines and the gap between them
@@ -338,15 +345,15 @@ class Layout:
             css.append("text-transform:uppercase")
         elif _on(_last(chain, "smallCaps")):
             css.append("font-variant:small-caps")
-        color = _val(_last(chain, "color"))
-        if color and color.lower() != "auto":
-            css.append("color:" + _hex(color))
+        color = _hex(_val(_last(chain, "color")))
+        if color:
+            css.append("color:" + color)
         highlight = _HIGHLIGHT.get(_val(_last(chain, "highlight")) or "")
-        fill = _val(_last(chain, "shd"), "fill")
+        fill = _hex(_val(_last(chain, "shd"), "fill"))
         if highlight:
             css.append("background-color:" + highlight)
-        elif fill and fill.lower() != "auto":
-            css.append("background-color:" + _hex(fill))
+        elif fill:
+            css.append("background-color:" + fill)
         if _on(_last(chain, "vanish")):
             css.append("display:none")
         return css
@@ -472,7 +479,9 @@ class Layout:
         # numbering across instances of one abstract list, rare in these files.
         counts = self._counters.setdefault(num_id, {})
         start = starts.get(str(ilvl), int(_num(_val(lvl.find(qn("w:start"))), 1)))
-        counts[ilvl] = counts.get(ilvl, start - 1) + 1
+        # Capped: a crafted start of 2e9 would print a lowerLetter marker
+        # a hundred million letters long.
+        counts[ilvl] = min(counts.get(ilvl, start - 1) + 1, 9999)
         for deeper in [k for k in counts if k > ilvl]:
             del counts[deeper]
 
@@ -596,9 +605,9 @@ class Layout:
             css.append("padding:" + " ".join(_pt(margins[s]) for s in ("top", "right", "bottom", "left")))
 
             if tc_pr is not None:
-                fill = _val(tc_pr.find(qn("w:shd")), "fill")
-                if fill and fill.lower() != "auto":
-                    css.append("background-color:" + _hex(fill))
+                fill = _hex(_val(tc_pr.find(qn("w:shd")), "fill"))
+                if fill:
+                    css.append("background-color:" + fill)
                 valign = _VALIGN.get(_val(tc_pr.find(qn("w:vAlign"))) or "")
                 if valign:
                     css.append("vertical-align:" + valign)

@@ -440,7 +440,7 @@ def _render_doc_body_html(doc, items, slots, cell_value_targets):
     index_by_el_id = {id(item["el"]): idx for idx, item in enumerate(items)}
     body_html = _render_block_children(doc, doc.element.body, slots, cell_value_targets, index_by_el_id, layout)
     page_css, page_width = layout.page()
-    return f'<div class="lp-doc" style="{page_css}" data-page-width="{page_width:g}">' + body_html + "</div>"
+    return f'<div class="lp-doc"{_style_attr(page_css)} data-page-width="{page_width:g}">' + body_html + "</div>"
 
 def _plan_html_slots(doc, items, anchors, weekly_keys=frozenset()):
     """Decide, for each matched field, where its editable value slot goes in the
@@ -499,6 +499,18 @@ def _html_escape(text):
     # would otherwise be able to break out of href="..." and inject markup.
     return html_lib.escape(text or "")
 
+def _style_attr(css):
+    """ style="..." for layout CSS, escaped. Layout already keeps only colours
+    and font names that are what they claim to be; this is the backstop, since
+    the .docx is one teacher's upload shown to others."""
+    # Inside a double-quoted attribute only & < > and " can break out; the
+    # single quotes around font names stay readable.
+    escaped = html_lib.escape(css, quote=False).replace('"', "&quot;")
+    return f' style="{escaped}"' if css else ""
+
+# The only links a document may carry: never javascript: or data:.
+_SAFE_HREF_RE = re.compile(r"^(https?:|mailto:)", re.IGNORECASE)
+
 def _run_html(run, layout, p_el):
     pictures = layout.pictures(run._r)
     text = run.text
@@ -506,7 +518,7 @@ def _run_html(run, layout, p_el):
         return pictures
     style = layout.run_css(run._r, p_el)
     escaped = _html_escape(text)
-    return pictures + (f'<span style="{style}">{escaped}</span>' if style else escaped)
+    return pictures + (f'<span{_style_attr(style)}>{escaped}</span>' if style else escaped)
 
 def _render_runs_html(para, layout):
     """Render each run as its own span so mixed formatting within one
@@ -525,7 +537,8 @@ def _render_runs_html(para, layout):
             inner = "".join(_run_html(r, layout, p_el) for r in item.runs)
             if not inner:
                 continue
-            href = _html_escape(item.address or "")
+            address = (item.address or "").strip()
+            href = _html_escape(address) if _SAFE_HREF_RE.match(address) else ""
             out.append(f'<a href="{href}" target="_blank" rel="noopener">{inner}</a>' if href else inner)
         else:
             out.append(_run_html(item, layout, p_el))
@@ -547,7 +560,7 @@ def _render_html_paragraph(doc, p_el, slots, index_by_el_id, layout):
         if marker["width"]:
             width = f"--lp-marker-w:{marker['width']:g}pt"
             style = f"{style};{width}" if style else width
-    style_attr = f' style="{style}"' if style else ""
+    style_attr = _style_attr(style)
 
     inner = _render_runs_html(para, layout)
     if "<img" not in inner and not text.strip():
@@ -576,7 +589,7 @@ def _render_html_paragraph(doc, p_el, slots, index_by_el_id, layout):
     # its own editable block right after it (inside the same cell, if any),
     # in the style Word would give text typed there.
     slot_css = layout.slot_css(p_el)
-    slot_style = f' style="{slot_css}"' if slot_css else ""
+    slot_style = _style_attr(slot_css)
     return (
         f'{open_tag}{inner}</p>'
         f'<div class="lp-field lp-field-block" data-field-key="{field_key}"{slot_style} '
@@ -599,7 +612,7 @@ def _cell_grid_span(tc):
         return 1
 
 def _render_html_cell(doc, cell, slots, cell_value_targets, cell_css, colspan, rowspan, index_by_el_id, layout):
-    style_attr = f' style="{cell_css}"' if cell_css else ""
+    style_attr = _style_attr(cell_css)
     span_attr = (f' colspan="{colspan}"' if colspan > 1 else "") + (f' rowspan="{rowspan}"' if rowspan > 1 else "")
 
     target = cell_value_targets.get(id(cell._tc))
@@ -613,7 +626,7 @@ def _render_html_cell(doc, cell, slots, cell_value_targets, cell_css, colspan, r
         part_attr = f' data-part="{part}"' if part is not None else ""
         first_p = cell._tc.find(qn("w:p"))
         slot_css = layout.slot_css(first_p) if first_p is not None else ""
-        slot_style = f' style="{slot_css}"' if slot_css else ""
+        slot_style = _style_attr(slot_css)
         return (
             f'<td class="lp-td lp-td-value"{span_attr}{style_attr}>'
             f'<div class="lp-field lp-field-cell" data-field-key="{field_key}"{part_attr}{slot_style} '
@@ -694,13 +707,13 @@ def _render_html_table(doc, table, slots, cell_value_targets, index_by_el_id, la
                 doc, cell, slots, cell_value_targets, cell_css, colspan, rowspan, index_by_el_id, layout
             ))
         row_css = layout.row(row._tr)
-        row_attr = f' style="{row_css}"' if row_css else ""
+        row_attr = _style_attr(row_css)
         rows_html.append(f"<tr{row_attr}>{''.join(cells_html)}</tr>")
 
     colgroup = ""
     if grid:
         colgroup = "<colgroup>" + "".join(f'<col style="width:{round(w, 2):g}pt">' for w in grid) + "</colgroup>"
-    style_attr = f' style="{table_css}"' if table_css else ""
+    style_attr = _style_attr(table_css)
     return f'<table class="lp-table"{style_attr}>{colgroup}{"".join(rows_html)}</table>'
 
 def resolve_source_path(fmt):
