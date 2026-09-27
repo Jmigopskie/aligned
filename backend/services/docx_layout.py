@@ -442,7 +442,26 @@ class Layout:
         align = _ALIGN.get(_val(_last(chain, "jc")) or "")
         if align:
             css.append("text-align:" + align)
+        if self._holds_only_pictures(p_el):
+            css.append("min-height:" + _pt(self._pictures_height(p_el)))
         return ";".join(css), self._marker(chain, hanging)
+
+    def _holds_only_pictures(self, p_el):
+        """Whether a paragraph has floating pictures and no text of its own."""
+        if p_el is None or "".join(t.text or "" for t in p_el.iter(qn("w:t"))).strip():
+            return False
+        return p_el.find(f".//{{{_WP}}}anchor") is not None
+
+    def _pictures_height(self, p_el):
+        """How far down this paragraph's floating pictures reach, in pt."""
+        bottom = 0.0
+        for frame in p_el.iter(f"{{{_WP}}}anchor"):
+            extent = frame.find(f"{{{_WP}}}extent")
+            offset = frame.find(f"{{{_WP}}}positionV/{{{_WP}}}posOffset")
+            top = max(_num(offset.text, 0) / _EMU_PER_PT, 0.0) if offset is not None else 0.0
+            if extent is not None:
+                bottom = max(bottom, top + _num(extent.get("cy"), 0) / _EMU_PER_PT)
+        return bottom
 
     def _marker(self, chain, hanging):
         level = self._list_level(chain)
@@ -634,11 +653,17 @@ class Layout:
         _v_from, v_offset, _v_align = position("V")
         wrap = next((_local(c) for c in frame if isinstance(c.tag, str) and _local(c).startswith("wrap")),
                     "wrapNone")
+        in_cell = frame.get("layoutInCell") in ("1", "true") and next(frame.iterancestors(qn("w:tc")), None) is not None
         # An offset from the page or its margins can't be placed inside a cell
-        # or paragraph; one from the column or the text itself can.
-        x = h_offset if h_from in ("column", "character") else 0.0
+        # or paragraph; one from the column or the text itself can. Word lays a
+        # picture that keeps to its cell out from the cell whatever it names.
+        x = h_offset if in_cell or h_from in ("column", "character") else 0.0
         y = max(v_offset, 0.0)
-        if frame.get("behindDoc") in ("1", "true") or wrap == "wrapNone":
+        if (frame.get("behindDoc") in ("1", "true") or wrap == "wrapNone"
+                or self._holds_only_pictures(next(frame.iterancestors(qn("w:p")), None))):
+            # A line holding nothing but pictures (a title cell's logos): each
+            # at its own offset; paragraph() makes the line as tall as they are,
+            # so the text after it flows below them, as Word wraps it.
             return ["position:absolute", "left:" + _pt(x), "top:" + _pt(y)]
         if wrap == "wrapTopAndBottom":
             return ["display:block", "margin-left:" + _pt(x), "margin-top:" + _pt(y)]

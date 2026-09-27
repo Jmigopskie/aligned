@@ -182,15 +182,15 @@ def _png():
             + chunk(b"IDAT", zlib.compress(b"\x00\xff\x00\x00")) + chunk(b"IEND", b""))
 
 
-def _make_floating(r_el):
-    """Turn an inline picture into a square-wrapped one, 1pt from its column."""
+def _make_floating(r_el, x_emu=12700, relative="column"):
+    """Turn an inline picture into a square-wrapped one, x_emu from `relative`."""
     inline = r_el.find(".//" + qn("wp:inline"))
     anchor = parse_xml(
         '<wp:anchor %s distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="1" '
         'behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/>'
-        '<wp:positionH relativeFrom="column"><wp:posOffset>12700</wp:posOffset></wp:positionH>'
+        '<wp:positionH relativeFrom="%s"><wp:posOffset>%d</wp:posOffset></wp:positionH>'
         '<wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>'
-        '</wp:anchor>' % nsdecls("wp"))
+        '</wp:anchor>' % (nsdecls("wp"), relative, x_emu))
     for child in list(inline):
         anchor.append(child)
         if child.tag == qn("wp:extent"):
@@ -201,7 +201,7 @@ def _make_floating(r_el):
 def check_pictures():
     doc = Document()
     doc.add_picture(io.BytesIO(_png()), width=Pt(40), height=Pt(20))
-    floating = doc.add_paragraph().add_run()
+    floating = doc.add_paragraph("Text that wraps beside the picture.").add_run()
     floating.add_picture(io.BytesIO(_png()), width=Pt(30), height=Pt(30))
     _make_floating(floating._r)
     broken = doc.add_paragraph().add_run()
@@ -213,6 +213,24 @@ def check_pictures():
     assert len(styles) == 2, styles
     assert styles[0].startswith("width:40pt;height:20pt"), styles
     assert "float:left" in styles[1] and "margin-left:1pt" in styles[1] and "margin-right:9pt" in styles[1], styles
+
+    # Two logos floated in an otherwise empty line of a table cell (the
+    # teacher's ILAW title cell): Word places each at its own offset, side by
+    # side, and the next line's text flows below them.
+    doc = Document()
+    cell = doc.add_table(rows=1, cols=1).cell(0, 0)
+    holder = cell.paragraphs[0]
+    for x_emu, relative in ((577390, "leftMargin"), (-35560, "column")):
+        run = holder.add_run()
+        run.add_picture(io.BytesIO(_png()), width=Pt(47), height=Pt(47))
+        _make_floating(run._r, x_emu, relative)
+    cell.add_paragraph("LESSON PLAN (ILAW)")
+    html = _render(doc)
+    styles = re.findall(r'<img src="data:image/png;base64,[A-Za-z0-9+/=]+" alt="" style="([^"]*)">', html)
+    assert "position:absolute" in styles[0] and "left:45.46pt" in styles[0], styles
+    assert "position:absolute" in styles[1] and "left:-2.8pt" in styles[1], styles
+    holder_style = re.search(r'<p class="lp-p" style="([^"]*)"[^>]*><img', html).group(1)
+    assert "min-height:47pt" in holder_style, holder_style
     print("  pictures OK")
 
 
