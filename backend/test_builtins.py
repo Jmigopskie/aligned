@@ -12,6 +12,7 @@ Run it directly: `venv/Scripts/python test_builtins.py`.
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -30,6 +31,11 @@ from models.user import User
 from services import builtins, docx_service
 
 KEYS = {"4as-lesson-plan", "dlp", "ilaw-lesson-plan", "pal3-sdlp", "snhs-dlp"}
+
+# Paragraph counts of the built-in templates. The PDF repair changed fonts,
+# widths and a few characters, never structure: a field's anchor_index still
+# names the same paragraph, so saved plans keep their answers where they were.
+TEMPLATE_ITEMS = {"4as-lesson-plan": 60, "dlp": 111, "ilaw-lesson-plan": 190, "pal3-sdlp": 96, "snhs-dlp": 91}
 
 
 def client_for(app, user):
@@ -165,6 +171,40 @@ def check_export_fills_frozen_anchors(app, student):
     # The shared template itself is never written to.
     assert "XYZ" not in "\n".join(c.text for t in Document(fmt.template_docx_path).tables for r in t.rows for c in r.cells)
     print("  export into the real layout OK")
+
+
+def check_templates_keep_their_structure(app):
+    folder = os.path.join(builtins.BUILTIN_DIR, "formats")
+    with open(os.path.join(folder, "formats.json"), encoding="utf-8") as fh:
+        manifest = json.load(fh)
+    for entry in manifest:
+        doc = Document(os.path.join(folder, entry["template"]))
+        items = docx_service._iter_items(doc)
+        assert len(items) == TEMPLATE_ITEMS[entry["key"]], (entry["key"], len(items))
+        for field in entry["fields"]:
+            text = " ".join(docx_service._element_text(doc, items[field["anchor_index"]]["el"]).split()).lower()
+            words = [w for w in re.findall(r"[a-z]+", field["label"].lower()) if len(w) > 3]
+            assert any(w in text for w in words), (entry["key"], field["label"], text)
+        # Converted files wrote row heights as "exact", which clips a filled
+        # answer in Word; repaired ones grow with their text.
+        assert not doc.element.body.xpath('.//w:trHeight[@w:hRule="exact"]'), entry["key"]
+    print("  templates keep their structure OK")
+
+
+def check_views_show_logos(app):
+    """Every picture in a built-in shows in its document view, and a format
+    whose original PDF has logos shows them. (SNHS's two logos are one stacked
+    picture in its template, so the counts are compared with the template.)"""
+    import pymupdf
+
+    for fmt in builtin_formats():
+        html = docx_service.render_template_html(fmt)["html"]
+        in_template = len(Document(fmt.template_docx_path).element.body.xpath(".//w:drawing"))
+        in_pdf = len(pymupdf.open(fmt.source_file_path)[0].get_image_info())
+        got = len(re.findall(r'<img src="data:image/[a-z+]+;base64,[A-Za-z0-9+/=]{40,}', html))
+        assert got == in_template, (fmt.builtin_key, got, in_template)
+        assert bool(got) == bool(in_pdf), (fmt.builtin_key, got, in_pdf)
+    print("  logos in the document view OK")
 
 
 def _guide_docx(path, text):
@@ -361,6 +401,8 @@ def main():
         check_lock(app, admin, teacher, student)
         check_visibility(app, student)
         check_export_fills_frozen_anchors(app, student)
+        check_templates_keep_their_structure(app)
+        check_views_show_logos(app)
         check_guides(app, admin, student)
         check_guide_text_is_precomputed(app)
         check_admin_owning_builtins_can_be_deleted(app, admin)
