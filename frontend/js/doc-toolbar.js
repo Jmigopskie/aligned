@@ -47,6 +47,21 @@ const DOC_ZOOM_STEPS = [0.5, 0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 // "Fit": the page scaled to the panel's width, never past 100%. The default.
 const DOC_ZOOM_FIT = -1;
 
+// The ladder step one notch in `direction` (+1 in, -1 out) from `scale`, or
+// null when there is none. A phone's Fit (about 19%) sits below every step, so
+// zooming out from it stays put rather than jumping up to 50%.
+function docZoomStepIndex(scale, direction) {
+  if (direction > 0) {
+    const next = DOC_ZOOM_STEPS.findIndex((s) => s > scale + 0.001);
+    return next === -1 ? null : next;
+  }
+  let next = null;
+  DOC_ZOOM_STEPS.forEach((s, i) => {
+    if (s < scale - 0.001) next = i;
+  });
+  return next;
+}
+
 function docColorMenu(kind, options) {
   const items = options
     .map(
@@ -203,17 +218,8 @@ function initDocViewControls({ toolbarEl, wrapEl, stageEl, storageKey }) {
 
   // − and + step along the ladder from wherever the page is now, Fit included.
   function stepZoom(direction) {
-    const scale = currentScale();
-    if (direction > 0) {
-      const next = DOC_ZOOM_STEPS.findIndex((s) => s > scale + 0.001);
-      setZoom(next === -1 ? DOC_ZOOM_STEPS.length - 1 : next);
-    } else {
-      let next = 0;
-      DOC_ZOOM_STEPS.forEach((s, i) => {
-        if (s < scale - 0.001) next = i;
-      });
-      setZoom(next);
-    }
+    const next = docZoomStepIndex(currentScale(), direction);
+    if (next !== null) setZoom(next);
   }
 
   toolbarEl.querySelectorAll("[data-zoom]").forEach((btn) => {
