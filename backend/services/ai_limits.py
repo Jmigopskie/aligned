@@ -14,6 +14,9 @@ import re
 
 # Matches the bullet and numbering a model prepends despite being asked not to,
 # plus the markdown emphasis it sometimes adds anyway.
+# Field keys are slugs and never contain brackets, so any trailing "(...)" is
+# the field type the model copied from the prompt.
+_TYPE_SUFFIX = re.compile(r"\s*\([^()]*\)\s*$")
 _LEADING_MARKER = re.compile(r"^\s*(?:[-*•·●▪]|\(?\d{1,2}[.)])\s+")
 _MARKDOWN_EMPHASIS = re.compile(r"\*{1,3}(.+?)\*{1,3}")
 _MARKDOWN_HEADING = re.compile(r"^\s*#{1,6}\s*")
@@ -159,6 +162,9 @@ def enforce_limits(values: dict, fields, *, max_items: int, max_item_words: int,
     parts_by_key = {f.field_key: (getattr(f, "parts_list", None) or []) for f in fields}
     out = {}
     for key, value in (values or {}).items():
+        # The prompt lists fields as "- flow (weekly): ...", and the model
+        # sometimes echoes "flow (weekly)" back as the key.
+        key = _TYPE_SUFFIX.sub("", str(key)).strip()
         if key not in types_by_key:
             continue
         if types_by_key[key] == "weekly":

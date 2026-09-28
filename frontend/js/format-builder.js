@@ -57,7 +57,9 @@ let pendingRoles = {};
 // Same teacher-facing wording as the two manual options below, so the
 // "Decide automatically" row doesn't print the internal heavy/easy tokens.
 function roleLabel(role) {
-  return role === "heavy" ? "Guided walks me through it" : "Filled in automatically";
+  if (role === "heavy") return "Guided walks me through it";
+  if (role === "self") return "Students fill it in themselves";
+  return "Filled in automatically";
 }
 
 function renderFieldRoles(fields) {

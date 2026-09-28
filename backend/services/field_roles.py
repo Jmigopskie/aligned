@@ -18,6 +18,12 @@ or "objective".
 
 HEAVY = "heavy"
 EASY = "easy"
+# The student's own to write (the lesson's title, which session it is): never
+# filled in automatically, offered to the AI only if they tick it.
+SELF = "self"
+
+_SELF_KEYWORDS = ("lesson title", "name of lesson", "session no", "session number", "no. of sessions",
+                  "no of sessions")
 
 # Matched as plain substrings against "<field_key> <label>", lowercased with
 # underscores turned into spaces. Substrings rather than whole words so
@@ -61,4 +67,6 @@ def role_for(field) -> str:
         return override
 
     haystack = _haystack(field)
+    if any(word in haystack for word in _SELF_KEYWORDS):
+        return SELF
     return HEAVY if any(word in haystack for word in _HEAVY_KEYWORDS) else EASY

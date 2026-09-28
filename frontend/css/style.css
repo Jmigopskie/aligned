@@ -712,6 +712,18 @@ a.btn-primary:hover {
   border-color: #FDE68A;
 }
 
+/* Information the student should act on, not a failure: calm, not red. */
+.alert-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--primary-tint);
+  color: var(--text-heading);
+  border-color: var(--border);
+}
+
 .alert[hidden] {
   display: none;
 }
@@ -4673,6 +4685,15 @@ body.owl-chat-shown .dash-main {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 6px 10px;
+}
+
+/* "Lesson Title and Session No. are yours to fill in": its own row above the
+   student's own fields. */
+.generate-scope-note {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-body);
 }
 
 .generate-scope-option {

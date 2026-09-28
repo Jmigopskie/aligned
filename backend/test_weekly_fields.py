@@ -156,6 +156,10 @@ class _Field:
 def check_limits():
     field = _Field("flow", "weekly", DAYS)
     limits = dict(max_items=6, max_item_words=18, max_sentences=3, max_prose_words=70)
+    # The model sometimes echoes the prompt's "- flow (weekly): ..." line back as
+    # the key. That answer is still this field's, not an unknown one to drop.
+    out = ai_limits.enforce_limits({"flow (weekly)": ["Mon", "Tue", "Wed", "Thu", "Fri"]}, [field], **limits)
+    assert out == {"flow": ["Mon", "Tue", "Wed", "Thu", "Fri"]}, out
     out = ai_limits.enforce_limits({"flow": ["**Mon** plan", "Tue", "Wed", "Thu", "Fri"]}, [field], **limits)
     assert out["flow"] == ["Mon plan", "Tue", "Wed", "Thu", "Fri"], out
     # Keyed by day, in any order, comes back in day order.

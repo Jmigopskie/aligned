@@ -106,6 +106,9 @@ const generateScope = document.getElementById("generate-scope");
 const generateScopeAuto = document.getElementById("generate-scope-auto");
 const generateScopeOptions = document.getElementById("generate-scope-options");
 const generationProgressEl = document.getElementById("generation-progress");
+const ownFieldsNote = document.getElementById("own-fields-note");
+const ownFieldsNoteText = document.getElementById("own-fields-note-text");
+const ownFieldsGenerateBtn = document.getElementById("own-fields-generate-btn");
 const stepContinueBtn = document.getElementById("step-continue-btn");
 const stepClearBtn = document.getElementById("step-clear-btn");
 const resultsEl = document.getElementById("results");
@@ -1028,7 +1031,13 @@ function heavyFieldKeys() {
 }
 
 function easyFieldKeys() {
-  return fieldsInDocumentOrder().filter((f) => f.role !== "heavy").map((f) => f.field_key);
+  return fieldsInDocumentOrder().filter((f) => f.role !== "heavy" && f.role !== "self").map((f) => f.field_key);
+}
+
+// The student's own to write (lesson title, session number): never filled in
+// automatically, only when they tick them in the checklist.
+function selfFieldKeys() {
+  return fieldsInDocumentOrder().filter((f) => f.role === "self").map((f) => f.field_key);
 }
 
 function fieldByKey(key) {
@@ -1144,13 +1153,43 @@ function writeScopeChoice(excluded) {
   }
 }
 
+// The student's own fields they asked the AI to write anyway. Kept apart from
+// the excluded list above because these start unticked, not ticked.
+const SELF_SCOPE_PREFIX = "alignedGenSelf:v1:";
+
+function readSelfTicks() {
+  try {
+    return JSON.parse(localStorage.getItem(`${SELF_SCOPE_PREFIX}${fmt.id}`) || "[]");
+  } catch (err) {
+    return [];
+  }
+}
+
+function writeSelfTicks(keys) {
+  try {
+    localStorage.setItem(`${SELF_SCOPE_PREFIX}${fmt.id}`, JSON.stringify(keys));
+  } catch (err) {
+    /* private mode or quota: the choice just won't persist */
+  }
+}
+
+function scopeOption(key, checked) {
+  const field = fieldByKey(key);
+  return `
+    <label class="generate-scope-option">
+      <input type="checkbox" data-scope-key="${escapeHtml(key)}" ${checked ? "checked" : ""} />
+      <span>${escapeHtml(field ? field.label : key)}</span>
+    </label>`;
+}
+
 function renderGenerateScope() {
   const heavy = heavyFieldKeys();
   const easy = easyFieldKeys();
+  const own = selfFieldKeys();
 
-  // Nothing to choose between: no heavy fields means the old all-or-nothing
-  // behaviour, so the panel stays out of the way.
-  if (!heavy.length) {
+  // Nothing to choose between means the old all-or-nothing behaviour, so the
+  // panel stays out of the way.
+  if (!heavy.length && !own.length) {
     generateScope.hidden = true;
     return;
   }
@@ -1160,30 +1199,42 @@ function renderGenerateScope() {
     ? `${easy.length} straightforward ${easy.length === 1 ? "field" : "fields"} will be filled in automatically.`
     : "";
 
-  // Previously excluded keys stay excluded; anything new to this format starts
-  // ticked.
+  // Previously excluded heavy keys stay excluded; anything new starts ticked.
+  // The student's own fields start unticked and stay as they last left them.
   const excluded = new Set(readScopeChoice() || []);
+  const ownTicked = new Set(readSelfTicks());
+  const ownLabels = own.map((key) => (fieldByKey(key) || {}).label || key);
 
-  generateScopeOptions.innerHTML = heavy
-    .map((key) => {
-      const field = fieldByKey(key);
-      return `
-        <label class="generate-scope-option">
-          <input type="checkbox" data-scope-key="${escapeHtml(key)}" ${excluded.has(key) ? "" : "checked"} />
-          <span>${escapeHtml(field ? field.label : key)}</span>
-        </label>`;
-    })
-    .join("");
+  generateScopeOptions.innerHTML =
+    heavy.map((key) => scopeOption(key, !excluded.has(key))).join("") +
+    (own.length
+      ? `<p class="generate-scope-note">${escapeHtml(joinLabels(ownLabels))} ${own.length === 1 ? "is" : "are"} yours to fill in. Tick ${own.length === 1 ? "it" : "them"} if you want me to write ${own.length === 1 ? "it" : "them"} too.</p>` +
+        own.map((key) => scopeOption(key, ownTicked.has(key))).join("")
+      : "");
 
+  const ownSet = new Set(own);
   generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((box) => {
     box.addEventListener("change", () => {
-      const next = [];
+      const nextExcluded = [];
+      const nextOwn = [];
       generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((b) => {
-        if (!b.checked) next.push(b.dataset.scopeKey);
+        const key = b.dataset.scopeKey;
+        if (ownSet.has(key)) {
+          if (b.checked) nextOwn.push(key);
+        } else if (!b.checked) {
+          nextExcluded.push(key);
+        }
       });
-      writeScopeChoice(next);
+      writeScopeChoice(nextExcluded);
+      writeSelfTicks(nextOwn);
     });
   });
+}
+
+// "Lesson Title and Session No." / "A, B and C".
+function joinLabels(labels) {
+  if (labels.length <= 1) return labels.join("");
+  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
 
 // The keys to generate: every quick field, plus the heavy ones still ticked.
@@ -1208,7 +1259,7 @@ function isFieldComplete(key) {
 // fix. Every place that needs to say so calls this one check, so the messages
 // can't drift apart and start disagreeing about what "done" means.
 function incompleteEasyFieldKeys() {
-  return easyFieldKeys().filter((k) => !isFieldComplete(k));
+  return easyFieldKeys().concat(selfFieldKeys()).filter((k) => !isFieldComplete(k));
 }
 
 // The guided side of the same problem: Task 7 left already-stepped-past
@@ -2384,18 +2435,31 @@ function renderProgress(sectionStates) {
     .join("");
 }
 
-generateFullBtn.addEventListener("click", async () => {
+generateFullBtn.addEventListener("click", () => runGeneration(selectedGenerateKeys()));
+
+// "Generate these too": only the student's own fields that are still blank,
+// leaving everything already written untouched.
+ownFieldsGenerateBtn.addEventListener("click", () => {
+  const blank = selfFieldKeys().filter((key) => !isFieldComplete(key));
+  if (blank.length) runGeneration(blank);
+});
+
+// Generates exactly `includeKeys`: the full plan's selection, or just the
+// student's own fields when they ask for those after the fact.
+async function runGeneration(includeKeys) {
+  if (generating) return;
   if (!updateGate()) {
     showError("Fill in the cooperating teacher, subject, and course guide first.");
     return;
   }
 
-  if (!selectedGenerateKeys().length) {
+  if (!includeKeys.length) {
     showError("Tick at least one field for me to write, or fill the plan in yourself.");
     return;
   }
 
   errorBox.hidden = true;
+  ownFieldsNote.hidden = true;
   setButtonLoading(generateFullBtn, true, "Generating");
   setOwlState("thinking", "Thinking hard about your lesson...");
   generating = true;
@@ -2411,7 +2475,7 @@ generateFullBtn.addEventListener("click", async () => {
   // fresh read of the checklist that could have drifted (it can't change
   // mid-stream since the panel is part of the same disabled controls, but
   // recomputing it separately would be one more place for the two to disagree).
-  const payload = baseGenerationPayload();
+  const payload = { ...baseGenerationPayload(), include_keys: includeKeys };
 
   try {
     const finalEvent = await Api.generateFullStream(payload, (event) => {
@@ -2450,7 +2514,7 @@ generateFullBtn.addEventListener("click", async () => {
     generationProgressEl.hidden = true;
     startGenerateCooldown();
   }
-});
+}
 
 // What the owl says once generation stops. The server only reports on the
 // fields it was asked for (`missing`/`missing_labels`), so an empty
@@ -2467,11 +2531,30 @@ function reportGenerationOutcome(finalEvent, requestedKeys) {
   // Fields the teacher deliberately unticked: not a generation failure, so
   // they get their own wording rather than being folded into "couldn't
   // generate" and implying the AI tried and failed at them.
-  const yoursFields = (fmt.fields || [])
+  const blankUnasked = (fmt.fields || [])
     .filter((f) => !asked.has(f.field_key) && !isFieldComplete(f.field_key));
+  // The student's own fields (lesson title, session number) are theirs to
+  // write, so a blank one is expected, not a problem: a calm note with the
+  // option to have them written after all.
+  const ownFields = blankUnasked.filter((f) => f.role === "self");
+  const yoursFields = blankUnasked.filter((f) => f.role !== "self");
   const yoursKeys = yoursFields.map((f) => f.field_key);
+  const ownKeys = ownFields.map((f) => f.field_key);
+
+  if (ownFields.length) {
+    const labels = joinLabels(ownFields.map((f) => f.label || f.field_key));
+    ownFieldsNoteText.textContent = `${labels} ${ownFields.length === 1 ? "is" : "are"} yours to fill in. Want me to write ${ownFields.length === 1 ? "it" : "them"} too?`;
+    ownFieldsNote.hidden = false;
+  } else {
+    ownFieldsNote.hidden = true;
+  }
 
   if (!missingLabels.length && !yoursKeys.length) {
+    if (ownKeys.length) {
+      setOwlState("guide", `I wrote everything else. ${ownFieldsNoteText.textContent}`);
+      highlightEmptyFields(ownKeys);
+      return;
+    }
     setOwlState("celebrate", "All done! Review what I wrote below, then save when you're happy with it.");
     highlightEmptyFields([]);
     return;
@@ -2509,7 +2592,7 @@ function reportGenerationOutcome(finalEvent, requestedKeys) {
 
   // Draw attention to the actual empty fields rather than only naming them,
   // whichever bucket (or both) they came from.
-  highlightEmptyFields([...missingKeys, ...yoursKeys]);
+  highlightEmptyFields([...missingKeys, ...yoursKeys, ...ownKeys]);
 }
 
 // Marks the still-empty fields in whichever editor this format uses, so the
