@@ -1764,6 +1764,84 @@ body.auth-page::after {
   color: inherit;
 }
 
+.announcement-banner-video {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---- A tutorial video on an announcement ---- */
+
+.announcement-video {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  aspect-ratio: 16 / 9;
+  margin-top: 10px;
+  border-radius: var(--radius-sm);
+  background: #000;
+}
+
+.video-tag,
+.video-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-body);
+}
+
+.video-tag svg,
+.video-current svg {
+  width: 15px;
+  height: 15px;
+  color: var(--primary);
+  flex: 0 0 auto;
+}
+
+.video-current {
+  flex-wrap: wrap;
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-heading);
+}
+
+.video-current[hidden] {
+  display: none;
+}
+
+.upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-body);
+}
+
+.upload-progress[hidden] {
+  display: none;
+}
+
+.upload-progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.upload-progress-bar {
+  height: 100%;
+  background: var(--primary);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.2s ease;
+}
+
 .announcement-banner-close {
   flex-shrink: 0;
   border: none;
@@ -5529,4 +5607,135 @@ body.owl-chat-shown .dash-main {
     width: 20px;
     height: 20px;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Help and FAQ (2026-10-05)
+   --------------------------------------------------------------------------- */
+
+#help-btn[aria-current="page"] {
+  color: var(--primary);
+}
+
+.faq {
+  display: grid;
+  gap: 22px;
+  max-width: 820px;
+}
+
+.faq-group[hidden],
+.faq details[hidden] {
+  display: none;
+}
+
+.faq-group-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin: 0 0 8px;
+}
+
+.faq details {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+}
+
+.faq summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 12px 40px 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+  position: relative;
+}
+
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+
+/* A chevron drawn with borders: no icon font, no emoji. */
+.faq summary::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--text-body);
+  border-bottom: 2px solid var(--text-body);
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.faq details[open] summary::after {
+  transform: translateY(-30%) rotate(225deg);
+}
+
+.faq summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.faq details p {
+  margin: 0;
+  padding: 0 14px 14px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-body);
+}
+
+.faq-empty {
+  font-size: 14px;
+  color: var(--text-body);
+}
+
+/* ---- The owl's onboarding tour (2026-10-05) ---- */
+
+.owl-tour-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.owl-tour-controls[hidden] {
+  display: none;
+}
+
+.owl-tour-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-body);
+  margin-right: auto;
+}
+
+.owl-tour-skip {
+  border: none;
+  background: none;
+  padding: 4px 2px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-body);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.owl-tour-skip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* The menu item (or Help button) the owl is describing right now. */
+.tour-target {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 6px var(--primary-tint);
 }

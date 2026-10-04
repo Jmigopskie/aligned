@@ -15,8 +15,19 @@ const endsInput = document.getElementById("announcement-ends");
 const activeCheckbox = document.getElementById("announcement-active");
 const submitBtn = document.getElementById("announcement-submit-btn");
 const modalClose = document.getElementById("announcement-modal-close");
+const videoInput = document.getElementById("announcement-video");
+const videoCurrent = document.getElementById("announcement-video-current");
+const videoName = document.getElementById("announcement-video-name");
+const videoRemoveBtn = document.getElementById("announcement-video-remove");
+const videoProgress = document.getElementById("announcement-video-progress");
+const videoBar = document.getElementById("announcement-video-bar");
+const videoPercent = document.getElementById("announcement-video-percent");
+const MAX_VIDEO_MB = 500;
+
+videoCurrent.querySelector("[data-icon]").innerHTML = Icons.video;
 
 let allAnnouncements = [];
+let uploading = false;
 
 function fmtDateTime(iso) {
   if (!iso) return null;
@@ -71,6 +82,7 @@ function renderAnnouncements() {
         <td>
           <strong>${escapeHtml(a.title)}</strong>
           <div class="text-sm" style="margin-top:2px;">${escapeHtml(a.message)}</div>
+          ${a.has_video ? `<div class="video-tag">${Icons.video}<span>${escapeHtml(a.video_name || "Video")}</span></div>` : ""}
         </td>
         <td><span class="badge">${typeLabel(a.type)}</span></td>
         <td>${windowLabel(a)}</td>
@@ -146,8 +158,37 @@ function toLocalInputValue(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function showCurrentVideo(a) {
+  const has = !!(a && a.has_video);
+  videoCurrent.hidden = !has;
+  videoName.textContent = has ? `${a.video_name || "Video"} (${Math.max(1, Math.round((a.video_size || 0) / 1048576))} MB)` : "";
+}
+
+function showProgress(fraction) {
+  const pct = Math.round(fraction * 100);
+  videoProgress.hidden = false;
+  videoBar.style.transform = `scaleX(${fraction})`;
+  videoPercent.textContent = `${pct}%`;
+  submitBtn.textContent = `Uploading video ${pct}%`;
+}
+
+videoRemoveBtn.addEventListener("click", async () => {
+  const id = idInput.value;
+  if (!id || !confirm("Remove this video from the announcement?")) return;
+  try {
+    const data = await Api.adminDeleteAnnouncementVideo(id);
+    showCurrentVideo(data.announcement);
+    showToast("Video removed.");
+    loadAnnouncements();
+  } catch (err) {
+    showToast(err.message, true);
+  }
+});
+
 function openModal(a) {
   form.reset();
+  videoProgress.hidden = true;
+  showCurrentVideo(a);
   if (a) {
     modalTitle.textContent = "Edit announcement";
     idInput.value = a.id;
@@ -167,6 +208,8 @@ function openModal(a) {
 }
 
 function closeModal() {
+  // Closing mid-upload would leave the video half sent with no sign of it.
+  if (uploading) return;
   overlay.hidden = true;
 }
 
@@ -191,19 +234,45 @@ form.addEventListener("submit", async (e) => {
     ends_at: endsInput.value ? new Date(endsInput.value).toISOString() : null,
   };
 
+  const video = videoInput.files[0] || null;
+  if (video) {
+    if (!/\.(mp4|webm)$/i.test(video.name)) {
+      showToast("Choose an MP4 or WebM video.", true);
+      return;
+    }
+    if (video.size > MAX_VIDEO_MB * 1024 * 1024) {
+      showToast(`That video is over ${MAX_VIDEO_MB} MB. Use a shorter or smaller one.`, true);
+      return;
+    }
+  }
+
   setButtonLoading(submitBtn, true, "Saving");
+  let savedId = id;
   try {
     if (id) {
       await Api.adminUpdateAnnouncement(id, payload);
     } else {
-      await Api.adminCreateAnnouncement(payload);
+      const data = await Api.adminCreateAnnouncement(payload);
+      savedId = data.announcement.id;
+      idInput.value = savedId;
     }
-    showToast("Announcement saved.");
+    if (video) {
+      // Sent after the announcement exists, so a failed upload never loses
+      // the text the admin wrote; they can attach the video again.
+      uploading = true;
+      showProgress(0);
+      await Api.adminUploadAnnouncementVideo(savedId, video, showProgress);
+    }
+    showToast(video ? "Announcement and video saved." : "Announcement saved.");
+    uploading = false;
     closeModal();
     loadAnnouncements();
   } catch (err) {
-    showToast(err.message, true);
+    uploading = false;
+    showToast(video && savedId ? `The announcement was saved, but the video didn't upload: ${err.message}` : err.message, true);
+    loadAnnouncements();
   } finally {
+    uploading = false;
     setButtonLoading(submitBtn, false);
   }
 });

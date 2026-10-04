@@ -80,10 +80,15 @@ function renderAnnouncements() {
     .map((a) => {
       const canManage = currentUser && a.author_id === currentUser.id;
       return `
-      <tr>
+      <tr id="announcement-${a.id}">
         <td>
           <strong>${escapeHtml(a.title)}</strong>
           <div class="text-sm" style="margin-top:2px;">${escapeHtml(a.message)}</div>
+          ${
+            a.has_video
+              ? `<video class="announcement-video" controls preload="none" playsinline src="${escapeHtml(a.video_url)}" aria-label="${escapeHtml(a.title)} video"></video>`
+              : ""
+          }
         </td>
         <td><span class="badge">${typeLabel(a.type)}</span></td>
         <td>${audienceLabel(a)}</td>
@@ -116,6 +121,9 @@ async function loadAnnouncements() {
     const data = await Api.myAnnouncements();
     allAnnouncements = data.announcements || [];
     renderAnnouncements();
+    // Arriving from a banner's "Watch the video": the row only exists now.
+    const target = location.hash && document.getElementById(location.hash.slice(1));
+    if (target) target.scrollIntoView({ block: "center" });
   } catch (err) {
     announcementsBody.innerHTML = `<tr class="table-empty-row"><td colspan="7">Couldn't load announcements.</td></tr>`;
     errorBox.textContent = err.message;

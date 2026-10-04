@@ -65,6 +65,7 @@ const Api = {
     apiFetch("/api/login", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => apiFetch("/api/logout", { method: "POST" }),
   me: () => apiFetch("/api/me"),
+  markOnboarded: () => apiFetch("/api/me/onboarded", { method: "POST" }),
   updateMe: (payload) =>
     apiFetch("/api/me", { method: "PATCH", body: JSON.stringify(payload) }),
   changePassword: (currentPassword, newPassword) =>
@@ -289,6 +290,28 @@ const Api = {
     apiFetch(`/api/admin/announcements/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   adminDeleteAnnouncement: (id) =>
     apiFetch(`/api/admin/announcements/${id}`, { method: "DELETE" }),
+  adminDeleteAnnouncementVideo: (id) =>
+    apiFetch(`/api/admin/announcements/${id}/video`, { method: "DELETE" }),
+  // Sends a video in 5 MB pieces: the server stops any one request after two
+  // minutes, which a large file over a school connection would outlast.
+  // onProgress(fraction) after each piece. Resolves with the updated announcement.
+  async adminUploadAnnouncementVideo(id, file, onProgress) {
+    const CHUNK = 5 * 1024 * 1024;
+    const total = Math.max(1, Math.ceil(file.size / CHUNK));
+    const uploadId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    let data = null;
+    for (let index = 0; index < total; index++) {
+      const form = new FormData();
+      form.append("upload_id", uploadId);
+      form.append("index", String(index));
+      form.append("total", String(total));
+      form.append("filename", file.name);
+      form.append("chunk", file.slice(index * CHUNK, (index + 1) * CHUNK), "chunk");
+      data = await apiFetch(`/api/admin/announcements/${id}/video/chunks`, { method: "POST", body: form });
+      if (onProgress) onProgress((index + 1) / total);
+    }
+    return data.announcement;
+  },
 
   // Notifications
   listNotifications: () => apiFetch("/api/notifications"),
@@ -464,6 +487,7 @@ async function requireAuth() {
     const data = await Api.me();
     cacheUser(data.user);
     loadAnnouncementBanner();
+    addHelpButton();
     wireNotificationBell();
     hidePageTransition();
     return data.user;
@@ -616,6 +640,23 @@ const ANNOUNCEMENT_TYPE_LABEL = {
 // known announcements immediately, then reconciling once the real fetch
 // resolves, means the shift only ever happens on genuine changes (a new
 // announcement, one expiring) instead of on every single page load.
+// The Help and FAQ button, first in the top bar of every signed-in page. Added
+// here rather than in each page's markup so no page can be missed. The icon is
+// inlined because api.js loads on pages that never load icons.js.
+function addHelpButton() {
+  const actions = document.querySelector(".topbar-actions");
+  if (!actions || document.getElementById("help-btn")) return;
+  const link = document.createElement("a");
+  link.id = "help-btn";
+  link.className = "icon-btn";
+  link.href = "faq.html";
+  link.title = "Help and FAQ";
+  link.setAttribute("aria-label", "Help and FAQ");
+  if (location.pathname.endsWith("/faq.html")) link.setAttribute("aria-current", "page");
+  link.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>`;
+  actions.insertBefore(link, actions.firstChild);
+}
+
 function loadAnnouncementBanner() {
   const shell = document.querySelector(".dash-shell");
   if (!shell) return;
@@ -650,6 +691,7 @@ function loadAnnouncementBanner() {
           <div class="announcement-banner-body">
             <strong>${escapeHtml(a.title)}</strong>
             <span>${escapeHtml(a.message)}</span>
+            ${a.has_video ? `<a class="announcement-banner-video" href="announcements.html#announcement-${a.id}">Watch the video</a>` : ""}
           </div>
           <button type="button" class="announcement-banner-close" aria-label="Dismiss"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         </div>`
@@ -754,7 +796,7 @@ const OwlGuide = {
       </span>`;
     document.body.appendChild(el);
 
-    el.querySelector(".owl-guide-close").addEventListener("click", () => this.hide());
+    el.querySelector(".owl-guide-close").addEventListener("click", () => (this._tour ? this._tour.onSkip() : this.hide()));
 
     // Hold still while it is being read or moved — a message that vanishes
     // mid-sentence is worse than one that never appeared. Bound to each part
@@ -884,7 +926,42 @@ const OwlGuide = {
 
   _arm() {
     clearTimeout(this._timer);
+    // A tour step stays until the reader moves on.
+    if (this._tour) return;
     this._timer = setTimeout(() => this.hide(), this.VISIBLE_MS);
+  },
+
+  // One step of a guided tour: the line, a counter, and Back / Next / Skip.
+  // tour = { index, total, onBack, onNext, onSkip }. The close button skips.
+  tourStep(spec, tour) {
+    const el = this._el || this._build();
+    this._tour = tour;
+    this.show(spec);
+    let bar = el.querySelector(".owl-tour-controls");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.className = "owl-tour-controls";
+      this._bubble().appendChild(bar);
+    }
+    const last = tour.index === tour.total - 1;
+    bar.innerHTML = `
+      <span class="owl-tour-count">${tour.index + 1} of ${tour.total}</span>
+      <button type="button" class="owl-tour-skip" data-tour="skip">Skip tour</button>
+      ${tour.index ? '<button type="button" class="btn btn-secondary btn-sm" data-tour="back">Back</button>' : ""}
+      <button type="button" class="btn btn-primary btn-sm" data-tour="next">${last ? "Finish" : "Next"}</button>`;
+    bar.hidden = false;
+    bar.querySelector('[data-tour="next"]').addEventListener("click", tour.onNext);
+    bar.querySelector('[data-tour="skip"]').addEventListener("click", tour.onSkip);
+    const back = bar.querySelector('[data-tour="back"]');
+    if (back) back.addEventListener("click", tour.onBack);
+    bar.querySelector('[data-tour="next"]').focus({ preventScroll: true });
+  },
+
+  endTour() {
+    this._tour = null;
+    const bar = this._el && this._el.querySelector(".owl-tour-controls");
+    if (bar) bar.hidden = true;
+    this.hide();
   },
 
   _bubble() {
