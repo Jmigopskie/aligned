@@ -24,9 +24,19 @@ def _guides_dir():
 
 # The generator's subject values, and the other names the same subject goes by
 # in document titles and in what teachers type when they upload.
+# Matching is by substring, so every alias is specific: a bare "IA" or "HE"
+# would match "Social" or "the". The curriculum guide covers every component
+# ("ICT / CP / AFA / FCS / IA"), and Grades 4 to 8 publish one combined
+# "AFA / FCS / IA" file per grade, so those strings are aliases too.
+_CG = "ICT / CP / AFA / FCS / IA"
+_COMBINED = "AFA / FCS / IA"
 SUBJECT_ALIASES = {
-    "cp (comprog)": ["CP (ComProg)", "Computer Programming", "ComProg", "Programming"],
-    "ict": ["ICT", "Information and Communications Technology"],
+    "cp (comprog)": ["CP (ComProg)", "Computer Programming", "ComProg", "Programming", _CG],
+    "ict": ["ICT", "Information and Communications Technology", _CG],
+    "afa": ["AFA", "Agri-Fishery", _COMBINED],
+    "he (fcs)": ["FCS", "Home Economics", "Family and Consumer", _COMBINED],
+    "ia": ["TLE: IA", "Industrial Arts", _COMBINED],
+    "electrical (ees)": ["Electrical", "Electronics Servicing", _COMBINED],
 }
 
 DOC_TYPES = {"budget_of_work", "curriculum_guide"}
@@ -69,6 +79,12 @@ def search_course_guides():
     order = [CourseGuide.is_builtin.desc()]
     if prefer in GRADE_BANDS:
         order.append(case((CourseGuide.grade_band.like(f"%{prefer}%"), 0), else_=1))
+    if subject:
+        # A subject's own guides (and the curriculum guide that covers them
+        # all) before guides it only shares, like the combined AFA / FCS / IA
+        # files: Electrical's own Budget of Work leads, not Grade 4's.
+        order.append(case((or_(CourseGuide.subject == subject,
+                               CourseGuide.doc_type == "curriculum_guide"), 0), else_=1))
     # Official guides keep their catalogue order (the curriculum guide, then
     # Grade 4 upwards, as seeded); teachers' uploads stay newest first.
     order += [case((CourseGuide.is_builtin.is_(True), CourseGuide.id), else_=None).asc(),

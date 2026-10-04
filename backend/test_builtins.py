@@ -213,6 +213,38 @@ def _guide_docx(path, text):
     d.save(path)
 
 
+def check_new_subject_search(app, student):
+    """Each TLE subject finds its own official guides and not other components'.
+    Matching is by substring, so a careless alias ("IA", "HE") would drag in
+    titles that merely contain those letters."""
+    client = client_for(app, student)
+
+    def titles(subject):
+        res = client.get("/api/course-guides", query_string={"subject": subject})
+        return [g["title"] for g in res.get_json()["course_guides"] if g.get("is_builtin")]
+
+    curriculum = "MATATAG EPP/TLE Curriculum Guide, Grades 4 to 10"
+    ia = titles("IA")
+    assert any("Electrical and Electronics Servicing" in t for t in ia), ia
+    assert any("Shielded Metal Arc Welding" in t for t in ia), ia
+    assert any("AFA | FCS | IA" in t for t in ia), ia
+    assert not any("ICT" in t and "Curriculum" not in t for t in ia), ia
+
+    ees = titles("Electrical (EES)")
+    assert ees and "Electrical and Electronics Servicing" in [t for t in ees if t != curriculum][0], ees
+
+    he = titles("HE (FCS)")
+    assert any("Beauty Care Services" in t for t in he), he
+    assert not any("ICT" in t and "Curriculum" not in t for t in he), he
+
+    afa = titles("AFA")
+    assert any("Fish Capture" in t for t in afa), afa
+
+    for subject in ("IA", "Electrical (EES)", "HE (FCS)", "AFA", "ICT", "CP (ComProg)"):
+        assert curriculum in titles(subject), subject
+    print("  new TLE subjects find their guides OK")
+
+
 def check_guides(app, admin, student):
     tmp = tempfile.mkdtemp()
     try:
@@ -403,6 +435,7 @@ def main():
         check_export_fills_frozen_anchors(app, student)
         check_templates_keep_their_structure(app)
         check_views_show_logos(app)
+        check_new_subject_search(app, student)
         check_guides(app, admin, student)
         check_guide_text_is_precomputed(app)
         check_admin_owning_builtins_can_be_deleted(app, admin)
