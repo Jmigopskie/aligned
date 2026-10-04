@@ -112,6 +112,17 @@ def _migrate_user_columns():
     _add_column("users", "avatar_path", "VARCHAR(255)")
     _add_column("users", "banner_path", "VARCHAR(255)")
 
+    # The owl's onboarding tour is for accounts made from now on. Only when the
+    # column is first added are the accounts already there marked as done: on
+    # every later boot it already exists, so new accounts keep their blank.
+    from sqlalchemy import inspect, text
+    had_column = "onboarded_at" in {c["name"] for c in inspect(db.engine).get_columns("users")} \
+        if "users" in inspect(db.engine).get_table_names() else True
+    _add_column("users", "onboarded_at", "DATETIME")
+    if not had_column:
+        db.session.execute(text("UPDATE users SET onboarded_at = CURRENT_TIMESTAMP WHERE onboarded_at IS NULL"))
+        db.session.commit()
+
 
 def _migrate_course_guide_columns():
     """Add the file_hash column (used to dedupe uploads) to databases
@@ -212,6 +223,10 @@ def _migrate_announcement_columns():
     one of their own sections instead of everyone) to databases created
     before this feature existed."""
     _add_column("announcements", "section_id", "INTEGER")
+    # An attached tutorial video.
+    _add_column("announcements", "video_path", "VARCHAR(500)")
+    _add_column("announcements", "video_name", "VARCHAR(255)")
+    _add_column("announcements", "video_size", "BIGINT")
 
 
 def _ensure_default_admin(app):

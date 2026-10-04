@@ -34,6 +34,12 @@ class Announcement(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # An optional video (a tutorial, say) an admin attached; it plays in the
+    # announcement card for the same audience the announcement reaches.
+    video_path = db.Column(db.String(500), nullable=True)
+    video_name = db.Column(db.String(255), nullable=True)
+    video_size = db.Column(db.BigInteger, nullable=True)
+
     author = db.relationship("User")
     section = db.relationship("Section")
 
@@ -62,4 +68,8 @@ class Announcement(db.Model):
             "ends_at": iso_utc(self.ends_at),
             "created_at": iso_utc(self.created_at),
             "updated_at": iso_utc(self.updated_at),
+            "has_video": bool(self.video_path),
+            "video_name": self.video_name if self.video_path else None,
+            "video_size": self.video_size if self.video_path else None,
+            "video_url": f"/api/announcements/{self.id}/video" if self.video_path else None,
         }

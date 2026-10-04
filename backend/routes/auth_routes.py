@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from functools import wraps
 
 from flask import Blueprint, request, jsonify, session, current_app, send_file
@@ -127,6 +128,18 @@ def update_me():
 
     db.session.commit()
     return jsonify({"status": "ok", "user": user.to_dict()})
+
+@auth_bp.post("/me/onboarded")
+@login_required
+def mark_onboarded():
+    """The owl's first-sign-in tour was finished or skipped: never start it on
+    its own again, on any device. (It can still be replayed from the FAQ.)"""
+    user = current_user()
+    if user.onboarded_at is None:
+        user.onboarded_at = datetime.utcnow()
+        db.session.commit()
+    return jsonify({"status": "ok", "user": user.to_dict()})
+
 
 @auth_bp.post("/me/password")
 @login_required
