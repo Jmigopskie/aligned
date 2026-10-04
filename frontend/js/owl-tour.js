@@ -1,100 +1,157 @@
-// The owl's first-sign-in tour. Runs on the landing page (dashboard for
-// students and teachers, admin dashboard for admins) once per account, or again
-// on demand with ?tour=1 (the FAQ's "Replay the tour"). Each step can point at a
-// sidebar link; on a phone, where the menu is folded away, the words name it.
-const TOUR_STEPS = {
+// The owl's tour of the app. It runs once for a new account (or again from the
+// FAQ's "Replay the tour") and walks through the tabs themselves: each stop
+// opens its page and points at the part that matters there. Where it is up to
+// is kept in sessionStorage, so it carries on across page loads; Skip or
+// Finish ends it everywhere. api.js loads this file only while a tour is due.
+const TOUR_KEY = "alignedTour";
+
+const TOUR_STOPS = {
   teacher: [
-    { pose: "wave", text: "Hi, I'm Alan. Let me show you around AlignED. It only takes a minute." },
-    { pose: "point", target: "lesson-plan.html", text: "Create Lesson Plan is where every plan starts. Pick your school's format, or add your own with New format." },
-    { pose: "point", target: "lesson-plan-list.html", text: "List of Lesson Plans keeps everything you make. Unfinished plans stay here as drafts; use Continue to pick one up." },
-    { pose: "idea", target: "sections.html", text: "In My Sections you create a class and share its join code. What your students hand in shows up in Submissions." },
-    { pose: "point", target: "course-guides.html", text: "Curriculum/Course Guide has the official DepEd guides for ICT, CP, AFA, HE, IA and Electrical. Your plans are written from these." },
-    { pose: "celebrate", target: "announcements.html", help: true, text: "Announcements has school news and the tutorial video. For quick answers any time, use the Help button at the top." },
+    { page: "dashboard.html", pose: "wave", text: "Hi, I'm Alan. I'll open each tab and show you what it's for. It takes about a minute." },
+    { page: "lesson-plan.html", focus: "#builtin-section", pose: "point", text: "This is Create Lesson Plan. Every plan starts by picking a format, and these ready-to-use ones are set up for you." },
+    { page: "lesson-plan.html", focus: "#new-format-btn", pose: "idea", text: "Does your school use its own layout? Upload a blank copy with New format and AlignED finds the fields for you." },
+    { page: "lesson-plan-list.html", focus: ["#status-filter", "#plans-body"], pose: "point", text: "List of Lesson Plans keeps everything you make. Unfinished plans stay here as drafts; use Continue to finish one." },
+    { page: "sections.html", focus: "#new-section-btn", pose: "point", text: "My Sections is where you create a class. Each one gets a join code to share with your students." },
+    { page: "submissions.html", focus: ["#review-body", "#no-sections-state"], pose: "check", text: "Submissions collects the plans your students hand in, ready for you to review." },
+    { page: "course-guides.html", focus: "#subject-filter", pose: "point", text: "Curriculum/Course Guide has the official DepEd guides. Filter by subject, or share your own with Upload a guide." },
+    { page: "announcements.html", focus: "#announcements-body", pose: "idea", text: "Announcements has school news, and the tutorial video when your admin posts one." },
+    { page: "announcements.html", focus: "#help-btn", pose: "celebrate", text: "Questions later? The Help button opens the FAQ, where you can also replay this tour. Enjoy AlignED!" },
   ],
   student: [
-    { pose: "wave", text: "Hi, I'm Alan. Let me show you around AlignED. It only takes a minute." },
-    { pose: "point", target: "lesson-plan.html", text: "Create Lesson Plan is where every plan starts. Pick the format your school uses and fill in a short setup." },
-    { pose: "point", target: "lesson-plan-list.html", text: "List of Lesson Plans keeps everything you make. Drafts wait here for you, and Submit to class hands a plan to your teacher." },
-    { pose: "idea", target: "my-classes.html", text: "In My Classes, join your teacher's class with the code they give you." },
-    { pose: "point", target: "course-guides.html", text: "Curriculum/Course Guide has the official DepEd guides your plans are written from." },
-    { pose: "celebrate", target: "announcements.html", help: true, text: "Announcements has school news and the tutorial video. For quick answers any time, use the Help button at the top." },
+    { page: "dashboard.html", pose: "wave", text: "Hi, I'm Alan. I'll open each tab and show you what it's for. It takes about a minute." },
+    { page: "lesson-plan.html", focus: "#builtin-section", pose: "point", text: "This is Create Lesson Plan. Every plan starts by picking the format your school uses." },
+    { page: "lesson-plan-list.html", focus: ["#status-filter", "#plans-body"], pose: "point", text: "List of Lesson Plans keeps everything you make. Drafts wait here, and Submit to class hands a plan to your teacher." },
+    { page: "my-classes.html", focus: "#join-form", pose: "idea", text: "In My Classes, join your teacher's class with the code they give you." },
+    { page: "course-guides.html", focus: "#subject-filter", pose: "point", text: "Curriculum/Course Guide has the official DepEd guides your plans are written from. Filter them by subject here." },
+    { page: "announcements.html", focus: "#announcements-body", pose: "idea", text: "Announcements has news from your school and teachers, and the tutorial video when one is posted." },
+    { page: "announcements.html", focus: "#help-btn", pose: "celebrate", text: "Questions later? The Help button opens the FAQ, where you can also replay this tour. Enjoy AlignED!" },
   ],
   admin: [
-    { pose: "wave", text: "Hi, I'm Alan. Here is a quick look at the admin console." },
-    { pose: "point", target: "admin-users.html", text: "Manage Users is where you add teacher and student accounts, and archive the ones that leave." },
-    { pose: "point", target: "admin-sections.html", text: "Manage Sections shows every class and who teaches it." },
-    { pose: "idea", target: "admin-documents.html", text: "Documents gathers the lesson plans and files across the school." },
-    { pose: "point", target: "admin-announcements.html", text: "In Announcements you post notices to everyone, and you can attach a tutorial video that plays right inside the notice." },
-    { pose: "celebrate", help: true, text: "For quick answers any time, use the Help button at the top. That's it. Enjoy AlignED!" },
+    { page: "admin-dashboard.html", pose: "wave", text: "Hi, I'm Alan. I'll open each part of the admin console and show you what it's for." },
+    { page: "admin-users.html", focus: "#new-user-btn", pose: "point", text: "Manage Users is where you add teacher and student accounts, and archive the ones who leave." },
+    { page: "admin-sections.html", focus: ["#sections-body"], pose: "point", text: "Manage Sections lists every class in the school and who teaches it." },
+    { page: "admin-documents.html", focus: "#doc-tabs", pose: "idea", text: "Documents brings the school's lesson plans, course guides and sections together in one place." },
+    { page: "admin-announcements.html", focus: "#new-announcement-btn", pose: "point", text: "Post notices to everyone here. Attach a video to an announcement to share a tutorial with the whole school." },
+    { page: "admin-announcements.html", focus: "#help-btn", pose: "celebrate", text: "The Help button opens the FAQ, where you can also replay this tour. That's the tour!" },
   ],
 };
 
-const OwlTour = {
-  _steps: [],
-  _index: 0,
-  _firstRun: false,
+function readTour() {
+  try {
+    return JSON.parse(sessionStorage.getItem(TOUR_KEY) || "null");
+  } catch (err) {
+    return null;
+  }
+}
 
+function writeTour(state) {
+  try {
+    if (state) sessionStorage.setItem(TOUR_KEY, JSON.stringify(state));
+    else sessionStorage.removeItem(TOUR_KEY);
+  } catch (err) {
+    /* storage blocked: the tour simply ends on the next page */
+  }
+}
+
+function currentPage() {
+  return location.pathname.split("/").pop() || "index.html";
+}
+
+const OwlTour = {
   _clearHighlight() {
     document.querySelectorAll(".tour-target").forEach((el) => el.classList.remove("tour-target"));
   },
 
-  _highlight(step) {
+  // The part of the page a stop is about. Pages fill in after loading, so it
+  // is looked for a few times before the stop shows without a highlight.
+  // `focus` may list several places, best first: some only show in certain
+  // states (a filter that appears once there are plans to filter). With none
+  // of them on screen, the tab's own menu item is pointed at instead.
+  async _focus(focus) {
+    if (!focus) return;
+    const selectors = [].concat(focus);
+    const visible = (sel) => {
+      const el = document.querySelector(sel);
+      return el && el.getClientRects().length && el.offsetHeight > 4 ? el : null;
+    };
+    for (let tries = 0; tries < 12; tries++) {
+      const el = selectors.map(visible).find(Boolean);
+      if (el) return this._mark(el);
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    const menuItem = document.querySelector(`#sidebar-nav a[href="${currentPage()}"]`);
+    if (menuItem && menuItem.getClientRects().length) this._mark(menuItem);
+  },
+
+  _mark(el) {
+    el.classList.add("tour-target");
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+  },
+
+  _stops(state) {
+    return TOUR_STOPS[state.role] || TOUR_STOPS.student;
+  },
+
+  // Moving to a stop: on this page it just shows; on another page it saves
+  // where it's up to and opens that page, which picks the tour up from there.
+  _goTo(state, index) {
+    const stops = this._stops(state);
+    const next = { ...state, index };
+    writeTour(next);
+    if (stops[index].page !== currentPage()) {
+      this._clearHighlight();
+      window.location.href = stops[index].page;
+      return;
+    }
+    this._show(next);
+  },
+
+  async _show(state) {
+    const stops = this._stops(state);
+    const stop = stops[state.index];
     this._clearHighlight();
-    const targets = [];
-    if (step.target) {
-      const link = document.querySelector(`#sidebar-nav a[href="${step.target}"]`);
-      if (link) targets.push(link);
+
+    // Somewhere else than this stop's page (the reader wandered off, or used
+    // the menu mid-tour): offer to carry on rather than talk about a page
+    // that isn't on screen.
+    if (stop.page !== currentPage()) {
+      OwlGuide.tourStep(
+        { pose: "idle", text: "Want to carry on with the tour? I'll take you back to where we were." },
+        { index: state.index, total: stops.length, nextLabel: "Continue the tour",
+          onNext: () => this._goTo(state, state.index), onSkip: () => this._end(state) }
+      );
+      return;
     }
-    if (step.help) {
-      const help = document.getElementById("help-btn");
-      if (help) targets.push(help);
-    }
-    targets.forEach((el) => {
-      // Folded-away menus (phones) have nothing to point at; the words do it.
-      if (!el.getClientRects().length) return;
-      el.classList.add("tour-target");
-      el.scrollIntoView({ block: "nearest" });
+
+    const last = state.index === stops.length - 1;
+    OwlGuide.tourStep(stop, {
+      index: state.index,
+      total: stops.length,
+      onBack: state.index ? () => this._goTo(state, state.index - 1) : null,
+      onNext: () => (last ? this._end(state) : this._goTo(state, state.index + 1)),
+      onSkip: () => this._end(state),
     });
+    await this._focus(stop.focus);
   },
 
-  _go(index) {
-    this._index = index;
-    const step = this._steps[index];
-    this._highlight(step);
-    OwlGuide.tourStep(step, {
-      index,
-      total: this._steps.length,
-      onBack: () => this._go(Math.max(0, index - 1)),
-      onNext: () => (index === this._steps.length - 1 ? this._end() : this._go(index + 1)),
-      onSkip: () => this._end(),
-    });
-  },
-
-  _end() {
+  _end(state) {
     this._clearHighlight();
     OwlGuide.endTour();
-    // Off the URL, so a reload doesn't replay it.
+    writeTour(null);
     if (location.search.includes("tour=1")) history.replaceState(null, "", location.pathname);
-    if (this._firstRun) Api.markOnboarded().catch(() => {});
-    this._firstRun = false;
+    if (state && state.firstRun) Api.markOnboarded().catch(() => {});
   },
 
-  start(user, { firstRun }) {
-    this._steps = TOUR_STEPS[user.role] || TOUR_STEPS.student;
-    this._firstRun = firstRun;
-    this._go(0);
+  // Called by api.js once the user is known.
+  run(user) {
+    let state = readTour();
+    const replay = new URLSearchParams(location.search).get("tour") === "1";
+    if (!state && (replay || !user.onboarded)) {
+      state = { role: user.role, index: 0, firstRun: !user.onboarded };
+      writeTour(state);
+    }
+    if (!state) return;
+    // After the page has drawn and the loading screen has gone.
+    setTimeout(() => this._show(state), 600);
   },
 };
-
-(async function startTourIfDue() {
-  let user;
-  try {
-    user = (await Api.me()).user;
-  } catch (err) {
-    return;
-  }
-  const replay = new URLSearchParams(location.search).get("tour") === "1";
-  if (!replay && user.onboarded) return;
-  // After the page has drawn its sidebar and the loading screen is gone.
-  setTimeout(() => OwlTour.start(user, { firstRun: !user.onboarded }), 700);
-})();

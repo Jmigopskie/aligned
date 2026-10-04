@@ -488,6 +488,7 @@ async function requireAuth() {
     cacheUser(data.user);
     loadAnnouncementBanner();
     addHelpButton();
+    loadTourIfDue(data.user);
     wireNotificationBell();
     hidePageTransition();
     return data.user;
@@ -640,6 +641,30 @@ const ANNOUNCEMENT_TYPE_LABEL = {
 // known announcements immediately, then reconciling once the real fetch
 // resolves, means the shift only ever happens on genuine changes (a new
 // announcement, one expiring) instead of on every single page load.
+// The owl's tour (js/owl-tour.js) is fetched only when it has something to do:
+// a tour already under way on another tab, or a new account (or "Replay the
+// tour") arriving on its landing page.
+function loadTourIfDue(user) {
+  let underWay = false;
+  try {
+    underWay = !!sessionStorage.getItem("alignedTour");
+  } catch (err) {
+    underWay = false;
+  }
+  const page = location.pathname.split("/").pop();
+  const landing = page === (user.role === "admin" ? "admin-dashboard.html" : "dashboard.html");
+  const replay = new URLSearchParams(location.search).get("tour") === "1";
+  if (!underWay && !(landing && (replay || !user.onboarded))) return;
+  if (typeof OwlTour !== "undefined") {
+    OwlTour.run(user);
+    return;
+  }
+  const script = document.createElement("script");
+  script.src = "js/owl-tour.js?v=2026-10-05e";
+  script.onload = () => OwlTour.run(user);
+  document.body.appendChild(script);
+}
+
 // The Help and FAQ button, first in the top bar of every signed-in page. Added
 // here rather than in each page's markup so no page can be missed. The icon is
 // inlined because api.js loads on pages that never load icons.js.
@@ -936,6 +961,7 @@ const OwlGuide = {
   tourStep(spec, tour) {
     const el = this._el || this._build();
     this._tour = tour;
+    el.classList.add("is-touring");
     this.show(spec);
     let bar = el.querySelector(".owl-tour-controls");
     if (!bar) {
@@ -944,11 +970,12 @@ const OwlGuide = {
       this._bubble().appendChild(bar);
     }
     const last = tour.index === tour.total - 1;
+    const nextLabel = tour.nextLabel || (last ? "Finish" : "Next");
     bar.innerHTML = `
       <span class="owl-tour-count">${tour.index + 1} of ${tour.total}</span>
       <button type="button" class="owl-tour-skip" data-tour="skip">Skip tour</button>
-      ${tour.index ? '<button type="button" class="btn btn-secondary btn-sm" data-tour="back">Back</button>' : ""}
-      <button type="button" class="btn btn-primary btn-sm" data-tour="next">${last ? "Finish" : "Next"}</button>`;
+      ${tour.onBack ? '<button type="button" class="btn btn-secondary btn-sm" data-tour="back">Back</button>' : ""}
+      <button type="button" class="btn btn-primary btn-sm" data-tour="next">${nextLabel}</button>`;
     bar.hidden = false;
     bar.querySelector('[data-tour="next"]').addEventListener("click", tour.onNext);
     bar.querySelector('[data-tour="skip"]').addEventListener("click", tour.onSkip);
@@ -959,6 +986,7 @@ const OwlGuide = {
 
   endTour() {
     this._tour = null;
+    if (this._el) this._el.classList.remove("is-touring");
     const bar = this._el && this._el.querySelector(".owl-tour-controls");
     if (bar) bar.hidden = true;
     this.hide();

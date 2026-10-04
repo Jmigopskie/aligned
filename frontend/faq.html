@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-10-05b" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-05e" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -57,36 +57,50 @@
       </aside>
 
       <main class="dash-main">
-        <div class="page-header">
-          <div class="page-heading">
-            <h1 class="dash-page-title">Help and FAQ</h1>
-            <p class="page-subtitle">Quick answers about making lesson plans in AlignED. Can't find yours? Ask your school admin.</p>
+        <section class="help-hero" aria-labelledby="help-title">
+          <div class="help-hero-copy">
+            <h1 class="dash-page-title" id="help-title">How can we help?</h1>
+            <p class="page-subtitle">Answers about making lesson plans in AlignED. Can't find yours? Ask your school admin.</p>
           </div>
-          <div class="page-actions">
-            <div class="format-search" role="search">
-              <span data-icon="search" class="format-search-icon"></span>
-              <label for="faq-search" class="sr-only">Search the FAQ</label>
-              <input type="search" id="faq-search" placeholder="Search the FAQ" autocomplete="off" />
-            </div>
-            <a class="btn btn-secondary" id="replay-tour-btn" href="dashboard.html?tour=1">Replay the tour</a>
+          <div class="help-search" role="search">
+            <span data-icon="search" class="help-search-icon"></span>
+            <label for="faq-search" class="sr-only">Search the FAQ</label>
+            <input type="search" id="faq-search" placeholder="Search questions, e.g. export, ILAW, join code" autocomplete="off" />
           </div>
-        </div>
+          <div class="help-actions">
+            <a class="help-action" id="tutorial-link" href="announcements.html" hidden>
+              <span class="help-action-icon" data-icon="video"></span>
+              <span><strong>Watch the tutorial</strong><span class="help-action-note">A short video from your school</span></span>
+            </a>
+            <a class="help-action" id="replay-tour-btn" href="dashboard.html?tour=1">
+              <span class="help-action-icon" data-icon="sparkle"></span>
+              <span><strong>Replay the tour</strong><span class="help-action-note">The owl shows you each tab</span></span>
+            </a>
+          </div>
+        </section>
 
-        <p class="faq-empty" id="faq-empty" hidden>No questions match that. Try a shorter word, such as "export" or "guide".</p>
+        <div class="help-layout">
+          <nav class="help-topics" id="help-topics" aria-label="Topics"></nav>
+
+          <div class="help-content">
+            <p class="faq-empty" id="faq-empty" hidden>No questions match that. Try a shorter word, such as "export" or "guide".</p>
 
         <div class="faq" id="faq">
-          <section class="faq-group">
+          <section class="faq-group" id="topic-getting-started" data-icon-name="sparkle">
             <h2 class="faq-group-title">Getting started</h2>
+            <div class="faq-list">
             <details><summary>What does AlignED do?</summary>
               <p>It makes DepEd lesson plans in your school's own format. Pick a format, fill in a short setup (teacher, subject, course guide), then let AlignED write the plan or write it yourself field by field with the owl's help. The finished plan looks like your format and exports as a Word file.</p></details>
             <details><summary>What can students, teachers and admins each do?</summary>
               <p>Students make lesson plans and submit them to the class they joined. Teachers make lesson plans, create sections for their students, and review what students submit. Admins manage accounts, sections, documents and announcements for the whole school.</p></details>
             <details><summary>Can I see the owl's tour again?</summary>
-              <p>Yes. Use <strong>Replay the tour</strong> at the top of this page.</p></details>
+              <p>Yes. Use <strong>Replay the tour</strong> at the top of this page. The owl opens each tab and points out what it is for.</p></details>
+            </div>
           </section>
 
-          <section class="faq-group">
+          <section class="faq-group" id="topic-formats" data-icon-name="file">
             <h2 class="faq-group-title">Formats</h2>
+            <div class="faq-list">
             <details><summary>What is a format?</summary>
               <p>It is the layout your plan is printed in, such as the DLP, ILAW, 4A's, PAL3 or SNHS DLP. Every plan follows its format exactly, from the header table to the procedure.</p></details>
             <details><summary>Why can't I edit the ready-to-use formats?</summary>
@@ -95,10 +109,12 @@
               <p>In <strong>Create Lesson Plan</strong>, choose <strong>New format</strong> and upload a blank copy of it as a .docx, .dotx or .pdf. AlignED shows a live copy you can tidy up (fix typos, delete leftover lines), and works out the fillable fields when you save.</p></details>
             <details><summary>AlignED says it couldn't read my file. What now?</summary>
               <p>That usually means the PDF is a scan (a picture of a page) rather than real text. Upload a .docx copy of the format, or export the PDF again from Word.</p></details>
+            </div>
           </section>
 
-          <section class="faq-group">
+          <section class="faq-group" id="topic-making-a-plan" data-icon-name="filePlus">
             <h2 class="faq-group-title">Making a plan</h2>
+            <div class="faq-list">
             <details><summary>What goes in the setup step?</summary>
               <p>Who is teaching, the subject, the level, grade and section, and the course guide the lesson comes from. The lesson is written from that guide, so pick the one that matches your class.</p></details>
             <details><summary>Building Proficiency or Guided mode: which should I use?</summary>
@@ -113,58 +129,71 @@
               <p>The page is shown at its real size, fitted to your screen (<strong>Fit</strong>). Use the zoom buttons in the toolbar to make it bigger, and the zoom readout to go back to Fit.</p></details>
             <details><summary>A field came back empty after generating. What do I do?</summary>
               <p>Write it in yourself, ask the owl about it in the chat, or generate the plan again.</p></details>
+            </div>
           </section>
 
-          <section class="faq-group">
+          <section class="faq-group" id="topic-course-guides-and-subjects" data-icon-name="bookOpen">
             <h2 class="faq-group-title">Course guides and subjects</h2>
+            <div class="faq-list">
             <details><summary>Which subjects does AlignED support?</summary>
               <p>ICT, Computer Programming, AFA (Agri-Fishery Arts), HE (Home Economics, now called Family and Consumer Science or FCS), IA (Industrial Arts), and Electrical (Electrical and Electronics Servicing).</p></details>
             <details><summary>Where do the official guides come from?</summary>
               <p>From DepEd: the MATATAG EPP/TLE Curriculum Guide and the Three-Term Budgets of Work published on the DepEd LR Portal. They are marked as official and can't be changed.</p></details>
             <details><summary>Can I add my own course guide?</summary>
               <p>Yes. Open <strong>Curriculum/Course Guide</strong> and use <strong>Upload a guide</strong>. Everyone can then find it in the shared library.</p></details>
+            </div>
           </section>
 
-          <section class="faq-group">
+          <section class="faq-group" id="topic-saving-drafts-and-exporting" data-icon-name="download">
             <h2 class="faq-group-title">Saving, drafts and exporting</h2>
+            <div class="faq-list">
             <details><summary>Where are the plans I haven't finished?</summary>
               <p>In <strong>List of Lesson Plans</strong>. Drafts are kept there; use <strong>Continue</strong> to pick up where you left off.</p></details>
             <details><summary>How do I get a Word copy?</summary>
               <p>Save the plan, then use <strong>Export as Word</strong>. The file keeps your format's exact layout.</p></details>
+            </div>
           </section>
 
-          <section class="faq-group">
+          <section class="faq-group" id="topic-sections-and-submissions" data-icon-name="users">
             <h2 class="faq-group-title">Sections and submissions</h2>
+            <div class="faq-list">
             <details><summary>Teachers: how do students join my class?</summary>
               <p>Go to <strong>My Sections</strong> and use <strong>Create Section</strong>. Each section gets a join code; give it to your students. What they submit appears in <strong>Submissions</strong>.</p></details>
             <details><summary>Students: how do I join a class and submit a plan?</summary>
               <p>Open <strong>My Classes</strong> and enter the code your teacher gave you. Then, in <strong>List of Lesson Plans</strong>, use <strong>Submit to class</strong> on the plan you want to hand in.</p></details>
+            </div>
           </section>
 
-          <section class="faq-group">
+          <section class="faq-group" id="topic-announcements-and-the-tutorial-video" data-icon-name="megaphone">
             <h2 class="faq-group-title">Announcements and the tutorial video</h2>
+            <div class="faq-list">
             <details><summary>Where do I find announcements?</summary>
               <p>New ones show at the top of your pages and in your notifications. All of them are in <strong>Announcements</strong>.</p></details>
             <details><summary>Where is the tutorial video?</summary>
               <p>When your admin posts one, it plays inside its announcement. Open <strong>Announcements</strong>, or use <strong>Watch the video</strong> on the notice at the top of the page.</p></details>
             <details><summary>Admins: how do I post a video?</summary>
               <p>In <strong>Announcements</strong>, create or edit an announcement and choose a video (MP4 or WebM, up to 500 MB). It uploads in small pieces with a progress bar, so keep the window open until it finishes.</p></details>
+            </div>
           </section>
 
-          <section class="faq-group">
+          <section class="faq-group" id="topic-your-account" data-icon-name="user">
             <h2 class="faq-group-title">Your account</h2>
+            <div class="faq-list">
             <details><summary>How do I change my name, email or password?</summary>
               <p>Open <strong>Settings</strong>, from the menu or your picture in the top corner.</p></details>
             <details><summary>I can't sign in. What should I do?</summary>
               <p>Check your email and password. If it still fails, your account may have been archived; ask your school admin.</p></details>
+            </div>
           </section>
+        </div>
+          </div>
         </div>
       </main>
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-10-05b"></script>
-  <script src="js/icons.js?v=2026-10-05b"></script>
-  <script src="js/faq.js?v=2026-10-05b"></script>
+  <script src="js/api.js?v=2026-10-05e"></script>
+  <script src="js/icons.js?v=2026-10-05e"></script>
+  <script src="js/faq.js?v=2026-10-05e"></script>
 </body>
 </html>
