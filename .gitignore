@@ -13,3 +13,9 @@ backend/aligned.db
 backend/instance/
 backend/uploads/
 backend/generated/
+
+# Local tool state
+.impeccable/
+.claude/
+.superpowers/
+.playwright-mcp/
