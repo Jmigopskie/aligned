@@ -1,0 +1,250 @@
+# Document view that looks like the file in Word
+
+Date: 2026-09-26
+Status: design approved in conversation, spec awaiting review
+
+## Why
+
+The document a teacher sees in the app (the generator's live document, the format
+builder canvas and the two plan previews) is HTML drawn from the format's .docx by
+`docx_service.render_template_html` / `render_reference_html`. It looks noticeably
+different from the same file opened in Word. The user's target is their own ILAW
+plan, `backend/uploads/T1W7-TLE8-AFA-ICT-LESSON-PLAN-ILAW.docx`: viewed in the app
+it must look like it does in Word or any other document viewer.
+
+Side-by-side renders (LibreOffice vs app) of that file and the five built-ins showed:
+
+1. **Page size ignored.** Every document is squeezed into a 760px portrait sheet.
+   ILAW is 13 x 8.5 in landscape, so cells wrap into tall slivers ("Sectio / n").
+2. **Pictures dropped.** Logos (`w:drawing`) never render.
+3. **Fonts and sizes ignored.** The app font replaces the file's (Arial, Arial
+   Narrow, Times, Bookman); sizes are rounded; document defaults and styles are
+   never read.
+4. **Spacing invented.** A flat 8px paragraph gap, 1.55 line height and 7x10px cell
+   padding replace the file's spacing, indents and cell margins, roughly doubling
+   the page height.
+5. **Tables approximated.** Cell widths, row heights and vertical alignment are
+   ignored; a grey fallback grid is drawn where Word draws nothing; every value
+   cell gets an app tint; table-style borders (Table Grid) are not read.
+6. **Numbering lost.** Numbered and bulleted lists render without their markers.
+7. **Headings guessed.** An app heuristic adds bold and margin Word doesn't have.
+
+## Decisions (confirmed with the user)
+
+- **Approach A**: teach our own renderer Word's layout properties. No third-party
+  renderer (docx-preview), no server-side LibreOffice (the VPS has 2 GB RAM, one
+  CPU and no LibreOffice).
+- **Continuous real page**: one sheet at the file's true width, margins and
+  orientation; no page breaks.
+- **Phones**: the same page, fitted to the screen width; zoom (buttons or pinch)
+  enlarges it and the panel scrolls both ways.
+- **Built-ins match their original PDFs.** The user's reference for a built-in is
+  its source PDF (`backend/builtin/formats/*.pdf`), e.g. the TUP DLP header with
+  both logos and centred Arial lines. The converted .docx files themselves drift
+  from those PDFs (lost fonts, wrong column widths, squeezed headers, lost list
+  markers and link, tables past the page edge), so a faithful renderer alone
+  can't match them. The five templates are **repaired against their PDFs**
+  (section 5), keeping their structure so every field stays pinned. The earlier
+  choice to keep the ILAW converted template stands: it is repaired, not replaced
+  by the teacher's T1W7 file.
+
+## Success criteria
+
+- The user's T1W7 sample, uploaded as a format, looks like its Word rendering in
+  the app: 936pt-wide landscape page, both logos at the top of the title cell,
+  Arial / Arial Narrow at the file's sizes, grey label cells, centred and
+  bottom-aligned cells, numbered objectives, the same column widths and borders.
+- Each of the five built-ins, in the app and in its export, matches its source
+  PDF: the same fonts, column widths, header layout and logos, list markers and
+  text, with every table inside the page. The DLP header looks like the PDF's
+  (logo left, certification logo right, the six centred lines between them).
+- Fields, weekly day cells, anchors, detection and export behave exactly as today;
+  all existing backend tests pass.
+- Known ceiling: browsers measure text a hair differently from Word, so a line can
+  wrap one word earlier or later.
+
+## Design
+
+### 1. Page and zoom
+
+- The renderer reads the document's last section (`w:sectPr`): `pgSz` and `pgMar`.
+  `.lp-doc` gets inline `width` and `padding` in points. Built-ins have zero
+  margins and render edge to edge, as in Word.
+- Every emitted length is in points (twips / 20, half-points / 2, EMU / 12700), so
+  100% zoom is the true physical size, like Word at 100%.
+- One continuous sheet: page breaks and section breaks draw nothing.
+- Zoom moves from `transform: scale` to CSS `zoom`, so scroll size, caret and
+  selection stay correct and the `margin-bottom` compensation is removed.
+- New default **Fit**: scale = min(1, available width of the wrap / page width),
+  recomputed on resize. The readout shows it ("Fit 68%"). − and + step along the
+  existing ladder from the current scale; Reset returns to Fit; the saved per-page
+  choice is kept (a saved step still wins over Fit).
+- Applies to all four views: generator live document, format builder canvas,
+  generator plan preview, plan list preview. The two previews have no toolbar and
+  get Fit only, from one shared helper.
+
+### 2. Text
+
+- **Style cascade**, resolved on the server in Word's order: `docDefaults` →
+  table style (`tblStyle` pPr/rPr, for text inside that table) → paragraph style
+  and its `basedOn` chain → character style (`rStyle`) and its chain → direct
+  formatting. Theme fonts (`minorHAnsi`, `majorHAnsi`) and theme colours resolve
+  from `word/theme/theme1.xml`.
+- **Runs** become inline CSS:
+  - `font-family`: the resolved name plus a generic fallback (serif for Times,
+    Cambria, Georgia, Bookman, Garamond, Book Antiqua; sans-serif otherwise).
+    Names starting with `Type3` or empty after conversion map to Arial.
+  - `font-size` in exact points (10.5pt stays 10.5pt).
+  - bold, italic, underline (single/double/dotted/dashed/wavy), strike, caps,
+    small caps, superscript/subscript (`vertAlign`).
+  - colour (including `themeColor`), highlight (Word's full 16-colour palette),
+    run shading.
+- **Paragraphs** become inline CSS:
+  - `margin-top` / `margin-bottom` from `spacing before/after`; with
+    `contextualSpacing`, the gap between two paragraphs of the same style is 0.
+  - line spacing: `lineRule="auto"` → unitless `line-height` = (line / 240) × the
+    font's single-line factor (1.15 by default, 1.22 for Calibri/Aptos);
+    `exact` → `line-height: Npt`; `atLeast` → `line-height: max(Npt, <auto>)`.
+  - `ind`: left/right → margins, `firstLine` → `text-indent`, `hanging` →
+    negative `text-indent` with matching left margin.
+  - alignment (`jc`, as today).
+- **Breaks and tabs**: `w:br` → `<br>`; page breaks are skipped; `w:tab` → an
+  inline gap to the next 0.5 in default stop (custom tab stops are ignored;
+  `ponytail:` note in code).
+- **Numbering**: `numPr` (direct or from the paragraph style) resolves through
+  `numbering.xml` (`num` → `abstractNum`, `lvlOverride`/`startOverride`). A counter
+  per list and level produces the marker from `lvlText` and `numFmt`: decimal,
+  lowerLetter, upperLetter, lowerRoman, upperRoman, bullet; any other format falls
+  back to decimal. Deeper levels reset when a shallower one advances. Symbol /
+  Wingdings private-use bullets map to the Unicode glyph they draw (`` •,
+  `` ▪, `` ➢, `` ❖, `` ✓, `o` stays o). The marker is an
+  inline-block span sized to the hanging indent, styled like the paragraph's
+  first run.
+- **App styling removed**: `.lp-doc` no longer sets font, size, line height,
+  colour, padding or paragraph margins; the `lp-heading` / `lp-bold` heuristic is
+  dropped from the markup. Classes the JS uses stay (`lp-p`, `lp-candidate`,
+  `data-anchor-index`, `lp-field*`). Field tints stay: they show where to type.
+
+### 3. Tables and pictures
+
+- **Geometry**: column widths from `tblGrid` in points (not percentages); table
+  width from `tblW` (`dxa` → pt, `pct` → %, `auto` → grid sum); `tblInd` and table
+  `jc` (centre/right); `table-layout: fixed` when `tblLayout` is fixed or all
+  widths are known.
+- **Cell padding** from cell margins: table style `tblCellMar` → table
+  `tblCellMar` → cell `tcMar` (`start`/`end` treated as `left`/`right`). Word's
+  default is 5.4pt left and right, 0 top and bottom.
+- **Borders**, Word's model: table-style `tblBorders` → table `tblBorders` → cell
+  `tcBorders`. A cell on the table's edge takes `top/left/bottom/right`; an
+  interior edge takes `insideH` / `insideV`. `none`/`nil` or nothing specified
+  draws no border (the grey fallback grid is removed). Widths are exact
+  (`sz` eighths of a point); single, double, dashed, dotted.
+- **Shading**: cell `shd` fill (including `themeFill`) and table-style shading.
+  The app's tint on every value cell is removed.
+- **Rows**: `trHeight` becomes a minimum height for both `atLeast` and `exact`, so
+  an exact row starts at the file's height and grows while a teacher types.
+- **Cells**: `vAlign` top/center/bottom → `vertical-align`. Merges (`gridSpan`,
+  `vMerge`) and nested tables work as today.
+- **Pictures**:
+  - inline (`wp:inline`) → `<img>` as a data URI at its `extent` size in points.
+  - floating (`wp:anchor`): `wrapSquare`/`wrapTight`/`wrapThrough` → CSS float
+    (left unless positioned right) with the `posOffset` as a margin, so text
+    wraps around it and two logos sit side by side; `wrapTopAndBottom` → block;
+    `wrapNone` or `behindDoc` → absolutely positioned in its paragraph.
+  - EMF/WMF or any image that can't be read is skipped; the page still renders.
+- **Hyperlinks** take the file's Hyperlink character style.
+
+### 4. Structure, errors, testing
+
+- **New module `backend/services/docx_layout.py`**: `Layout(doc)` is built once per
+  render and caches styles, theme, numbering and images. Its methods return CSS
+  strings or small HTML fragments: `page_css()`, `paragraph_css(p, table)`,
+  `run_css(run, p, table)`, `list_marker(p)`, `table_css(tbl)`,
+  `col_widths_pt(tbl)`, `cell_css(tc, row_idx, col_idx, n_rows, n_cols, tbl)`,
+  `row_css(tr)`, `picture_html(run)`, `slot_css(p)`.
+- `docx_service`'s `_render_*` functions call it and keep their HTML contract
+  (`lp-doc`, `lp-table`, `lp-td`, `lp-td-value`, `lp-p`, `lp-candidate`,
+  `data-anchor-index`, `lp-field*`, `data-field-key`, `data-part`). Slot planning,
+  anchors, weekly cells, detection and export are not touched. The old helpers it
+  replaces (`_run_style_css`, `_paragraph_html_classes` styling,
+  `_border_side_css`, `_table_default_borders`, `_cell_border_style`,
+  `_cell_shading_css`, `_table_col_widths_pct`) are deleted.
+- **Typed text**: an empty value cell's slot gets `slot_css`, the style of that
+  cell's first paragraph and its paragraph-mark run properties (what Word gives
+  new text there). `.lp-doc` gets the document-default font and size inline, so
+  inline slots inherit the file's text style.
+- **Frontend**:
+  - `style.css`: `.lp-doc` keeps only white background, shadow, `color:#000` and
+    `box-sizing`; `.lp-td` loses its border, padding and font size; the value-cell
+    tint and heading rules go; `.lp-doc-wrap` stays as the grey desk; the
+    `max-width` overrides on `.lp-doc` go.
+  - `doc-toolbar.js`: CSS `zoom`, Fit default, readout.
+  - A shared `fitDocPage(wrapEl)` helper for the two previews.
+  - Bump the `?v=` asset version.
+- **Errors**: every property read is wrapped so a malformed style, numbering,
+  theme or picture drops only that property. Missing `styles.xml`,
+  `numbering.xml` or theme → Word's built-in defaults (Calibri 11pt, spacing after
+  8pt, line 1.08). Return values of `render_template_html` and
+  `render_reference_html` are unchanged.
+- **Tests**: new `backend/test_render_fidelity.py`, assert-based and runnable
+  directly, using small .docx files generated with python-docx:
+  page size and margins; the cascade (defaults → style → direct); table-style
+  inner vs outer borders; cell margins; row minimum height; `vAlign`; list
+  counters ("1.", "2.", "a.", "•"); inline picture as data URI; floating picture
+  as float; `Type3` → Arial. Plus checks on the T1W7 sample: page 936pt wide, two
+  logos, the first objective carries "1.". And for every built-in, the rendered
+  view contains exactly as many `<img>` pictures as its source PDF's first page
+  (DLP 2, SNHS 2, ILAW 2), each with a non-empty data URI, so a missing logo
+  fails the test. The existing 13 backend tests and the
+  weekly-field tests keep passing.
+- **Visual check**: side-by-side images at the same scale, app at 100% against
+  the source PDF for the five built-ins and against LibreOffice's rendering for
+  the T1W7 sample, saved under
+  `docs/superpowers/screenshots/2026-09-26/fidelity/`; generator and format
+  builder checked in the browser at 1440 and 390px with Fit.
+- **Deploy**: backup, then the usual archive deploy to the VPS; verify health and
+  a rendered ILAW view.
+
+### 5. Repairing the five built-in templates
+
+Side-by-side renders of each source PDF against its converted .docx showed:
+
+| Format | Drift in the converted .docx |
+|---|---|
+| DLP (TUP) | header squeezed into a narrow middle column; Calibri lost; "A. / B." spacing lost; `www.tup.edu.ph` link text dropped |
+| 4A's | Century Gothic lost (falls back to a serif); header column widths wrong; "•", "1.", "a." markers lost |
+| SNHS DLP | label column twice the PDF's width; lettered items run together ("A.Content Standards"); stray tab gaps |
+| PAL3 SDLP | table wider than the page (last column cut off); label column too wide |
+| ILAW | PDF uses only unnamed `Type3` fonts; exact rows; table past the right edge |
+
+- **One-off repair script**, run once and not committed (like the earlier guide
+  sourcing). It reads each source PDF with PyMuPDF (text spans with font, size
+  and position; vector table rules; image rectangles) and writes corrected,
+  frozen .docx files over the current ones in `backend/builtin/formats/`.
+- **Fonts**: each run gets the font of the PDF span that drew its text, with the
+  subset prefix and PostScript suffixes stripped (`CenturyGothic-Bold` → Century
+  Gothic + bold, `ArialMT` → Arial, `ArialNarrow` → Arial Narrow, `Calibri-Bold`
+  → Calibri + bold). ILAW's `Type3` spans get Arial.
+- **Column widths**: `gridCol` and `tcW` from the x-positions of each table's
+  vertical rules in the PDF; every table fits inside the page width.
+- **Headers**: the DLP and SNHS header tables and the 4A's title take the PDF's
+  column split, and pictures take the PDF image sizes, so the TUP header centres
+  its six lines between the two logos as in the PDF.
+- **Lost text**: list markers ("•", "1.", "a.", "A.") and the DLP's
+  `www.tup.edu.ph` hyperlink are restored where the PDF shows them, as literal
+  text in the same paragraph (no new paragraphs).
+- **Row heights**: `hRule="exact"` becomes `atLeast` with the same height. A blank
+  template looks identical; a filled plan's row grows instead of clipping its
+  text in Word, fixing the export clipping seen on a real ILAW export.
+- **Guard**: paragraph and cell structure is unchanged: `_iter_items` yields the
+  same count, and a new check in `backend/test_builtins.py` asserts every field in
+  `formats.json` still anchors to a paragraph containing its label. No
+  `formats.json` field changes; the seeder serves the new files on next boot.
+- **Check**: side-by-side images (source PDF vs app view at 100%) for all five,
+  saved with the fidelity screenshots; plus one export of each rendered through
+  LibreOffice to confirm nothing clips.
+
+## Out of scope
+
+- Pagination and page breaks; headers, footers and text boxes (none of the six
+  files use them); custom tab stops; right-to-left text.

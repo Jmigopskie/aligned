@@ -15,7 +15,7 @@ backend/uploads/
 backend/generated/
 
 # Local tool state
-.impeccable/
+.impeccable/hook.cache.json
 .claude/
 .superpowers/
 .playwright-mcp/
