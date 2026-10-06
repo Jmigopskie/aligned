@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Course Guide / References — AlignED</title>
+  <title>Course Guide / References | AlignED</title>
   <link rel="icon" href="img/Icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-05e" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -21,7 +21,7 @@
         <img src="img/Icon.png" alt="" />
         <div>
           <div class="brand-name">AlignED</div>
-          <div class="brand-sub">TLE-ICT Lesson Plan Maker</div>
+          <div class="brand-sub">Lesson Plan Maker</div>
         </div>
       </div>
       <div class="topbar-actions">
@@ -57,31 +57,23 @@
       </aside>
 
       <main class="dash-main">
-        <h1 class="dash-page-title">Curriculum/Course Guide</h1>
-        <p class="text-sm mt-0" style="margin-bottom:22px;">A shared library of TLE-ICT curriculum guides and references every teacher can search when generating a lesson plan.</p>
-
-        <div id="error-box" class="alert alert-error" hidden></div>
-
-        <div class="panel" style="margin-bottom:24px;">
-          <div class="flex gap-8" style="align-items:flex-end; flex-wrap:wrap;">
-            <div class="field" style="flex:1; min-width:220px; margin-bottom:0;">
-              <label for="subject-input">Search by TLE-ICT topic</label>
-              <input type="text" id="subject-input" placeholder="e.g. Computer Systems Servicing, Programming, Web Development" />
-            </div>
-            <button class="btn btn-primary" id="search-btn" type="button">Search</button>
+        <div class="page-header">
+          <div class="page-heading">
+            <h1 class="dash-page-title">Curriculum and Course Guides</h1>
+            <p class="page-subtitle">DepEd's budgets of work and curriculum guides for ICT and Computer Programming, plus references other teachers shared. The generator can draw on any of them.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-secondary" id="upload-toggle-btn" type="button" aria-expanded="false" aria-controls="upload-panel"><span data-icon="upload"></span>Upload a guide</button>
           </div>
         </div>
 
-        <div class="section-card-header" style="margin-bottom:12px;">
-          <h2 style="font-size:16px;">Results</h2>
-          <button class="btn btn-secondary btn-sm" id="upload-toggle-btn" type="button">+ Upload a course guide</button>
-        </div>
+        <div id="error-box" class="alert alert-error" hidden></div>
 
-        <div class="panel" id="upload-panel" hidden style="margin-bottom:20px;">
+        <div class="panel upload-panel" id="upload-panel" hidden>
           <div class="intake-grid">
             <div class="field">
-              <label for="upload-subject">TLE-ICT topic *</label>
-              <input type="text" id="upload-subject" placeholder="e.g. Computer Systems Servicing, Web Development" />
+              <label for="upload-subject">TLE topic *</label>
+              <input type="text" id="upload-subject" placeholder="e.g. Computer Systems Servicing, Food Preparation, Residential Plumbing" />
             </div>
             <div class="field">
               <label for="upload-title">Title</label>
@@ -94,18 +86,69 @@
           <input type="file" id="cg-file-input" accept=".docx,.dotx,.pdf" hidden />
         </div>
 
-        <div id="results-empty" class="empty-state" hidden>
-          <h3>No course guides yet</h3>
-          <p>Be the first to upload a TLE-ICT course guide for other teachers to use.</p>
+        <div class="guide-filters" role="search" aria-label="Filter guides">
+          <div class="field guide-search">
+            <label for="subject-input">Search</label>
+            <input type="search" id="subject-input" placeholder="e.g. Computer Systems Servicing, HTML" autocomplete="off" />
+          </div>
+          <div class="guide-filter-group">
+            <span class="guide-filter-label" id="grade-label">Grade</span>
+            <div class="chip-row" id="grade-chips" role="group" aria-labelledby="grade-label">
+              <button type="button" class="chip" data-band="" aria-pressed="true">All</button>
+              <button type="button" class="chip" data-band="4-6" aria-pressed="false">4 to 6</button>
+              <button type="button" class="chip" data-band="7-8" aria-pressed="false">7 to 8</button>
+              <button type="button" class="chip" data-band="9-10" aria-pressed="false">9 to 10</button>
+              <button type="button" class="chip" data-band="SHS" aria-pressed="false">SHS</button>
+            </div>
+          </div>
+          <div class="guide-filter-group">
+            <span class="guide-filter-label" id="subject-label">Subject</span>
+            <div class="chip-row" id="subject-filter" role="group" aria-labelledby="subject-label">
+              <button type="button" class="chip" data-subject="" aria-pressed="true">All</button>
+              <button type="button" class="chip" data-subject="ICT" aria-pressed="false">ICT</button>
+              <button type="button" class="chip" data-subject="CP (ComProg)" aria-pressed="false">Computer Programming</button>
+              <button type="button" class="chip" data-subject="AFA" aria-pressed="false">AFA</button>
+              <button type="button" class="chip" data-subject="HE (FCS)" aria-pressed="false">HE (FCS)</button>
+              <button type="button" class="chip" data-subject="IA" aria-pressed="false">IA</button>
+              <button type="button" class="chip" data-subject="Electrical (EES)" aria-pressed="false">Electrical</button>
+            </div>
+          </div>
+          <div class="field guide-type">
+            <label for="type-filter">Type</label>
+            <select id="type-filter">
+              <option value="">All types</option>
+              <option value="budget_of_work">Budget of Work</option>
+              <option value="curriculum_guide">Curriculum Guide</option>
+            </select>
+          </div>
         </div>
 
-        <div id="results-grid" class="card-grid"></div>
+        <div id="results-empty" class="empty-state" hidden>
+          <h2>No course guides yet</h2>
+          <p>Be the first to upload a course guide for other teachers to use.</p>
+          <button type="button" class="btn btn-secondary" id="clear-filters-btn" hidden>Clear filters</button>
+        </div>
+
+        <section class="format-section" id="official-guides-section" hidden aria-labelledby="official-title">
+          <div class="format-section-head">
+            <h2 class="section-title" id="official-title">Official DepEd</h2>
+            <p class="section-note">Downloaded from DepEd and kept as published. The generator uses their text when you pick one.</p>
+          </div>
+          <div id="official-grid" class="guide-list"></div>
+        </section>
+
+        <section class="format-section" id="shared-guides-section" hidden aria-labelledby="shared-guides-title">
+          <div class="format-section-head">
+            <h2 class="section-title" id="shared-guides-title">Shared by teachers</h2>
+          </div>
+          <div id="results-grid" class="guide-list"></div>
+        </section>
       </main>
     </div>
   </div>
 
-  <script src="js/api.js"></script>
-  <script src="js/icons.js"></script>
+  <script src="js/api.js?v=2026-10-05e"></script>
+  <script src="js/icons.js?v=2026-10-05e"></script>
   <script src="js/course-guides.js"></script>
 </body>
 </html>

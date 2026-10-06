@@ -15,6 +15,7 @@ from docx.text.hyperlink import Hyperlink
 from docx.text.paragraph import Paragraph
 
 from config import Config
+from services import docx_layout
 
 _log = logging.getLogger(__name__)
 
@@ -23,6 +24,9 @@ _SIGNATURE_RE = re.compile(r"^(prepared|checked|noted)\s+by\b", re.IGNORECASE)
 _STOPWORDS = {"the", "a", "an", "of", "for", "by", "and", "or", "to", "in", "on"}
 _PREAMBLE_MATCH_WINDOW = 1
 _LABEL_MAX_CHARS = 100
+# "Label: instructions..." in one paragraph. The label may wrap over lines in a
+# narrow cell ("Opportunities for\nintegration and\ncontextualization:").
+_LONG_LABEL_RE = re.compile(r"^\s*([^:]{2,90}?)\s*:\s*\S", re.S)
 
 def export_lesson_plan(plan, fmt) -> str:
     template_path = resolve_template_path(fmt)
@@ -274,7 +278,8 @@ def render_template_html(fmt):
             "unmatched_fields": [f.field_key for f in fields_sorted],
         }
 
-    slots, cell_value_targets = _plan_html_slots(doc, items, anchors)
+    weekly_keys = {f.field_key for f in fields_sorted if f.field_type == "weekly"}
+    slots, cell_value_targets = _plan_html_slots(doc, items, anchors, weekly_keys)
     html = _render_doc_body_html(doc, items, slots, cell_value_targets)
 
     return {
@@ -331,10 +336,11 @@ def candidate_label_lines(source_path):
         return None
 
     items = _iter_items(doc)
+    header = _day_header(doc)
     lines = []
     for idx, item in enumerate(items):
         text = _element_text(doc, item["el"])
-        if not text or len(text) > _LABEL_MAX_CHARS:
+        if not text:
             continue
 
         # A table cell's second and later lines are typically explanatory
@@ -345,10 +351,60 @@ def candidate_label_lines(source_path):
         if item["cell"] is not None and not _is_first_textual_line_in_cell(doc, items, idx):
             continue
 
+        # A line that starts mid-sentence is the tail of text cut at a page
+        # break when a PDF was converted ("guidance or support throughout each
+        # session."), never a label. A weekday is a column header.
+        if text[:1].islower() or text.lower() in _WEEKDAY_NAMES:
+            continue
+
+        # DepEd templates often put the label and its instructions in one
+        # paragraph ("Flow: Describe the activities that you can implement...").
+        # Too long to be a label as a whole, but the part before the colon is.
+        if len(text) > _LABEL_MAX_CHARS:
+            match = _LONG_LABEL_RE.match(text)
+            label = " ".join(match.group(1).split()) if match else ""
+            if not label or len(label) > 60:
+                continue
+            text = label + ":"
+
+        cells = _weekly_cells(item) if item["cell"] is not None else []
+        # A table label whose next cell already holds text, with no blank of
+        # its own beside, under or inside it, is either answered in the
+        # template ("School: | EMMANUEL ... IHS") or a heading over the real
+        # fields ("Learning Competency and Curriculum Standards:"). As a field
+        # it would only steal a neighbour's blank cell.
+        if (item["cell"] is not None and not cells and _next_cell_has_text(item)
+                and not _blank_lines_after_in_cell(item)):
+            continue
+
         if _looks_like_label(text) or _has_fillable_slot(doc, items, idx):
-            lines.append({"index": idx, "text": text})
+            entry = {"index": idx, "text": text}
+            if item["cell"] is not None:
+                entry["blank_cells"] = len(cells)
+                if len(cells) >= 2:
+                    entry["parts"] = weekly_part_labels(doc, cells, header)
+            lines.append(entry)
 
     return lines
+
+def _next_cell_has_text(item):
+    """Whether the cell right after this one in its row already holds text."""
+    row_cells, col_idx, cell = item["row_cells"], item["col_idx"], item["cell"]
+    if not row_cells or col_idx is None:
+        return False
+    for other in row_cells[col_idx + 1:]:
+        if other._tc is cell._tc:
+            continue  # the same merged cell repeated by python-docx
+        return bool(other.text.strip())
+    return False
+
+
+def _blank_lines_after_in_cell(item):
+    """Whether the label's own cell has blank lines under it to write into."""
+    paragraphs = item["cell"].paragraphs
+    pos = next((i for i, p in enumerate(paragraphs) if p._p is item["el"]), None)
+    return pos is not None and any(not p.text.strip() for p in paragraphs[pos + 1:])
+
 
 def _is_first_textual_line_in_cell(doc, items, idx):
     cell = items[idx]["cell"]
@@ -360,7 +416,7 @@ def _is_first_textual_line_in_cell(doc, items, idx):
             return False
     return True
 
-def _render_block_children(doc, parent_el, slots, cell_value_targets, index_by_el_id):
+def _render_block_children(doc, parent_el, slots, cell_value_targets, index_by_el_id, layout):
     """Render the paragraph/table children of any container element, in
     document order. Used for both the document body and a table cell's
     contents — a table nested inside another table's cell (a common way to
@@ -371,18 +427,22 @@ def _render_block_children(doc, parent_el, slots, cell_value_targets, index_by_e
     parts = []
     for child in parent_el:
         if child.tag == qn("w:p"):
-            parts.append(_render_html_paragraph(doc, child, slots, index_by_el_id))
+            parts.append(_render_html_paragraph(doc, child, slots, index_by_el_id, layout))
         elif child.tag == qn("w:tbl"):
-            parts.append(_render_html_table(doc, Table(child, doc), slots, cell_value_targets, index_by_el_id))
+            parts.append(_render_html_table(doc, Table(child, doc), slots, cell_value_targets, index_by_el_id, layout))
         # w:tcPr / w:sectPr and anything else is layout metadata, not content.
     return "".join(parts)
 
 def _render_doc_body_html(doc, items, slots, cell_value_targets):
+    # One Layout per render: it resolves Word's styles once, and its list
+    # counters advance as paragraphs are drawn in document order.
+    layout = docx_layout.Layout(doc)
     index_by_el_id = {id(item["el"]): idx for idx, item in enumerate(items)}
-    body_html = _render_block_children(doc, doc.element.body, slots, cell_value_targets, index_by_el_id)
-    return '<div class="lp-doc">' + body_html + "</div>"
+    body_html = _render_block_children(doc, doc.element.body, slots, cell_value_targets, index_by_el_id, layout)
+    page_css, page_width = layout.page()
+    return f'<div class="lp-doc"{_style_attr(page_css)} data-page-width="{page_width:g}">' + body_html + "</div>"
 
-def _plan_html_slots(doc, items, anchors):
+def _plan_html_slots(doc, items, anchors, weekly_keys=frozenset()):
     """Decide, for each matched field, where its editable value slot goes in the
     HTML — mirroring the same priority order the real .docx fill uses (an empty
     sibling cell in the same row, then appending within the same cell, then
@@ -391,8 +451,9 @@ def _plan_html_slots(doc, items, anchors):
 
     Returns:
       slots: {id(anchor_paragraph_el): (field_key, "inline" | "same_cell" | "block")}
-      cell_value_targets: {id(cell._tc): field_key} -- cells that themselves ARE
-        the value slot for a field labeled earlier in the same row.
+      cell_value_targets: {id(cell._tc): (field_key, part)} -- cells that
+        themselves ARE the value slot for a field labeled earlier in the same
+        row; part is the day index of a weekly field, None otherwise.
     """
     slots = {}
     cell_value_targets = {}
@@ -408,10 +469,18 @@ def _plan_html_slots(doc, items, anchors):
         row_cells = item["row_cells"]
         col_idx = item["col_idx"]
 
+        if field_key in weekly_keys:
+            day_cells = [c for c in _weekly_cells(item) if id(c[0]) not in claimed_cells]
+            if day_cells:
+                for part, (tc, _start, _span) in enumerate(day_cells):
+                    cell_value_targets[id(tc)] = (field_key, part)
+                    claimed_cells.add(id(tc))
+                continue
+
         if cell is not None and row_cells and col_idx is not None:
             sibling = _find_empty_sibling_cell(row_cells, cell, col_idx, claimed_cells)
             if sibling is not None:
-                cell_value_targets[id(sibling._tc)] = field_key
+                cell_value_targets[id(sibling._tc)] = (field_key, None)
                 claimed_cells.add(id(sibling._tc))
                 continue
 
@@ -430,83 +499,28 @@ def _html_escape(text):
     # would otherwise be able to break out of href="..." and inject markup.
     return html_lib.escape(text or "")
 
-def _paragraph_html_classes(para, text):
-    classes = ["lp-p"]
-    if para.runs and para.runs[0].bold:
-        classes.append("lp-bold")
-    if _HEADING_RE.match(text) or (para.runs and para.runs[0].bold and len(text) < 60):
-        classes.append("lp-heading")
-    return " ".join(classes)
+def _style_attr(css):
+    """ style="..." for layout CSS, escaped. Layout already keeps only colours
+    and font names that are what they claim to be; this is the backstop, since
+    the .docx is one teacher's upload shown to others."""
+    # Inside a double-quoted attribute only & < > and " can break out; the
+    # single quotes around font names stay readable.
+    escaped = html_lib.escape(css, quote=False).replace('"', "&quot;")
+    return f' style="{escaped}"' if css else ""
 
-_ALIGN_CSS = {
-    WD_ALIGN_PARAGRAPH.CENTER: "center",
-    WD_ALIGN_PARAGRAPH.RIGHT: "right",
-    WD_ALIGN_PARAGRAPH.JUSTIFY: "justify",
-    WD_ALIGN_PARAGRAPH.DISTRIBUTE: "justify",
-    WD_ALIGN_PARAGRAPH.JUSTIFY_LOW: "justify",
-    WD_ALIGN_PARAGRAPH.JUSTIFY_MED: "justify",
-    WD_ALIGN_PARAGRAPH.JUSTIFY_HI: "justify",
-}
+# The only links a document may carry: never javascript: or data:.
+_SAFE_HREF_RE = re.compile(r"^(https?:|mailto:)", re.IGNORECASE)
 
-def _paragraph_align_style(para):
-    try:
-        align = para.alignment
-    except Exception:
-        return ""
-    css = _ALIGN_CSS.get(align)
-    return f" text-align:{css};" if css else ""
-
-# Word's highlight enum back to a CSS colour, so a highlighted run in the file
-# still looks highlighted in the canvas.
-_HIGHLIGHT_CSS = {
-    WD_COLOR_INDEX.YELLOW: "#FDE68A",
-    WD_COLOR_INDEX.BRIGHT_GREEN: "#BBF7D0",
-    WD_COLOR_INDEX.TURQUOISE: "#A5F3FC",
-}
-
-
-def _run_style_css(run):
-    parts = []
-    if run.bold:
-        parts.append("font-weight:700")
-    if run.italic:
-        parts.append("font-style:italic")
-    if run.underline:
-        parts.append("text-decoration:underline")
-
-    # Read back with a try/except throughout: a run whose font properties are
-    # inherited from a style rather than set directly raises instead of
-    # returning None on some documents, and a canvas that renders is worth more
-    # than one that reports the exact colour.
-    try:
-        if run.font.size is not None:
-            parts.append(f"font-size:{run.font.size.pt:.0f}pt")
-    except Exception:
-        pass
-    try:
-        rgb = run.font.color.rgb if run.font.color is not None else None
-        if rgb is not None:
-            parts.append(f"color:#{rgb}")
-    except Exception:
-        pass
-    try:
-        css = _HIGHLIGHT_CSS.get(run.font.highlight_color)
-        if css:
-            parts.append(f"background-color:{css}")
-    except Exception:
-        pass
-
-    return ";".join(parts)
-
-def _run_html(run):
+def _run_html(run, layout, p_el):
+    pictures = layout.pictures(run._r)
     text = run.text
     if not text:
-        return ""
+        return pictures
+    style = layout.run_css(run._r, p_el)
     escaped = _html_escape(text)
-    style = _run_style_css(run)
-    return f'<span style="{style}">{escaped}</span>' if style else escaped
+    return pictures + (f'<span{_style_attr(style)}>{escaped}</span>' if style else escaped)
 
-def _render_runs_html(para):
+def _render_runs_html(para, layout):
     """Render each run as its own span so mixed formatting within one
     paragraph (e.g. a bold label followed by a plain colon) survives in the
     HTML instead of being collapsed to a single paragraph-wide guess.
@@ -516,27 +530,41 @@ def _render_runs_html(para):
     .runs at all, so relying on .runs alone would silently drop it even
     though para.text (used for anchor/heading detection) does include it.
     """
+    p_el = para._p
     out = []
     for item in para.iter_inner_content():
         if isinstance(item, Hyperlink):
-            inner = "".join(_run_html(r) for r in item.runs)
+            inner = "".join(_run_html(r, layout, p_el) for r in item.runs)
             if not inner:
                 continue
-            href = _html_escape(item.address or "")
+            address = (item.address or "").strip()
+            href = _html_escape(address) if _SAFE_HREF_RE.match(address) else ""
             out.append(f'<a href="{href}" target="_blank" rel="noopener">{inner}</a>' if href else inner)
         else:
-            out.append(_run_html(item))
+            out.append(_run_html(item, layout, p_el))
     return "".join(out)
 
-def _render_html_paragraph(doc, p_el, slots, index_by_el_id=None):
+def _render_html_paragraph(doc, p_el, slots, index_by_el_id, layout):
     para = Paragraph(p_el, doc)
     text = para.text
-    classes = _paragraph_html_classes(para, text)
-    if _looks_like_label(text):
-        classes += " lp-candidate"
-    style_attr = _paragraph_align_style(para)
-    style_attr = f' style="{style_attr.strip()}"' if style_attr else ""
-    inner = _render_runs_html(para) if text.strip() else "&nbsp;"
+    classes = "lp-p lp-candidate" if _looks_like_label(text) else "lp-p"
+
+    # Everything visual comes from the file (docx_layout). A list number is an
+    # attribute drawn by CSS ::before, never text in the paragraph: both editors
+    # read a paragraph's text back from the page, and a marker in it would be
+    # saved into the document as typed text.
+    style, marker = layout.paragraph(p_el)
+    marker_attr = ""
+    if marker:
+        marker_attr = f' data-marker="{_html_escape(marker["text"])}"'
+        if marker["width"]:
+            width = f"--lp-marker-w:{marker['width']:g}pt"
+            style = f"{style};{width}" if style else width
+    style_attr = _style_attr(style)
+
+    inner = _render_runs_html(para, layout)
+    if "<img" not in inner and not text.strip():
+        inner = "&nbsp;"
 
     anchor_attr = ""
     if index_by_el_id is not None:
@@ -544,27 +572,29 @@ def _render_html_paragraph(doc, p_el, slots, index_by_el_id=None):
         if idx is not None:
             anchor_attr = f' data-anchor-index="{idx}"'
 
+    open_tag = f'<p class="{classes}"{style_attr}{marker_attr}{anchor_attr}>'
     slot = slots.get(id(p_el))
     if not slot:
-        return f'<p class="{classes}"{style_attr}{anchor_attr}>{inner}</p>'
+        return f"{open_tag}{inner}</p>"
 
     field_key, kind = slot
     if kind == "inline":
         return (
-            f'<p class="{classes}"{style_attr}{anchor_attr}>{inner} '
+            f'{open_tag}{inner} '
             f'<span class="lp-field lp-field-inline" data-field-key="{field_key}" '
             f'contenteditable="true"></span></p>'
         )
 
     # "block" or "same_cell" — label paragraph stays read-only, the value gets
-    # its own editable block right after it (inside the same cell, if any).
+    # its own editable block right after it (inside the same cell, if any),
+    # in the style Word would give text typed there.
+    slot_css = layout.slot_css(p_el)
+    slot_style = _style_attr(slot_css)
     return (
-        f'<p class="{classes}"{style_attr}{anchor_attr}>{inner}</p>'
-        f'<div class="lp-field lp-field-block" data-field-key="{field_key}" '
+        f'{open_tag}{inner}</p>'
+        f'<div class="lp-field lp-field-block" data-field-key="{field_key}"{slot_style} '
         f'contenteditable="true"></div>'
     )
-
-_BORDER_SIDES = ("top", "left", "bottom", "right")
 
 def _tc_pr(tc):
     return tc.find(qn("w:tcPr"))
@@ -581,89 +611,29 @@ def _cell_grid_span(tc):
     except (TypeError, ValueError):
         return 1
 
-def _border_side_css(side_el):
-    val = side_el.get(qn("w:val")) or "single"
-    if val in ("none", "nil"):
-        return "none"
-    try:
-        sz = int(side_el.get(qn("w:sz")))
-    except (TypeError, ValueError):
-        sz = 4
-    width_px = max(1, round(sz / 8 * 1.333))
-    color = (side_el.get(qn("w:color")) or "").strip()
-    if not color or color.lower() == "auto":
-        color = "000000"
-    style = {"double": "double", "dashed": "dashed", "dotted": "dotted"}.get(val, "solid")
-    return f"{width_px}px {style} #{color}"
-
-def _borders_from_element(borders_el):
-    if borders_el is None:
-        return {}
-    out = {}
-    for side in _BORDER_SIDES:
-        side_el = borders_el.find(qn(f"w:{side}"))
-        if side_el is not None:
-            out[side] = _border_side_css(side_el)
-    return out
-
-def _table_default_borders(tbl_el):
-    tblPr = tbl_el.find(qn("w:tblPr"))
-    if tblPr is None:
-        return {}
-    return _borders_from_element(tblPr.find(qn("w:tblBorders")))
-
-def _cell_border_style(tc, default_borders):
-    tcPr = _tc_pr(tc)
-    cell_borders = _borders_from_element(tcPr.find(qn("w:tcBorders"))) if tcPr is not None else {}
-    merged = {**default_borders, **cell_borders}
-    # Only emit sides we actually found real data for — an unspecified side
-    # falls through to the CSS default grid instead of being forced blank.
-    return "".join(f"border-{side}:{css};" for side, css in merged.items())
-
-def _cell_shading_css(tc):
-    tcPr = _tc_pr(tc)
-    if tcPr is None:
-        return ""
-    shd = tcPr.find(qn("w:shd"))
-    if shd is None:
-        return ""
-    fill = (shd.get(qn("w:fill")) or "").strip()
-    if not fill or fill.lower() in ("auto", "ffffff"):
-        return ""
-    return f"background-color:#{fill};"
-
-def _table_col_widths_pct(tbl_el):
-    grid = tbl_el.find(qn("w:tblGrid"))
-    if grid is None:
-        return None
-    widths = []
-    for col in grid.findall(qn("w:gridCol")):
-        try:
-            widths.append(int(col.get(qn("w:w"))))
-        except (TypeError, ValueError):
-            widths.append(0)
-    total = sum(widths)
-    if not widths or total <= 0:
-        return None
-    return [w / total * 100 for w in widths]
-
-def _render_html_cell(doc, cell, slots, cell_value_targets, default_borders, colspan=1, rowspan=1, index_by_el_id=None):
-    style = _cell_border_style(cell._tc, default_borders) + _cell_shading_css(cell._tc)
-    style_attr = f' style="{style}"' if style else ""
+def _render_html_cell(doc, cell, slots, cell_value_targets, cell_css, colspan, rowspan, index_by_el_id, layout):
+    style_attr = _style_attr(cell_css)
     span_attr = (f' colspan="{colspan}"' if colspan > 1 else "") + (f' rowspan="{rowspan}"' if rowspan > 1 else "")
 
-    field_key = cell_value_targets.get(id(cell._tc))
-    if field_key:
+    target = cell_value_targets.get(id(cell._tc))
+    if target:
         # This cell IS the (originally empty) value slot for a label earlier in
         # the same row — replace its near-empty content with one editable slot
-        # instead of rendering its blank paragraphs.
+        # instead of rendering its blank paragraphs. A weekly field's day cells
+        # each carry which part (day) they hold. The slot takes the style Word
+        # gives text typed into this cell.
+        field_key, part = target
+        part_attr = f' data-part="{part}"' if part is not None else ""
+        first_p = cell._tc.find(qn("w:p"))
+        slot_css = layout.slot_css(first_p) if first_p is not None else ""
+        slot_style = _style_attr(slot_css)
         return (
             f'<td class="lp-td lp-td-value"{span_attr}{style_attr}>'
-            f'<div class="lp-field lp-field-cell" data-field-key="{field_key}" '
+            f'<div class="lp-field lp-field-cell" data-field-key="{field_key}"{part_attr}{slot_style} '
             f'contenteditable="true"></div></td>'
         )
 
-    inner = _render_block_children(doc, cell._tc, slots, cell_value_targets, index_by_el_id)
+    inner = _render_block_children(doc, cell._tc, slots, cell_value_targets, index_by_el_id, layout)
     return f'<td class="lp-td"{span_attr}{style_attr}>{inner or "&nbsp;"}</td>'
 
 def _vmerge_rowspans(rows_cells):
@@ -707,16 +677,17 @@ def _vmerge_rowspans(rows_cells):
 
     return origin_rowspan, skip
 
-def _render_html_table(doc, table, slots, cell_value_targets, index_by_el_id=None):
+def _render_html_table(doc, table, slots, cell_value_targets, index_by_el_id, layout):
     tbl_el = table._tbl
-    default_borders = _table_default_borders(tbl_el)
-    col_widths = _table_col_widths_pct(tbl_el)
-
-    rows_cells = [row.cells for row in table.rows]
+    table_css, grid = layout.table(tbl_el)
+    rows = list(table.rows)
+    rows_cells = [row.cells for row in rows]
     origin_rowspan, vmerge_skip = _vmerge_rowspans(rows_cells)
+    n_rows = len(rows_cells)
+    n_cols = len(grid) or max((len(rc) for rc in rows_cells), default=0)
 
     rows_html = []
-    for row_idx, row_cells in enumerate(rows_cells):
+    for row_idx, (row, row_cells) in enumerate(zip(rows, rows_cells)):
         seen_tc_ids = set()
         cells_html = []
         for col_idx, cell in enumerate(row_cells):
@@ -730,16 +701,20 @@ def _render_html_table(doc, table, slots, cell_value_targets, index_by_el_id=Non
             seen_tc_ids.add(tc_id)
             colspan = _cell_grid_span(cell._tc)
             rowspan = origin_rowspan.get((row_idx, col_idx), 1)
+            cell_css = layout.cell(cell._tc, tbl_el, top=row_idx == 0, bottom=row_idx + rowspan >= n_rows,
+                                   left=col_idx == 0, right=col_idx + colspan >= n_cols)
             cells_html.append(_render_html_cell(
-                doc, cell, slots, cell_value_targets, default_borders, colspan, rowspan, index_by_el_id
+                doc, cell, slots, cell_value_targets, cell_css, colspan, rowspan, index_by_el_id, layout
             ))
-        rows_html.append(f"<tr>{''.join(cells_html)}</tr>")
+        row_css = layout.row(row._tr)
+        row_attr = _style_attr(row_css)
+        rows_html.append(f"<tr{row_attr}>{''.join(cells_html)}</tr>")
 
     colgroup = ""
-    if col_widths:
-        colgroup = "<colgroup>" + "".join(f'<col style="width:{w:.3f}%">' for w in col_widths) + "</colgroup>"
-
-    return f'<table class="lp-table">{colgroup}{"".join(rows_html)}</table>'
+    if grid:
+        colgroup = "<colgroup>" + "".join(f'<col style="width:{round(w, 2):g}pt">' for w in grid) + "</colgroup>"
+    style_attr = _style_attr(table_css)
+    return f'<table class="lp-table"{style_attr}>{colgroup}{"".join(rows_html)}</table>'
 
 def resolve_source_path(fmt):
     raw = (fmt.source_file_path or "").strip()
@@ -876,6 +851,10 @@ def _has_fillable_slot(doc, items, idx):
         if _find_empty_sibling_cell(row_cells, cell, col_idx) is not None:
             return True
 
+    # A merged header label whose blank answer cells are in the row below.
+    if cell is not None and _weekly_cells(item):
+        return True
+
     if cell is not None:
         cell_paragraphs = cell.paragraphs
         anchor_pos = next((i for i, p in enumerate(cell_paragraphs) if p._p is item["el"]), None)
@@ -915,6 +894,138 @@ def _find_empty_sibling_cell(row_cells, cell, col_idx, claimed=None):
         if _cell_is_empty(candidate):
             return candidate
     return None
+
+# ---- Weekly fields: one answer per day, each in its own cell ----
+# A weekly lesson plan (ILAW) answers most rows once per day, under a
+# MONDAY..FRIDAY header, so one field has several blank cells rather than one.
+
+_WEEKDAY_NAMES = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
+
+def _tc_text(tc):
+    return "".join(t.text or "" for t in tc.iter(qn("w:t"))).strip()
+
+
+def _row_grid(tr):
+    """[(tc, start_col, span), ...] for one table row, in grid columns, so cells
+    in different rows (or tables built on the same grid) can be lined up."""
+    col = 0
+    trpr = tr.find(qn("w:trPr"))
+    if trpr is not None:
+        before = trpr.find(qn("w:gridBefore"))
+        if before is not None:
+            col = int(before.get(qn("w:val")) or 0)
+    out = []
+    for tc in tr.findall(qn("w:tc")):
+        span = _cell_grid_span(tc)
+        out.append((tc, col, span))
+        col += span
+    return out
+
+
+def _table_grid_width(tbl):
+    return len(tbl.findall(qn("w:tblGrid") + "/" + qn("w:gridCol")))
+
+
+def _day_header(doc):
+    """The document's day header: ({grid_col: "Monday", ...}, table grid width)
+    from the first table row naming at least three weekdays, or (None, None)."""
+    for tbl in doc.element.body.iter(qn("w:tbl")):
+        for tr in tbl.findall(qn("w:tr")):
+            labels = {}
+            for tc, start, _span in _row_grid(tr):
+                text = _tc_text(tc).lower()
+                if text in _WEEKDAY_NAMES:
+                    labels[start] = text.capitalize()
+            if len(labels) >= 3:
+                return labels, _table_grid_width(tbl)
+    return None, None
+
+
+def _weekly_cells(item):
+    """Where a weekly field's parts go, left to right, as [(tc, start_col, span)]:
+    the run of blank cells right after the label in its own row or, when the
+    label is the last cell of a merged header row ("Performance Standards:"
+    spanning the week), the blank cells directly under it in the next row."""
+    cell = item.get("cell")
+    if cell is None:
+        return []
+    label_tc = cell._tc
+    tr = label_tc.getparent()
+    if tr is None or tr.tag != qn("w:tr"):
+        return []
+    grid = _row_grid(tr)
+    pos = next((i for i, g in enumerate(grid) if g[0] is label_tc), None)
+    if pos is None:
+        return []
+
+    beside = []
+    for tc, start, span in grid[pos + 1:]:
+        if _tc_text(tc):
+            break
+        beside.append((tc, start, span))
+    if beside or pos + 1 < len(grid):
+        return beside
+
+    _tc, label_start, label_span = grid[pos]
+    below_tr = tr.getnext()
+    while below_tr is not None and below_tr.tag != qn("w:tr"):
+        below_tr = below_tr.getnext()
+    if below_tr is None:
+        return []
+    below = [(tc, start, span) for tc, start, span in _row_grid(below_tr)
+             if start >= label_start and start + span <= label_start + label_span]
+    if len(below) >= 2 and all(not _tc_text(tc) for tc, _s, _sp in below):
+        return below
+    return []
+
+
+def weekly_part_labels(doc, cells, header=None):
+    """A name for each weekly part: the day(s) above its column in the day
+    header when the document has one ("Monday", or "Monday to Tuesday" for a
+    cell spanning two days), otherwise "Column 1", "Column 2"..."""
+    labels, width = header if header is not None else _day_header(doc)
+    fallback = [f"Column {i}" for i in range(1, len(cells) + 1)]
+    if not labels or not cells:
+        return fallback
+    tbl = cells[0][0].getparent().getparent()
+    if tbl is not None and _table_grid_width(tbl) == width:
+        names = []
+        for _tc, start, span in cells:
+            covered = [labels[c] for c in range(start, start + span) if c in labels]
+            if not covered:
+                return fallback
+            names.append(covered[0] if len(covered) == 1 else f"{covered[0]} to {covered[-1]}")
+        return names
+    ordered = [labels[c] for c in sorted(labels)]
+    return ordered if len(ordered) == len(cells) else fallback
+
+
+def _weekly_parts(value, count):
+    """A weekly value as exactly `count` strings. Older saves or a model that
+    answered with one string still land, in the first part."""
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, (list, tuple)):
+        value = []
+    parts = ["" if v is None else str(v) for v in value][:count]
+    return parts + [""] * (count - len(parts))
+
+
+def _fill_weekly(doc, items, idx, value, rich, claimed_cells):
+    """Write each part of a weekly value into its own cell, leaving a part with
+    nothing in it blank rather than borrowing another day's text."""
+    cells = [c for c in _weekly_cells(items[idx]) if id(c[0]) not in claimed_cells]
+    parts = _weekly_parts(value, len(cells))
+    rich_parts = list(rich) if isinstance(rich, (list, tuple)) else []
+    for i, (tc, _start, _span) in enumerate(cells):
+        claimed_cells.add(id(tc))
+        paragraphs = [Paragraph(p, None) for p in tc.findall(qn("w:p"))]
+        rich_html = rich_parts[i] if i < len(rich_parts) else ""
+        if rich_html:
+            _fill_paragraphs_rich(doc, paragraphs, parse_rich_value(rich_html))
+        elif parts[i].strip():
+            _fill_paragraphs(doc, paragraphs, parts[i])
 
 def _fill_paragraphs(doc, paragraphs, value):
     """Write value's lines into an existing run of (assumed blank) paragraphs,
@@ -1216,7 +1327,9 @@ def _export_from_template(plan, fmt, template_path) -> str:
     # document the teacher actually edited.
     apply_doc_edits(doc, items, plan.get_doc_edits())
 
-    consumed = _fill_labeled_blanks(doc, items, fields_sorted, anchors, values)
+    # Weekly fields always fill their own day cells, never an inline blank.
+    consumed = _fill_labeled_blanks(
+        doc, items, [f for f in fields_sorted if f.field_type != "weekly"], anchors, values)
 
     other_anchor_els = {
         id(items[anchors[f.field_key]]["el"])
@@ -1240,6 +1353,11 @@ def _export_from_template(plan, fmt, template_path) -> str:
     for field in cell_fields:
         idx = anchors[field.field_key]
         rich_html = rich_values.get(field.field_key)
+        if field.field_type == "weekly" and _weekly_cells(items[idx]):
+            _fill_weekly(doc, items, idx, values.get(field.field_key), rich_html, claimed_cells)
+            continue
+        if isinstance(rich_html, list):
+            rich_html = "<br>".join(part for part in rich_html if part)
         if rich_html:
             _fill_cell_value_rich(doc, items, idx, parse_rich_value(rich_html), claimed_cells)
         else:
@@ -1595,6 +1713,20 @@ def _add_field_value(doc, field, value, style):
         run = para.add_run(text)
         _apply_style(run, style, bold_override=False)
         return para
+
+    # A weekly value, outside its day cells, reads as one labelled line per day.
+    if field.field_type == "weekly" and isinstance(value, list):
+        names = field.parts_list or []
+        written = False
+        for i, part in enumerate(value):
+            text = " ".join(str(part or "").split())
+            if text:
+                name = names[i] if i < len(names) else f"Part {i + 1}"
+                _line(f"{name}: {text}")
+                written = True
+        if not written:
+            _line("-")
+        return
 
     if isinstance(value, list):
         items = [str(v).strip() for v in value if str(v).strip()]

@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import uuid
@@ -53,19 +54,41 @@ def _build_format_fields(format_id, fields_payload):
         if role not in ("heavy", "easy"):
             role = None
 
+        field_type = f.get("field_type", "textarea")
+        # A weekly field keeps the names of its parts (days); anything else,
+        # or a malformed list, carries none.
+        parts = f.get("parts")
+        if field_type == "weekly" and isinstance(parts, list) and parts:
+            parts = json.dumps([str(p).strip()[:40] for p in parts[:10]])
+        else:
+            parts = None
+
         rows.append(FormatField(
             format_id=format_id,
             field_key=final_key,
             label=label,
-            field_type=f.get("field_type", "textarea"),
+            field_type=field_type,
             section_group=f.get("section_group"),
             sort_order=f.get("sort_order", i),
             is_required=bool(f.get("is_required", True)),
             ai_hint=f.get("ai_hint"),
             anchor_index=anchor_index,
             role=role,
+            parts=parts,
         ))
     return rows
+
+def _reject_if_builtin(fmt):
+    """The ready-made formats are shared by everyone and seeded from files in
+    the repository, so nobody may change them, not even the admin account
+    that nominally owns them. Checked before ownership so the answer is the
+    same for every user. Returns an error response, or None to carry on."""
+    if fmt.is_builtin:
+        return jsonify({
+            "status": "error",
+            "message": "Built-in formats are read-only. Make your own with New format to change a layout.",
+        }), 403
+    return None
 
 def _tmp_dir():
     path = os.path.join(current_app.config["UPLOAD_FOLDER"], "tmp")
@@ -99,6 +122,7 @@ def _suggest_fields(renderable_path):
         return [], "AI couldn't suggest fields automatically — define them by clicking the document below."
 
     valid_indices = {l["index"] for l in lines}
+    line_by_index = {l["index"]: l for l in lines}
     fields = []
     for s in raw:
         if not isinstance(s, dict):
@@ -112,12 +136,20 @@ def _suggest_fields(renderable_path):
         label = (s.get("label") or "").strip()
         if not label:
             continue
-        fields.append({
+        field = {
             "anchor_index": idx,
             "label": label,
             "field_type": s.get("field_type") if s.get("field_type") in ("text", "textarea", "list", "table") else "textarea",
             "is_required": bool(s.get("is_required", True)),
-        })
+        }
+        # A label with a row of blank cells (one per day in a weekly plan) is a
+        # weekly field. That comes from the document's structure, so it is set
+        # here rather than left to the model to notice.
+        parts = line_by_index[idx].get("parts")
+        if parts:
+            field["field_type"] = "weekly"
+            field["parts"] = parts
+        fields.append(field)
     return fields, None
 
 @format_bp.post("/formats/scan")
@@ -155,7 +187,7 @@ def scan_format():
             scan_error = (
                 "Couldn't convert this PDF into an editable layout. If it's a scanned PDF "
                 "(a photo or image of a page rather than real text), export/print it from "
-                "Word instead, or start from a blank sheet."
+                "Word as a .docx instead."
             )
 
     preview = None
@@ -169,7 +201,7 @@ def scan_format():
     if preview is None and scan_error is None:
         scan_error = (
             "No content could be found in this file to build a template from. "
-            "Try a different file, or start from a blank sheet instead."
+            "Try a different file, such as a .docx copy of the format."
         )
 
     return jsonify({
@@ -226,7 +258,7 @@ def create_format():
             return jsonify({
                 "status": "error",
                 "message": ai_error or "Couldn't find any fillable fields in this document. "
-                                       "Try cleaning it up further, or start from a blank sheet instead.",
+                                       "Check that the labels you fill in are still in it, then save again.",
             }), 400
         field_rows = _build_format_fields(fmt.id, detected_fields)
     else:
@@ -283,6 +315,9 @@ def get_format(format_id):
 def update_format(format_id):
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
+    locked = _reject_if_builtin(fmt)
+    if locked:
+        return locked
 
     if fmt.owner_id != user.id:
         return jsonify({"status": "error", "message": "Only the teacher who created this format can edit it."}), 403
@@ -324,6 +359,9 @@ def update_format(format_id):
 def delete_format(format_id):
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
+    locked = _reject_if_builtin(fmt)
+    if locked:
+        return locked
 
     if fmt.owner_id != user.id:
         return jsonify({"status": "error", "message": "Only the teacher who created this format can delete it."}), 403
@@ -417,6 +455,9 @@ def edit_format_content(format_id):
     detection create_format() runs when the format is first saved."""
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
+    locked = _reject_if_builtin(fmt)
+    if locked:
+        return locked
 
     if fmt.owner_id != user.id:
         return jsonify({"status": "error", "message": "Only the teacher who created this format can edit its document."}), 403
@@ -476,6 +517,9 @@ def set_field_roles(format_id):
     """
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
+    locked = _reject_if_builtin(fmt)
+    if locked:
+        return locked
     if fmt.owner_id != user.id:
         return jsonify({"status": "error", "message": "You don't have access to this format."}), 403
 
@@ -587,4 +631,6 @@ def download_format_source(format_id):
             "status": "error",
             "message": "No reference file is on record for this format — it may have been created without one.",
         }), 404
-    return send_file(path, as_attachment=True)
+    # ?inline=1 opens the file in a browser tab (the PDF viewer) instead of
+    # downloading it.
+    return send_file(path, as_attachment=request.args.get("inline") != "1")

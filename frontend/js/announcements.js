@@ -80,17 +80,22 @@ function renderAnnouncements() {
     .map((a) => {
       const canManage = currentUser && a.author_id === currentUser.id;
       return `
-      <tr>
+      <tr id="announcement-${a.id}">
         <td>
           <strong>${escapeHtml(a.title)}</strong>
           <div class="text-sm" style="margin-top:2px;">${escapeHtml(a.message)}</div>
+          ${
+            a.has_video
+              ? `<video class="announcement-video" controls preload="none" playsinline src="${escapeHtml(a.video_url)}" aria-label="${escapeHtml(a.title)} video"></video>`
+              : ""
+          }
         </td>
         <td><span class="badge">${typeLabel(a.type)}</span></td>
         <td>${audienceLabel(a)}</td>
         <td>${windowLabel(a)}</td>
         <td>${statusPill(a)}</td>
         <td>${escapeHtml(a.author_name || "–")}</td>
-        <td>
+        <td${actionsColHead.hidden ? " hidden" : ""}>
           ${
             canManage
               ? `<div class="row-actions">
@@ -116,6 +121,9 @@ async function loadAnnouncements() {
     const data = await Api.myAnnouncements();
     allAnnouncements = data.announcements || [];
     renderAnnouncements();
+    // Arriving from a banner's "Watch the video": the row only exists now.
+    const target = location.hash && document.getElementById(location.hash.slice(1));
+    if (target) target.scrollIntoView({ block: "center" });
   } catch (err) {
     announcementsBody.innerHTML = `<tr class="table-empty-row"><td colspan="7">Couldn't load announcements.</td></tr>`;
     errorBox.textContent = err.message;
@@ -258,7 +266,7 @@ async function init() {
   if (user.role === "teacher") {
     newAnnouncementBtn.hidden = false;
     actionsColHead.hidden = false;
-    pageSubtitle.textContent = "Notices from your school admin and other teachers — and a place to post your own.";
+    pageSubtitle.textContent = "Notices from your school admin and other teachers, and a place to post your own.";
     try {
       const data = await Api.listSections();
       mySections = data.sections || [];

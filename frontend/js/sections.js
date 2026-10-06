@@ -124,7 +124,6 @@ function closeDetail() {
 }
 
 document.getElementById("new-section-btn").addEventListener("click", openCreateModal);
-document.getElementById("empty-new-section-btn").addEventListener("click", openCreateModal);
 document.getElementById("create-close").addEventListener("click", closeCreateModal);
 createOverlay.addEventListener("click", (e) => {
   if (e.target === createOverlay) closeCreateModal();

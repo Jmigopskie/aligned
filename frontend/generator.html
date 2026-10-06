@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Generate lesson plan — AlignED</title>
+  <title>Generate lesson plan | AlignED</title>
   <link rel="icon" href="img/Icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-09-24c" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-05e" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -21,7 +21,7 @@
         <img src="img/Icon.png" alt="" />
         <div>
           <div class="brand-name">AlignED</div>
-          <div class="brand-sub">TLE-ICT Lesson Plan Maker</div>
+          <div class="brand-sub">Lesson Plan Maker</div>
         </div>
       </div>
       <div class="topbar-actions">
@@ -101,11 +101,15 @@
                     <option value="" disabled selected>Select a subject…</option>
                     <option value="ICT">ICT</option>
                     <option value="CP (ComProg)">CP (ComProg)</option>
+                    <option value="AFA">AFA (Agri-Fishery Arts)</option>
+                    <option value="HE (FCS)">HE (Family and Consumer Science)</option>
+                    <option value="IA">IA (Industrial Arts)</option>
+                    <option value="Electrical (EES)">Electrical (Electrical and Electronics Servicing)</option>
                   </select>
                 </div>
                 <div class="field full-width">
                   <label for="ctx-topic">Specific topic</label>
-                  <input type="text" id="ctx-topic" placeholder="e.g. Cell Formulas — a narrower topic within the subject above" />
+                  <input type="text" id="ctx-topic" placeholder="e.g. Cell formulas" />
                 </div>
                 <div class="field">
                   <label for="ctx-level-type">Level *</label>
@@ -200,7 +204,8 @@
         <div id="tab-panel-generate" class="tab-panel" hidden>
 
           <div id="gate-lock" class="gate-lock">
-            Fill in the cooperating teacher, subject, and course guide in the Setup tab to continue.
+            <p>Fill in the cooperating teacher, subject and course guide on the Setup tab first. Generating starts from those answers.</p>
+            <button type="button" class="btn btn-primary" id="gate-setup-btn"><span data-icon="arrowLeft"></span>Go to Setup</button>
           </div>
 
           <div id="unlocked-content" hidden>
@@ -227,6 +232,10 @@
                   <button type="button" id="generate-full-btn" class="btn btn-primary">Generate full plan</button>
                 </div>
                 <div id="generation-progress" class="generation-progress mt-16" hidden></div>
+                <div id="own-fields-note" class="alert alert-info mt-16" role="status" hidden>
+                  <span id="own-fields-note-text"></span>
+                  <button type="button" id="own-fields-generate-btn" class="btn btn-secondary btn-sm">Generate these too</button>
+                </div>
               </section>
 
               <section id="step-controls" class="mt-24" hidden>
@@ -284,7 +293,7 @@
     </div>
   </div>
 
-  <section class="owl-chat" id="owl-chat" aria-label="Chat with the owl" hidden>
+  <section class="owl-chat is-collapsed" id="owl-chat" aria-label="Chat with the owl" hidden>
     <div class="owl-chat-resizer" id="owl-chat-resizer" role="separator" aria-orientation="vertical"
          tabindex="0" aria-label="Resize the chat panel. Use the left and right arrow keys."></div>
     <header class="owl-chat-head">
@@ -294,7 +303,7 @@
         <span id="owl-chat-field">Guided mode</span>
       </div>
       <button type="button" class="owl-chat-toggle" id="owl-chat-history-btn" aria-pressed="false">History</button>
-      <button type="button" class="owl-chat-toggle" id="owl-chat-toggle" aria-expanded="true" aria-controls="owl-chat-body">Hide</button>
+      <button type="button" class="owl-chat-toggle" id="owl-chat-toggle" aria-expanded="false" aria-controls="owl-chat-body">Open</button>
     </header>
     <div class="owl-chat-body" id="owl-chat-body">
       <div class="owl-chat-log" id="owl-chat-log" role="log" aria-live="polite"></div>
@@ -328,9 +337,9 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-09-24c"></script>
-  <script src="js/icons.js?v=2026-09-24c"></script>
-  <script src="js/doc-toolbar.js?v=2026-09-24c"></script>
-  <script src="js/generator.js?v=2026-09-24c"></script>
+  <script src="js/api.js?v=2026-10-05e"></script>
+  <script src="js/icons.js?v=2026-10-05e"></script>
+  <script src="js/doc-toolbar.js?v=2026-10-05e"></script>
+  <script src="js/generator.js?v=2026-10-05e"></script>
 </body>
 </html>

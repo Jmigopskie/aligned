@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Submissions — AlignED</title>
+  <title>Submissions | AlignED</title>
   <link rel="icon" href="img/Icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-05e" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -21,7 +21,7 @@
         <img src="img/Icon.png" alt="" />
         <div>
           <div class="brand-name">AlignED</div>
-          <div class="brand-sub">TLE-ICT Lesson Plan Maker</div>
+          <div class="brand-sub">Lesson Plan Maker</div>
         </div>
       </div>
       <div class="topbar-actions">
@@ -58,18 +58,20 @@
 
       <main class="dash-main">
         <div class="page-header">
-          <h1 class="dash-page-title" style="margin-bottom:0;">Submissions</h1>
+          <div class="page-heading">
+            <h1 class="dash-page-title">Submissions</h1>
+            <p class="page-subtitle">Lesson plans your students have submitted for review.</p>
+          </div>
         </div>
-        <p class="text-sm mt-0" style="margin-bottom:18px;">Lesson plans your students have submitted for review.</p>
 
         <div id="error-box" class="alert alert-error" hidden></div>
 
-        <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:20px;">
-          <div class="field" style="max-width:280px; margin-bottom:0;">
+        <div class="filter-bar">
+          <div class="field field-wide">
             <label for="section-select">Section</label>
             <select id="section-select"></select>
           </div>
-          <div class="field" style="max-width:200px; margin-bottom:0;">
+          <div class="field">
             <label for="status-select">Status</label>
             <select id="status-select">
               <option value="">All</option>
@@ -77,7 +79,7 @@
               <option value="reviewed">Reviewed</option>
             </select>
           </div>
-          <div class="field" style="max-width:200px; margin-bottom:0;">
+          <div class="field">
             <label for="sort-select">Sort by</label>
             <select id="sort-select">
               <option value="date">Date (newest first)</option>
@@ -88,7 +90,7 @@
         </div>
 
         <div id="no-sections-state" class="empty-state" hidden>
-          <h3>No sections yet</h3>
+          <h2>No sections yet</h2>
           <p>Create a section first so students can join and submit lesson plans.</p>
           <button class="btn btn-primary" onclick="window.location.href='sections.html'">Go to My Sections</button>
         </div>
@@ -108,8 +110,8 @@
     </div>
   </div>
 
-  <script src="js/api.js"></script>
-  <script src="js/icons.js"></script>
+  <script src="js/api.js?v=2026-10-05e"></script>
+  <script src="js/icons.js?v=2026-10-05e"></script>
   <script src="js/submissions.js"></script>
 </body>
 </html>

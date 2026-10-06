@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lesson Plan — AlignED</title>
+  <title>Create Lesson Plan | AlignED</title>
   <link rel="icon" href="img/Icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-05e" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -21,7 +21,7 @@
         <img src="img/Icon.png" alt="" />
         <div>
           <div class="brand-name">AlignED</div>
-          <div class="brand-sub">TLE-ICT Lesson Plan Maker</div>
+          <div class="brand-sub">Lesson Plan Maker</div>
         </div>
       </div>
       <div class="topbar-actions">
@@ -58,28 +58,21 @@
 
       <main class="dash-main">
         <div class="page-header">
-          <h1 class="dash-page-title">Lesson Plan</h1>
-          <button id="new-format-btn" class="btn btn-primary">+ New format</button>
+          <div class="page-heading">
+            <h1 class="dash-page-title">Create Lesson Plan</h1>
+            <p class="page-subtitle">Pick the format your school uses. Every plan you make follows its layout, from the header table to the procedure.</p>
+          </div>
+          <div class="page-actions">
+            <div class="format-search" id="format-search-row" role="search">
+              <span data-icon="search" class="format-search-icon"></span>
+              <label for="format-search" class="sr-only">Search formats</label>
+              <input type="search" id="format-search" placeholder="Search formats" autocomplete="off" />
+            </div>
+            <button id="new-format-btn" class="btn btn-primary"><span data-icon="plus"></span>New format</button>
+          </div>
         </div>
-        <p class="page-subtitle">Choose a format to generate a TLE-ICT lesson plan, or add your own — DLP, SDLP, ILAP, or a school-specific layout.</p>
 
         <div id="error-box" class="alert alert-error" hidden></div>
-
-        <!-- Unfinished plans, newest edit first. Hidden until there is at
-             least one, so a first-time user still lands straight on the
-             format picker. -->
-        <section id="drafts-strip" class="drafts-strip" hidden aria-labelledby="drafts-strip-title">
-          <div class="drafts-strip-head">
-            <h2 id="drafts-strip-title" class="drafts-strip-title">Continue where you left off</h2>
-            <a href="lesson-plan-list.html" class="text-sm">View all plans</a>
-          </div>
-          <div id="drafts-list" class="drafts-list"></div>
-        </section>
-
-        <div class="field" id="format-search-row" style="max-width:320px;" hidden>
-          <label for="format-search">Search</label>
-          <input type="text" id="format-search" placeholder="Search formats by name&hellip;" />
-        </div>
 
         <div id="loading-state" class="card-grid">
           <div class="format-card format-card-skeleton skeleton"></div>
@@ -88,18 +81,42 @@
         </div>
 
         <div id="empty-state" class="empty-state" hidden>
-          <h3>No formats yet</h3>
-          <p>Add a lesson plan format — DLP, SDLP, ILAP, or your own — to start generating plans.</p>
-          <button class="btn btn-primary" onclick="window.location.href='format-builder.html'">+ New format</button>
+          <h2>No matching formats</h2>
+          <p>Try another name, or clear the search to see every format.</p>
         </div>
 
-        <div id="format-grid" class="card-grid" hidden></div>
+        <section class="format-section" id="builtin-section" hidden aria-labelledby="builtin-title">
+          <div class="format-section-head">
+            <h2 class="section-title" id="builtin-title">Ready-to-use formats</h2>
+            <p class="section-note">School formats set up for you. Use them as they are; to change one, make your own copy with New format.</p>
+          </div>
+          <div id="builtin-grid" class="card-grid format-grid-builtin"></div>
+        </section>
+
+        <section class="format-section" id="mine-section" hidden aria-labelledby="mine-title">
+          <div class="format-section-head">
+            <h2 class="section-title" id="mine-title">My formats</h2>
+            <p class="section-note">Formats you made. Only you can edit or delete them.</p>
+          </div>
+          <div id="mine-empty" class="empty-state empty-state-compact" hidden>
+            <p>You haven't made a format yet. Use New format to upload your school's blank template, and AlignED finds the fields for you.</p>
+          </div>
+          <div id="mine-grid" class="card-grid"></div>
+        </section>
+
+        <section class="format-section" id="shared-section" hidden aria-labelledby="shared-title">
+          <div class="format-section-head">
+            <h2 class="section-title" id="shared-title">Shared by other teachers</h2>
+            <p class="section-note">Formats other teachers chose to make public.</p>
+          </div>
+          <div id="shared-grid" class="card-grid"></div>
+        </section>
       </main>
     </div>
   </div>
 
-  <script src="js/api.js"></script>
-  <script src="js/icons.js"></script>
+  <script src="js/api.js?v=2026-10-05e"></script>
+  <script src="js/icons.js?v=2026-10-05e"></script>
   <script src="js/lesson-plan.js"></script>
 </body>
 </html>

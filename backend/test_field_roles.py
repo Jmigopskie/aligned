@@ -29,11 +29,11 @@ class Field:
 
 # The user's real ILAW format, in document order: (key, label, expected role).
 ILAW = [
-    ("name_of_lesson", "Name of Lesson", "easy"),
+    ("name_of_lesson", "Name of Lesson", "self"),
     ("learning_area_s", "Learning Area/s", "easy"),
     ("designed_by_teacher_s", "Designed by Teacher/s", "easy"),
     ("designed_for_which_grade_level_section", "Designed for which Grade Level & Section", "easy"),
-    ("no_of_sessions", "No. of Sessions", "easy"),
+    ("no_of_sessions", "No. of Sessions", "self"),
     ("references", "References", "easy"),
     ("declaration_of_ai_use", "Declaration of AI use", "easy"),
     ("learning_competency", "Learning Competency", "heavy"),
@@ -73,10 +73,22 @@ def check_real_format():
     heavy = [l for k, l, _ in ILAW if field_roles.role_for(Field(k, l)) == "heavy"]
     easy = [l for k, l, _ in ILAW if field_roles.role_for(Field(k, l)) == "easy"]
     assert len(heavy) == 9, heavy
-    assert len(easy) == 8, easy
+    assert len(easy) == 6, easy
     assert heavy[0] == "Learning Competency", heavy
     assert heavy[-1] == "Reflections", heavy
     print("  real format OK")
+
+
+def check_self_fields():
+    """The lesson's title and session number are the student's own to write:
+    not filled in automatically, offered to the AI only if they tick them."""
+    for key, label in [("lesson_title", "Lesson Title"), ("session_no", "Session No."),
+                       ("name_of_lesson", "Name of Lesson"), ("no_of_sessions", "No. of Sessions"),
+                       ("session_number", "Session Number")]:
+        assert field_roles.role_for(Field(key, label)) == "self", label
+    # An explicit override still wins over it.
+    assert field_roles.role_for(Field("lesson_title", "Lesson Title", role="easy")) == "easy"
+    print("  self fields OK")
 
 
 def check_easy_default():
@@ -141,7 +153,7 @@ def check_to_dict_resolves():
 
         auto = FormatField(format_id=fmt.id, field_key="flow", label="Flow", sort_order=0)
         forced = FormatField(format_id=fmt.id, field_key="flow2", label="Flow", role="easy", sort_order=1)
-        plain = FormatField(format_id=fmt.id, field_key="no_of_sessions", label="No. of Sessions", sort_order=2)
+        plain = FormatField(format_id=fmt.id, field_key="quarter", label="Quarter", sort_order=2)
         db.session.add_all([auto, forced, plain])
         db.session.commit()
 
@@ -182,7 +194,7 @@ def check_role_endpoint():
         fmt_id = fmt.id
         db.session.add_all([
             FormatField(format_id=fmt_id, field_key="flow", label="Flow", sort_order=0),
-            FormatField(format_id=fmt_id, field_key="no_of_sessions", label="No. of Sessions", sort_order=1),
+            FormatField(format_id=fmt_id, field_key="quarter", label="Quarter", sort_order=1),
         ])
         db.session.commit()
 
@@ -201,27 +213,27 @@ def check_role_endpoint():
         login(owner_id)
 
         # Flip both directions.
-        res = client.patch(url, json={"roles": {"flow": "easy", "no_of_sessions": "heavy"}})
+        res = client.patch(url, json={"roles": {"flow": "easy", "quarter": "heavy"}})
         assert res.status_code == 200, res.status_code
         by_key = {f["field_key"]: f["role"] for f in res.get_json()["fields"]}
-        assert by_key == {"flow": "easy", "no_of_sessions": "heavy"}, by_key
+        assert by_key == {"flow": "easy", "quarter": "heavy"}, by_key
 
         # null clears the override, so the keywords decide again.
-        res = client.patch(url, json={"roles": {"flow": None, "no_of_sessions": None}})
+        res = client.patch(url, json={"roles": {"flow": None, "quarter": None}})
         by_key = {f["field_key"]: f["role"] for f in res.get_json()["fields"]}
-        assert by_key == {"flow": "heavy", "no_of_sessions": "easy"}, by_key
+        assert by_key == {"flow": "heavy", "quarter": "easy"}, by_key
 
         # Junk values must not overwrite valid stored roles: set flow to easy,
-        # then send junk for flow alongside a valid change for no_of_sessions.
-        # flow must stay easy (junk ignored) while no_of_sessions must change.
+        # then send junk for flow alongside a valid change for quarter.
+        # flow must stay easy (junk ignored) while quarter must change.
         res = client.patch(url, json={"roles": {"flow": "easy"}})
         assert res.status_code == 200
         by_key = {f["field_key"]: f["role"] for f in res.get_json()["fields"]}
         assert by_key["flow"] == "easy", by_key
-        res = client.patch(url, json={"roles": {"flow": "banana", "no_of_sessions": "heavy"}})
+        res = client.patch(url, json={"roles": {"flow": "banana", "quarter": "heavy"}})
         assert res.status_code == 200
         by_key = {f["field_key"]: f["role"] for f in res.get_json()["fields"]}
-        assert by_key == {"flow": "easy", "no_of_sessions": "heavy"}, by_key
+        assert by_key == {"flow": "easy", "quarter": "heavy"}, by_key
 
         # Clear flow back to None before the next assertions.
         client.patch(url, json={"roles": {"flow": None}})
@@ -263,12 +275,12 @@ def check_content_edit_keeps_roles():
         db.session.commit()
         fmt_id = fmt.id
 
-        # "flow" carries an explicit override; "no_of_sessions" does not and
+        # "flow" carries an explicit override; "quarter" does not and
         # will not survive re-detection at all, which is the expected case of
         # a field genuinely going away.
         db.session.add_all([
             FormatField(format_id=fmt_id, field_key="flow", label="Flow", role="easy", sort_order=0),
-            FormatField(format_id=fmt_id, field_key="no_of_sessions", label="No. of Sessions", sort_order=1),
+            FormatField(format_id=fmt_id, field_key="quarter", label="Quarter", sort_order=1),
         ])
         db.session.commit()
 
@@ -310,6 +322,7 @@ def check_content_edit_keeps_roles():
 
 check_named_six()
 check_real_format()
+check_self_fields()
 check_easy_default()
 check_override_wins()
 check_key_and_label_both_read()

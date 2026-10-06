@@ -106,6 +106,9 @@ const generateScope = document.getElementById("generate-scope");
 const generateScopeAuto = document.getElementById("generate-scope-auto");
 const generateScopeOptions = document.getElementById("generate-scope-options");
 const generationProgressEl = document.getElementById("generation-progress");
+const ownFieldsNote = document.getElementById("own-fields-note");
+const ownFieldsNoteText = document.getElementById("own-fields-note-text");
+const ownFieldsGenerateBtn = document.getElementById("own-fields-generate-btn");
 const stepContinueBtn = document.getElementById("step-continue-btn");
 const stepClearBtn = document.getElementById("step-clear-btn");
 const resultsEl = document.getElementById("results");
@@ -147,6 +150,10 @@ const cgDropzone = document.getElementById("cg-dropzone");
 const cgFileInput = document.getElementById("cg-file-input");
 const cgSelectedEl = document.getElementById("cg-selected");
 const gateLock = document.getElementById("gate-lock");
+// The locked Generate tab's way out: the tab button does the real switching.
+document.getElementById("gate-setup-btn").addEventListener("click", () => {
+  document.querySelector('[data-tab="setup"]').click();
+});
 const unlockedContent = document.getElementById("unlocked-content");
 
 const genTabsEl = document.getElementById("gen-tabs");
@@ -277,7 +284,7 @@ function addOwlTyping() {
   return row;
 }
 
-function addOwlMessage(text, choices = [], { error = false } = {}) {
+function addOwlMessage(text, choices = [], { error = false, unread = true } = {}) {
   // Only the latest set of choices stays tappable, so an old suggestion
   // isn't applied to a field it was never written for.
   owlChatLog.querySelectorAll(".owl-choice:not(.is-used)").forEach((b) => { b.disabled = true; });
@@ -317,6 +324,8 @@ function addOwlMessage(text, choices = [], { error = false } = {}) {
   }
   owlChatLog.appendChild(row);
   scrollChatToEnd();
+  // A reply the teacher can't see yet shows as a dot on the owl.
+  if (unread && !owlChat.hidden && owlChat.classList.contains("is-collapsed")) setChatUnread(true);
 }
 
 // Draw a saved thread back into the log. Restored owl turns carry no choice
@@ -329,7 +338,7 @@ function renderThread(key, note) {
   if (note && thread.length) addChatNote(note);
   thread.forEach((turn) => {
     if (turn.role === "teacher") addTeacherMessage(turn.text);
-    else addOwlMessage(turn.text, []);
+    else addOwlMessage(turn.text, [], { unread: false });
   });
   return thread.length;
 }
@@ -349,7 +358,7 @@ function introduceFieldInChat() {
   if (hadTurns) {
     scrollChatToEnd();
   } else {
-    addOwlMessage(`I can help with "${field.label}". Ask a question or tap an option.`, OWL_STARTERS);
+    addOwlMessage(`I can help with "${field.label}". Ask a question or tap an option.`, OWL_STARTERS, { unread: false });
   }
 }
 
@@ -398,24 +407,35 @@ function insertIntoActiveField(text) {
   if (!field) return;
   syncActiveStepValue();
   const addition = field.field_type === "text" ? text.replace(/\s*\n\s*/g, " ").trim() : formatGeneratedValue(text);
-  const current = String(fieldValues[key] || "").trim();
+  const root = docTemplateData ? liveDocWrap.querySelector(".lp-doc") : resultsEl;
+  const slots = slotsFor(key, root);
+
+  // A weekly field takes a suggestion one day at a time: into the day the
+  // teacher is on, else the first day still empty, else Monday.
+  let target = slots[0] || null;
+  if (partCount(key) && slots.length) {
+    const focused = slots.find((el) => el === document.activeElement || el.contains(document.activeElement));
+    target = focused || slots.find((el) => !valueForSlot(el).trim()) || slots[0];
+  }
+
+  const current = target ? valueForSlot(target).trim() : String(fieldValues[key] || "").trim();
   // A short text field is replaced; a multi-line field keeps what the
   // teacher already wrote and gains the new lines below it.
   const value = field.field_type !== "text" && current ? `${current}\n${addition}` : addition;
-  fieldValues[key] = value;
 
-  if (docTemplateData) {
-    const canvas = liveDocWrap.querySelector(".lp-doc");
-    const el = canvas && canvas.querySelector(`[data-field-key="${key}"]`);
-    if (el) {
-      el.textContent = value;
-      delete fieldRichValues[key];
-      el.classList.add("lp-filled");
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (target) {
+    storeSlot(target, value);
+    if (Array.isArray(fieldRichValues[key])) fieldRichValues[key][slotPart(target)] = "";
+    else delete fieldRichValues[key];
+    if (docTemplateData) {
+      target.textContent = value;
+      target.classList.add("lp-filled");
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      target.value = value;
     }
   } else {
-    const el = resultsEl.querySelector(`[data-field-key="${key}"]`);
-    if (el) el.value = value;
+    fieldValues[key] = value;
   }
   markDirty();
   renderStepFieldNav();
@@ -440,23 +460,97 @@ function updateChatRoom() {
   // On wide screens the page makes room for the open chat, so it never
   // covers the document the teacher is writing in.
   document.body.classList.toggle("owl-chat-open", !owlChat.hidden && !owlChat.classList.contains("is-collapsed"));
+  // Even collapsed, the bar and the owl float over the bottom of the page,
+  // so the page gets room to scroll its last buttons clear of them.
+  document.body.classList.toggle("owl-chat-shown", !owlChat.hidden);
 }
 
-function setOwlChatCollapsed(collapsed) {
+// Collapsed means the panel is gone and only the owl is left, as the button
+// that brings it back. Guided mode always starts that way; the teacher's
+// choice after that lasts for the tab (sessionStorage), so a reload or a
+// trip to the Setup tab keeps it but tomorrow starts minimized again.
+const CHAT_OPEN_KEY = "owlChatOpen";
+
+function chatWasOpen() {
+  try {
+    return sessionStorage.getItem(CHAT_OPEN_KEY) === "1";
+  } catch (err) {
+    return false;
+  }
+}
+
+// Collapsed, the chat shrinks to its header bar with an Open button; open, the
+// same button reads Hide. A reply that arrives while collapsed puts a dot on
+// that button.
+function setChatUnread(unread) {
+  owlChatToggle.classList.toggle("has-unread", !!unread);
+  // The button's own text names it; only a waiting reply needs saying.
+  if (unread) owlChatToggle.setAttribute("aria-label", "Open, new reply");
+  else owlChatToggle.removeAttribute("aria-label");
+}
+
+function setOwlChatCollapsed(collapsed, { remember = true } = {}) {
   owlChat.classList.toggle("is-collapsed", collapsed);
-  updateChatRoom();
   owlChatToggle.setAttribute("aria-expanded", String(!collapsed));
   owlChatToggle.textContent = collapsed ? "Open" : "Hide";
+  if (!collapsed) setChatUnread(false);
+  if (remember) {
+    try {
+      sessionStorage.setItem(CHAT_OPEN_KEY, collapsed ? "0" : "1");
+    } catch (err) {
+      /* not fatal: the choice just isn't remembered */
+    }
+  }
+  updateChatRoom();
+  placeChat();
   if (!collapsed) scrollChatToEnd();
 }
+
+// ---- Chat placement: beside the owl, never over him ----
+// Desktop: the panel's right edge sits a gap to the owl's left, bottoms
+// aligned. When there isn't room there (a phone, or the owl dragged to the
+// left edge) the open panel becomes a full-width sheet above the owl, or
+// below him when he sits in the top half of the screen. The collapsed bar is
+// narrow enough to stay beside him even on a phone.
+const OWL_GAP = 12;
+const EDGE = 16;
+const CHAT_BAR_MIN = 200;
+
+function placeChat() {
+  if (owlChat.hidden) return;
+  const owl = OwlGuide.rect();
+  if (!owl) return;
+  const s = owlChat.style;
+  const collapsed = owlChat.classList.contains("is-collapsed");
+  const room = owl.left - OWL_GAP - EDGE;
+  const sheet = collapsed ? room < CHAT_BAR_MIN : room < CHAT_W_MIN || window.innerWidth <= 640;
+  owlChat.classList.toggle("is-sheet", sheet);
+  owlChat.classList.remove("is-below");
+  if (!sheet) {
+    s.setProperty("--chat-right", `${window.innerWidth - owl.left + OWL_GAP}px`);
+    s.setProperty("--chat-bottom", `${Math.max(8, window.innerHeight - owl.bottom)}px`);
+    s.setProperty("--chat-room", `${room}px`);
+  } else if (owl.top > window.innerHeight / 2) {
+    s.setProperty("--chat-bottom", `${window.innerHeight - owl.top + OWL_GAP}px`);
+  } else {
+    owlChat.classList.add("is-below");
+    s.setProperty("--chat-top", `${owl.bottom + OWL_GAP}px`);
+  }
+}
+
+OwlGuide.onMove(placeChat);
 
 // ---- Chat panel width ----
 const CHAT_W_KEY = "owlChatWidth";
 const CHAT_W_MIN = 340;
 const chatResizer = document.getElementById("owl-chat-resizer");
 
+// As wide as the space left of the owl allows, since the panel must not
+// grow over him.
 function chatMaxWidth() {
-  return Math.max(CHAT_W_MIN, Math.min(820, window.innerWidth - 120));
+  const owl = OwlGuide.rect();
+  const room = owl ? owl.left - OWL_GAP - EDGE : window.innerWidth - 120;
+  return Math.max(CHAT_W_MIN, Math.min(820, room));
 }
 
 function setChatWidth(px, persist = true) {
@@ -611,26 +705,38 @@ function renderHistoryThread(key) {
 owlChatHistoryBtn.addEventListener("click", () => showChatHistory(owlChatHistory.hidden));
 owlChatHistoryBack.addEventListener("click", renderHistoryList);
 
+function toggleOwlChat() {
+  setOwlChatCollapsed(!owlChat.classList.contains("is-collapsed"));
+}
+
 function showOwlChat(visible) {
+  const opening = visible && owlChat.hidden;
   owlChat.hidden = !visible;
-  // The chat is the voice during guided mode; the guide owl steps aside.
-  if (visible) OwlGuide.hide();
-  updateChatRoom();
   if (visible) {
+    // The owl stays through Guided mode beside the chat, rather than stepping
+    // aside for a panel that then covered his corner.
+    OwlGuide.dock();
+    if (opening) setOwlChatCollapsed(!chatWasOpen(), { remember: false });
     showChatHistory(false);
     introduceFieldInChat();
+  } else {
+    OwlGuide.undock();
   }
+  updateChatRoom();
 }
 
 owlChatForm.addEventListener("submit", (e) => {
   e.preventDefault();
   sendToOwl(owlChatInput.value);
 });
-owlChatToggle.addEventListener("click", () => setOwlChatCollapsed(!owlChat.classList.contains("is-collapsed")));
-owlChat.querySelector(".owl-chat-head").addEventListener("click", (e) => {
-  if (owlChat.classList.contains("is-collapsed") && e.target !== owlChatToggle) setOwlChatCollapsed(false);
+owlChatToggle.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleOwlChat();
 });
-if (window.matchMedia("(max-width: 640px)").matches) setOwlChatCollapsed(true);
+// The collapsed bar is one big target: a click anywhere on it opens the chat.
+owlChat.querySelector(".owl-chat-head").addEventListener("click", (e) => {
+  if (owlChat.classList.contains("is-collapsed") && !e.target.closest("button")) setOwlChatCollapsed(false);
+});
 
 function setOwlState(state, message) {
   OwlGuide.show({ pose: OWL_POSES[state] || "idle", text: message });
@@ -653,10 +759,10 @@ levelTypeSelect.addEventListener("change", updateLevelFields);
 function getClassLabel() {
   if (levelTypeSelect.value === "college") {
     const parts = [collegeProgramInput.value.trim(), collegeYearSelect.value.trim(), sectionInput.value.trim()].filter(Boolean);
-    return parts.join(" — ");
+    return parts.join(" · ");
   }
   const parts = [k12GradeSelect.value.trim(), sectionInput.value.trim()].filter(Boolean);
-  return parts.join(" — ");
+  return parts.join(" · ");
 }
 
 function getAdvancedContext() {
@@ -707,7 +813,7 @@ function updateGate() {
   syncOwlVisibility();
 
   if (ready && !gateWasReady) {
-    setOwlState("guide", "Nice — you're all set. Head to “Generate & review” when you're ready.");
+    setOwlState("guide", "Nice, you're all set. Head to “Generate & review” when you're ready.");
   }
   gateWasReady = ready;
 
@@ -737,10 +843,10 @@ function goToTab(tabName) {
   if (tabName === "generate") {
     window.scrollTo({ top: 0, behavior: "smooth" });
     if (!hasAnyValue()) {
-      setOwlState("guide", "Pick “Building Proficiency” or “Guided mode,” then click Generate — I'll help write it.");
+      setOwlState("guide", "Pick “Building Proficiency” or “Guided mode,” then click Generate. I'll help write it.");
     }
   } else if (tabName === "setup") {
-    setOwlState("idle", "Let's set up your lesson plan — tell me who's teaching and what subject.");
+    setOwlState("idle", "Let's set up your lesson plan. Tell me who's teaching and what subject.");
   }
 }
 
@@ -765,15 +871,29 @@ cgTabsEl.querySelectorAll("button").forEach((btn) => {
   });
 });
 
+// The course guide library groups grades the way DepEd's documents do.
+function gradeBandFor() {
+  if (levelTypeSelect.value !== "k12") return "";
+  const grade = parseInt((k12GradeSelect.value || "").replace(/\D/g, ""), 10);
+  if (grade >= 4 && grade <= 6) return "4-6";
+  if (grade >= 7 && grade <= 8) return "7-8";
+  if (grade >= 9 && grade <= 10) return "9-10";
+  if (grade >= 11) return "SHS";
+  return "";
+}
+
 function renderCourseGuideResults(guides) {
   cgResultsEl.innerHTML = "";
   guides.forEach((g) => {
     const card = document.createElement("div");
     card.className = "cg-result-card";
+    const meta = g.is_builtin
+      ? `${g.doc_type === "curriculum_guide" ? "Curriculum Guide" : "Budget of Work"} &middot; ${escapeHtml(g.curriculum || "DepEd")}`
+      : `${escapeHtml(g.subject)} &middot; uploaded by ${escapeHtml(g.uploaded_by || "a teacher")}`;
     card.innerHTML = `
       <div>
         <div class="cg-title">${escapeHtml(g.title)}</div>
-        <div class="cg-meta">${escapeHtml(g.subject)} &middot; uploaded by ${escapeHtml(g.uploaded_by || "a teacher")}</div>
+        <div class="cg-meta">${g.is_builtin ? `<span class="badge badge-official">${Icons.shieldCheck}Official DepEd</span> ` : ""}${meta}</div>
       </div>
       <span class="text-sm">Select</span>
     `;
@@ -816,7 +936,9 @@ cgSearchBtn.addEventListener("click", async () => {
 
   setButtonLoading(cgSearchBtn, true, "Searching");
   try {
-    const data = await Api.searchCourseGuides(subject);
+    // The grade only ranks results, it never hides any: a guide for the next
+    // band up can still be the right reference.
+    const data = await Api.searchCourseGuides({ subject, prefer_grade_band: gradeBandFor() });
     const guides = data.course_guides || [];
     if (!guides.length) {
       cgResultsEl.innerHTML = "";
@@ -866,7 +988,7 @@ async function handleCourseGuideUpload(file) {
     selectCourseGuide(data.course_guide);
     showToast(
       data.duplicate
-        ? "This course guide is already in the shared library — using the existing copy."
+        ? "This course guide is already in the shared library, so the existing copy is used."
         : "Course guide added to the shared library."
     );
   } catch (err) {
@@ -909,11 +1031,99 @@ function heavyFieldKeys() {
 }
 
 function easyFieldKeys() {
-  return fieldsInDocumentOrder().filter((f) => f.role !== "heavy").map((f) => f.field_key);
+  return fieldsInDocumentOrder().filter((f) => f.role !== "heavy" && f.role !== "self").map((f) => f.field_key);
+}
+
+// The student's own to write (lesson title, session number): never filled in
+// automatically, only when they tick them in the checklist.
+function selfFieldKeys() {
+  return fieldsInDocumentOrder().filter((f) => f.role === "self").map((f) => f.field_key);
 }
 
 function fieldByKey(key) {
   return (fmt.fields || []).find((f) => f.field_key === key);
+}
+
+// ---- Weekly fields: one answer per day, each in its own slot ----
+// A weekly field (ILAW's day columns) is one field whose value is a list with
+// one entry per day, rendered as one slot per day carrying data-part. Every
+// place that reads or writes a slot goes through these, so a plain field keeps
+// working exactly as before.
+
+function partCount(key) {
+  const field = fieldByKey(key);
+  return field && field.field_type === "weekly" && field.parts ? field.parts.length : 0;
+}
+
+function weeklyArray(value, count) {
+  let parts;
+  if (Array.isArray(value)) parts = value.slice();
+  else if (value == null || String(value) === "") parts = [];
+  else parts = [String(value)];
+  parts = parts.slice(0, count).map((v) => (v == null ? "" : String(v)));
+  while (parts.length < count) parts.push("");
+  return parts;
+}
+
+function slotPart(el) {
+  return el.dataset.part === undefined ? null : parseInt(el.dataset.part, 10);
+}
+
+// The text one slot shows: its day's entry for a weekly field, the whole value
+// otherwise.
+function valueForSlot(el) {
+  const key = el.dataset.fieldKey;
+  const value = fieldValues[key];
+  const part = slotPart(el);
+  if (part !== null) return weeklyArray(value, partCount(key))[part] || "";
+  return Array.isArray(value) ? value.join("\n") : (value || "");
+}
+
+function richForSlot(el) {
+  const rich = fieldRichValues[el.dataset.fieldKey];
+  const part = slotPart(el);
+  if (part !== null) return Array.isArray(rich) ? (rich[part] || "") : "";
+  return Array.isArray(rich) ? "" : (rich || "");
+}
+
+// Writes one slot's text (and, when given, its styled HTML) back into the
+// value maps, touching only that day's entry for a weekly field.
+function storeSlot(el, text, html) {
+  const key = el.dataset.fieldKey;
+  const part = slotPart(el);
+  if (part === null) {
+    fieldValues[key] = text;
+    if (html !== undefined) fieldRichValues[key] = html;
+    return;
+  }
+  const count = partCount(key);
+  const parts = weeklyArray(fieldValues[key], count);
+  parts[part] = text;
+  fieldValues[key] = parts;
+  if (html !== undefined) {
+    const rich = weeklyArray(Array.isArray(fieldRichValues[key]) ? fieldRichValues[key] : [], count);
+    rich[part] = html;
+    fieldRichValues[key] = rich;
+  }
+}
+
+function slotsFor(key, root) {
+  return root ? Array.from(root.querySelectorAll(`[data-field-key="${CSS.escape(key)}"]`)) : [];
+}
+
+// A value as the plain preview lists it: a weekly field reads "Monday: ..."
+// line by line, leaving out days with nothing in them.
+function previewValue(key) {
+  const count = partCount(key);
+  if (!count) return fieldValues[key];
+  const names = fieldByKey(key).parts;
+  return weeklyArray(fieldValues[key], count)
+    .map((text, i) => (String(text).trim() ? `${names[i]}: ${text}` : ""))
+    .filter(Boolean);
+}
+
+function hasValue(value) {
+  return Array.isArray(value) ? value.some((v) => String(v == null ? "" : v).trim()) : !!String(value == null ? "" : value).trim();
 }
 
 // Which thinking-heavy fields the teacher wants written for them. Remembered per
@@ -943,13 +1153,43 @@ function writeScopeChoice(excluded) {
   }
 }
 
+// The student's own fields they asked the AI to write anyway. Kept apart from
+// the excluded list above because these start unticked, not ticked.
+const SELF_SCOPE_PREFIX = "alignedGenSelf:v1:";
+
+function readSelfTicks() {
+  try {
+    return JSON.parse(localStorage.getItem(`${SELF_SCOPE_PREFIX}${fmt.id}`) || "[]");
+  } catch (err) {
+    return [];
+  }
+}
+
+function writeSelfTicks(keys) {
+  try {
+    localStorage.setItem(`${SELF_SCOPE_PREFIX}${fmt.id}`, JSON.stringify(keys));
+  } catch (err) {
+    /* private mode or quota: the choice just won't persist */
+  }
+}
+
+function scopeOption(key, checked) {
+  const field = fieldByKey(key);
+  return `
+    <label class="generate-scope-option">
+      <input type="checkbox" data-scope-key="${escapeHtml(key)}" ${checked ? "checked" : ""} />
+      <span>${escapeHtml(field ? field.label : key)}</span>
+    </label>`;
+}
+
 function renderGenerateScope() {
   const heavy = heavyFieldKeys();
   const easy = easyFieldKeys();
+  const own = selfFieldKeys();
 
-  // Nothing to choose between: no heavy fields means the old all-or-nothing
-  // behaviour, so the panel stays out of the way.
-  if (!heavy.length) {
+  // Nothing to choose between means the old all-or-nothing behaviour, so the
+  // panel stays out of the way.
+  if (!heavy.length && !own.length) {
     generateScope.hidden = true;
     return;
   }
@@ -959,30 +1199,42 @@ function renderGenerateScope() {
     ? `${easy.length} straightforward ${easy.length === 1 ? "field" : "fields"} will be filled in automatically.`
     : "";
 
-  // Previously excluded keys stay excluded; anything new to this format starts
-  // ticked.
+  // Previously excluded heavy keys stay excluded; anything new starts ticked.
+  // The student's own fields start unticked and stay as they last left them.
   const excluded = new Set(readScopeChoice() || []);
+  const ownTicked = new Set(readSelfTicks());
+  const ownLabels = own.map((key) => (fieldByKey(key) || {}).label || key);
 
-  generateScopeOptions.innerHTML = heavy
-    .map((key) => {
-      const field = fieldByKey(key);
-      return `
-        <label class="generate-scope-option">
-          <input type="checkbox" data-scope-key="${escapeHtml(key)}" ${excluded.has(key) ? "" : "checked"} />
-          <span>${escapeHtml(field ? field.label : key)}</span>
-        </label>`;
-    })
-    .join("");
+  generateScopeOptions.innerHTML =
+    heavy.map((key) => scopeOption(key, !excluded.has(key))).join("") +
+    (own.length
+      ? `<p class="generate-scope-note">${escapeHtml(joinLabels(ownLabels))} ${own.length === 1 ? "is" : "are"} yours to fill in. Tick ${own.length === 1 ? "it" : "them"} if you want me to write ${own.length === 1 ? "it" : "them"} too.</p>` +
+        own.map((key) => scopeOption(key, ownTicked.has(key))).join("")
+      : "");
 
+  const ownSet = new Set(own);
   generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((box) => {
     box.addEventListener("change", () => {
-      const next = [];
+      const nextExcluded = [];
+      const nextOwn = [];
       generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((b) => {
-        if (!b.checked) next.push(b.dataset.scopeKey);
+        const key = b.dataset.scopeKey;
+        if (ownSet.has(key)) {
+          if (b.checked) nextOwn.push(key);
+        } else if (!b.checked) {
+          nextExcluded.push(key);
+        }
       });
-      writeScopeChoice(next);
+      writeScopeChoice(nextExcluded);
+      writeSelfTicks(nextOwn);
     });
   });
+}
+
+// "Lesson Title and Session No." / "A, B and C".
+function joinLabels(labels) {
+  if (labels.length <= 1) return labels.join("");
+  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
 
 // The keys to generate: every quick field, plus the heavy ones still ticked.
@@ -997,8 +1249,7 @@ function selectedGenerateKeys() {
 }
 
 function isFieldComplete(key) {
-  const v = fieldValues[key];
-  return Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim());
+  return hasValue(fieldValues[key]);
 }
 
 // stepFieldKeys is heavy-only, so finishing the walkthrough does not mean the
@@ -1008,7 +1259,7 @@ function isFieldComplete(key) {
 // fix. Every place that needs to say so calls this one check, so the messages
 // can't drift apart and start disagreeing about what "done" means.
 function incompleteEasyFieldKeys() {
-  return easyFieldKeys().filter((k) => !isFieldComplete(k));
+  return easyFieldKeys().concat(selfFieldKeys()).filter((k) => !isFieldComplete(k));
 }
 
 // The guided side of the same problem: Task 7 left already-stepped-past
@@ -1045,14 +1296,16 @@ function renderStepFieldNav() {
     // Disabled (locked) still goes purely by position: staying reachable and
     // unlocked when it's before the cursor is what lets the teacher go back
     // and fix it, whether or not it's currently complete.
+    // Words, not symbols: an <option> can't hold an icon, and emoji or
+    // geometric glyphs render differently on every OS.
     opt.textContent =
       i === stepIndex
-        ? `▸ ${label} (current)`
+        ? `${label} (current)`
         : i > stepIndex
-        ? `🔒 ${label}`
+        ? `${label} (locked)`
         : isFieldComplete(key)
-        ? `✓ ${label}`
-        : `○ ${label}`;
+        ? `${label} (done)`
+        : label;
     opt.disabled = i > stepIndex;
     sectionNav.appendChild(opt);
   });
@@ -1076,23 +1329,24 @@ function applyStepLocks() {
       // Only the walkthrough's own fields are locked or unlocked here. Anything
       // outside it keeps the editability the document was rendered with.
       stepFieldKeys.forEach((key, i) => {
-        const el = canvas.querySelector(`[data-field-key="${key}"]`);
-        if (!el) return;
-        el.classList.remove("step-locked", "step-active");
-        if (i === stepIndex) {
-          el.contentEditable = "true";
-          el.classList.add("step-active");
-          activeEl = el;
-        } else if (i > stepIndex) {
-          el.contentEditable = "false";
-          el.classList.add("step-locked");
-        } else {
-          // A field the teacher has already answered stays theirs to correct.
-          // It used to be set read-only with no lock styling at all, so it
-          // looked perfectly editable and silently swallowed typing, which is
-          // what "I can't edit the fields" was.
-          el.contentEditable = "true";
-        }
+        // Every slot of the field: a weekly field has one per day.
+        slotsFor(key, canvas).forEach((el) => {
+          el.classList.remove("step-locked", "step-active");
+          if (i === stepIndex) {
+            el.contentEditable = "true";
+            el.classList.add("step-active");
+            if (!activeEl) activeEl = el;
+          } else if (i > stepIndex) {
+            el.contentEditable = "false";
+            el.classList.add("step-locked");
+          } else {
+            // A field the teacher has already answered stays theirs to correct.
+            // It used to be set read-only with no lock styling at all, so it
+            // looked perfectly editable and silently swallowed typing, which is
+            // what "I can't edit the fields" was.
+            el.contentEditable = "true";
+          }
+        });
       });
       if (activeEl) {
         activeEl.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1139,11 +1393,9 @@ function syncActiveStepValue() {
   if (!key) return;
   if (docTemplateData) {
     const canvas = liveDocWrap.querySelector(".lp-doc");
-    const el = canvas && canvas.querySelector(`[data-field-key="${key}"]`);
-    if (el) fieldValues[key] = el.textContent;
+    slotsFor(key, canvas).forEach((el) => storeSlot(el, el.textContent));
   } else {
-    const el = resultsEl.querySelector(`[data-field-key="${key}"]`);
-    if (el) fieldValues[key] = el.value;
+    slotsFor(key, resultsEl).forEach((el) => storeSlot(el, el.value));
   }
 }
 
@@ -1190,7 +1442,9 @@ function formatGeneratedValue(raw) {
 function formatGeneratedValues(values) {
   const out = {};
   Object.entries(values || {}).forEach(([key, val]) => {
-    out[key] = formatGeneratedValue(val);
+    // A weekly field stays one entry per day, each formatted on its own.
+    const count = partCount(key);
+    out[key] = count ? weeklyArray(val, count).map(formatGeneratedValue) : formatGeneratedValue(val);
   });
   return out;
 }
@@ -1204,9 +1458,28 @@ function isBulletedValue(value) {
 }
 
 function fieldInputMarkup(field) {
-  const value = fieldValues[field.field_key] || "";
   const requiredMark = field.is_required ? " *" : "";
   const hint = field.ai_hint ? `<p class="hint">${escapeHtml(field.ai_hint)}</p>` : "";
+
+  // A weekly field: one labelled box per day.
+  if (field.field_type === "weekly" && field.parts && field.parts.length) {
+    const parts = weeklyArray(fieldValues[field.field_key], field.parts.length);
+    return `
+      <div class="field">
+        <label>${escapeHtml(field.label)}${requiredMark}</label>
+        <div class="weekly-parts">
+          ${field.parts.map((name, i) => `
+            <label class="weekly-part">
+              <span class="weekly-part-name">${escapeHtml(name)}</span>
+              <textarea data-field-key="${field.field_key}" data-part="${i}" rows="3" placeholder="Not generated yet">${escapeHtml(parts[i])}</textarea>
+            </label>`).join("")}
+        </div>
+        ${hint}
+      </div>
+    `;
+  }
+
+  const value = fieldValues[field.field_key] || "";
   const bulleted = isBulletedValue(value) || field.field_type === "list" || field.field_type === "table";
 
   const lineCount = String(value).split("\n").length;
@@ -1241,7 +1514,7 @@ function renderResults() {
 
   resultsEl.querySelectorAll("[data-field-key]").forEach((el) => {
     el.addEventListener("input", () => {
-      fieldValues[el.dataset.fieldKey] = el.value;
+      storeSlot(el, el.value);
       markDirty();
       if (mode === "step") renderStepFieldNav();
     });
@@ -1324,8 +1597,7 @@ function sanitizeRichValueHtml(node) {
 }
 
 function syncFieldFromEl(el) {
-  fieldValues[el.dataset.fieldKey] = el.textContent;
-  fieldRichValues[el.dataset.fieldKey] = sanitizeRichValueHtml(el);
+  storeSlot(el, el.textContent, sanitizeRichValueHtml(el));
   el.classList.toggle("lp-filled", !!el.textContent.trim());
 }
 
@@ -1335,7 +1607,7 @@ function syncFieldFromEl(el) {
 // since its checkmark now reflects real completeness rather than position,
 // and clearing a field the teacher already stepped past has to un-tick it.
 function clearFieldState(key) {
-  fieldValues[key] = "";
+  fieldValues[key] = partCount(key) ? weeklyArray([], partCount(key)) : "";
   delete fieldRichValues[key];
   markDirty();
   if (mode === "step") renderStepFieldNav();
@@ -1346,8 +1618,12 @@ function clearFieldState(key) {
 // otherwise the old styled HTML would come back on the next render.
 function clearField(el) {
   const key = el.dataset.fieldKey;
-  el.innerHTML = "";
-  el.classList.remove("lp-filled", "field-needs-answer");
+  // Every slot of the field: a weekly field is cleared for the whole week.
+  const root = el.closest(".lp-doc") || el.parentElement;
+  (slotsFor(key, root).length ? slotsFor(key, root) : [el]).forEach((slot) => {
+    slot.innerHTML = "";
+    slot.classList.remove("lp-filled", "field-needs-answer");
+  });
   clearFieldState(key);
 }
 
@@ -1647,20 +1923,21 @@ async function revealFieldsInLiveDoc(keys) {
   const canvas = liveDocWrap.querySelector(".lp-doc");
   if (!canvas) return;
   for (const key of keys) {
-    const el = canvas.querySelector(`[data-field-key="${key}"]`);
-    if (el) {
-      const value = fieldValues[key];
-      el.textContent = Array.isArray(value) ? value.join("\n") : (value || "");
+    const slots = slotsFor(key, canvas);
+    if (slots.length) {
       delete fieldRichValues[key]; // fresh AI text replaces any earlier manual styling
-      el.classList.add("lp-filled");
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      slots.forEach((el) => {
+        el.textContent = valueForSlot(el);
+        el.classList.toggle("lp-filled", !!el.textContent.trim());
+      });
+      slots[0].scrollIntoView({ behavior: "smooth", block: "center" });
     }
     await sleep(220);
   }
 }
 
 function hasAnyValue() {
-  return Object.values(fieldValues).some((v) => v && v.trim());
+  return Object.values(fieldValues).some(hasValue);
 }
 
 // The live document view always shows every field already (there's no
@@ -1672,7 +1949,7 @@ function maybeRenderResults() {
 
 function markDirty() {
   dirty = true;
-  saveStatus.textContent = "Unsaved changes — save to export the latest version.";
+  saveStatus.textContent = "Unsaved changes. Save to export the latest version.";
   exportBtn.style.pointerEvents = "none";
   exportBtn.style.opacity = "0.5";
   saveDraft();
@@ -1755,8 +2032,8 @@ function planTitle() {
   // Topic first when there is one: a teacher's drafts are nearly all the same
   // subject and format, so "Subject — Format" would give every card in the
   // "continue where you left off" strip an identical name.
-  if (topic) return `${topic}${subject ? ` — ${subject}` : ""}`;
-  if (subject) return `${subject} — ${fmt.name}`;
+  if (topic) return `${topic}${subject ? ` · ${subject}` : ""}`;
+  if (subject) return `${subject} · ${fmt.name}`;
   return `Untitled ${fmt.name}`;
 }
 
@@ -1810,7 +2087,7 @@ async function runServerSave() {
     } else {
       // A transient failure (offline, server restart) leaves the localStorage
       // draft as the safety net and the page still marked unsaved.
-      saveStatus.textContent = "Couldn't save the draft automatically — use Save lesson plan.";
+      saveStatus.textContent = "Couldn't save the draft automatically. Use Save lesson plan.";
     }
   } finally {
     serverSaveInFlight = false;
@@ -1906,10 +2183,8 @@ function paintRestoredValues(blankMissing = false) {
   const canvas = liveDocWrap.querySelector(".lp-doc");
   if (canvas) {
     canvas.querySelectorAll("[data-field-key]").forEach((el) => {
-      const key = el.dataset.fieldKey;
-      const rich = fieldRichValues[key];
-      const value = fieldValues[key];
-      const text = Array.isArray(value) ? value.join("\n") : (value || "");
+      const rich = richForSlot(el);
+      const text = valueForSlot(el);
       if (rich) {
         el.innerHTML = rich;
         el.classList.add("lp-filled");
@@ -2147,7 +2422,9 @@ function renderProgress(sectionStates) {
   generationProgressEl.hidden = false;
   generationProgressEl.innerHTML = sectionStates
     .map((s) => {
-      const icon = s.status === "done" ? "✓" : s.status === "active" ? "…" : s.status === "retrying" ? "⟳" : "";
+      const icon = s.status === "done" ? Icons.check
+        : s.status === "active" ? Icons.moreHorizontal
+        : s.status === "retrying" ? Icons.refresh : "";
       return `
         <div class="progress-row progress-${s.status}">
           <span class="progress-icon">${icon}</span>
@@ -2158,18 +2435,31 @@ function renderProgress(sectionStates) {
     .join("");
 }
 
-generateFullBtn.addEventListener("click", async () => {
+generateFullBtn.addEventListener("click", () => runGeneration(selectedGenerateKeys()));
+
+// "Generate these too": only the student's own fields that are still blank,
+// leaving everything already written untouched.
+ownFieldsGenerateBtn.addEventListener("click", () => {
+  const blank = selfFieldKeys().filter((key) => !isFieldComplete(key));
+  if (blank.length) runGeneration(blank);
+});
+
+// Generates exactly `includeKeys`: the full plan's selection, or just the
+// student's own fields when they ask for those after the fact.
+async function runGeneration(includeKeys) {
+  if (generating) return;
   if (!updateGate()) {
     showError("Fill in the cooperating teacher, subject, and course guide first.");
     return;
   }
 
-  if (!selectedGenerateKeys().length) {
+  if (!includeKeys.length) {
     showError("Tick at least one field for me to write, or fill the plan in yourself.");
     return;
   }
 
   errorBox.hidden = true;
+  ownFieldsNote.hidden = true;
   setButtonLoading(generateFullBtn, true, "Generating");
   setOwlState("thinking", "Thinking hard about your lesson...");
   generating = true;
@@ -2185,7 +2475,7 @@ generateFullBtn.addEventListener("click", async () => {
   // fresh read of the checklist that could have drifted (it can't change
   // mid-stream since the panel is part of the same disabled controls, but
   // recomputing it separately would be one more place for the two to disagree).
-  const payload = baseGenerationPayload();
+  const payload = { ...baseGenerationPayload(), include_keys: includeKeys };
 
   try {
     const finalEvent = await Api.generateFullStream(payload, (event) => {
@@ -2224,7 +2514,7 @@ generateFullBtn.addEventListener("click", async () => {
     generationProgressEl.hidden = true;
     startGenerateCooldown();
   }
-});
+}
 
 // What the owl says once generation stops. The server only reports on the
 // fields it was asked for (`missing`/`missing_labels`), so an empty
@@ -2241,11 +2531,30 @@ function reportGenerationOutcome(finalEvent, requestedKeys) {
   // Fields the teacher deliberately unticked: not a generation failure, so
   // they get their own wording rather than being folded into "couldn't
   // generate" and implying the AI tried and failed at them.
-  const yoursFields = (fmt.fields || [])
+  const blankUnasked = (fmt.fields || [])
     .filter((f) => !asked.has(f.field_key) && !isFieldComplete(f.field_key));
+  // The student's own fields (lesson title, session number) are theirs to
+  // write, so a blank one is expected, not a problem: a calm note with the
+  // option to have them written after all.
+  const ownFields = blankUnasked.filter((f) => f.role === "self");
+  const yoursFields = blankUnasked.filter((f) => f.role !== "self");
   const yoursKeys = yoursFields.map((f) => f.field_key);
+  const ownKeys = ownFields.map((f) => f.field_key);
+
+  if (ownFields.length) {
+    const labels = joinLabels(ownFields.map((f) => f.label || f.field_key));
+    ownFieldsNoteText.textContent = `${labels} ${ownFields.length === 1 ? "is" : "are"} yours to fill in. Want me to write ${ownFields.length === 1 ? "it" : "them"} too?`;
+    ownFieldsNote.hidden = false;
+  } else {
+    ownFieldsNote.hidden = true;
+  }
 
   if (!missingLabels.length && !yoursKeys.length) {
+    if (ownKeys.length) {
+      setOwlState("guide", `I wrote everything else. ${ownFieldsNoteText.textContent}`);
+      highlightEmptyFields(ownKeys);
+      return;
+    }
     setOwlState("celebrate", "All done! Review what I wrote below, then save when you're happy with it.");
     highlightEmptyFields([]);
     return;
@@ -2283,7 +2592,7 @@ function reportGenerationOutcome(finalEvent, requestedKeys) {
 
   // Draw attention to the actual empty fields rather than only naming them,
   // whichever bucket (or both) they came from.
-  highlightEmptyFields([...missingKeys, ...yoursKeys]);
+  highlightEmptyFields([...missingKeys, ...yoursKeys, ...ownKeys]);
 }
 
 // Marks the still-empty fields in whichever editor this format uses, so the
@@ -2433,7 +2742,7 @@ function renderPlainFieldList() {
       sectionsHtml += `
         <div class="preview-field">
           <div class="preview-field-label">${escapeHtml(field.label)}</div>
-          ${renderPreviewValue(fieldValues[field.field_key])}
+          ${renderPreviewValue(previewValue(field.field_key))}
         </div>`;
     });
   });
@@ -2452,7 +2761,7 @@ function renderUnmatchedFieldList(keys) {
       return `
         <div class="preview-field">
           <div class="preview-field-label">${escapeHtml(label)}</div>
-          ${renderPreviewValue(fieldValues[key])}
+          ${renderPreviewValue(previewValue(key))}
         </div>`;
     })
     .join("");
@@ -2468,8 +2777,7 @@ function fillDocCanvas() {
   if (!canvas) return;
   let filled = 0;
   canvas.querySelectorAll("[data-field-key]").forEach((el) => {
-    const value = fieldValues[el.dataset.fieldKey];
-    const text = Array.isArray(value) ? value.join("\n") : (value || "");
+    const text = valueForSlot(el);
     if (!text.trim()) return;
     el.textContent = text;
     el.classList.add("lp-filled");
@@ -2487,7 +2795,7 @@ function wireDocCanvasEditing() {
   canvas.querySelectorAll("[data-field-key]").forEach((el) => {
     el.setAttribute("data-placeholder", "Not generated yet");
     el.addEventListener("input", () => {
-      fieldValues[el.dataset.fieldKey] = el.textContent;
+      storeSlot(el, el.textContent);
       el.classList.toggle("lp-filled", !!el.textContent.trim());
       markDirty();
       renderResults();
@@ -2529,6 +2837,7 @@ function renderPreviewModal(templateData, docAvailable) {
   }
 
   previewBody.innerHTML = renderPreviewMeta() + toolbar + warning + content;
+  previewBody.querySelectorAll(".lp-doc-wrap").forEach(fitDocPage);
 
   previewBody.querySelectorAll(".doc-view-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -2675,11 +2984,17 @@ async function init() {
   updateGate();
 
   // Two ways in: ?format_id= starts a new plan, ?plan_id= reopens one already
-  // saved (what the "continue where you left off" cards link to). A reopened
+  // saved (what Continue in the list of lesson plans links to). A reopened
   // plan supplies its own format, so the format id doesn't have to be passed
   // alongside it.
   const params = new URLSearchParams(window.location.search);
   const requestedPlanId = params.get("plan_id");
+  if (requestedPlanId) {
+    // A reopened plan came from the list, so that is where Back goes.
+    const back = document.querySelector(".back-link");
+    back.href = "lesson-plan-list.html";
+    back.lastChild.textContent = "Back to List of Lesson Plans";
+  }
   let formatId = params.get("format_id");
   let openedPlan = null;
 
@@ -2712,7 +3027,7 @@ async function init() {
     }
 
     sections = buildSections(fmt.fields);
-    document.title = `${fmt.name} — AlignED`;
+    document.title = `${fmt.name} | AlignED`;
     document.getElementById("format-name").textContent = fmt.name;
 
     // Guided walks the fields that need real thinking. The quick ones are left

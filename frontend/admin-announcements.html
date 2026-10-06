@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Announcements — AlignED</title>
+  <title>Announcements | AlignED</title>
   <link rel="icon" href="img/Icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-05e" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -55,15 +55,19 @@
 
       <main class="dash-main">
         <div class="page-header">
-          <h1 class="dash-page-title" style="margin-bottom:0;">Announcements</h1>
-          <button class="btn btn-primary" id="new-announcement-btn">+ New Announcement</button>
+          <div class="page-heading">
+            <h1 class="dash-page-title">Announcements</h1>
+            <p class="page-subtitle">Post a notice, like an upcoming maintenance window, and it shows as a banner to every signed-in teacher, student and admin.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" id="new-announcement-btn"><span data-icon="plus"></span>New Announcement</button>
+          </div>
         </div>
-        <p class="text-sm mt-0" style="margin-bottom:18px;">Post a notice — like an upcoming system maintenance window — and it shows as a banner to every signed-in teacher, student, and admin.</p>
 
         <div id="error-box" class="alert alert-error" hidden></div>
 
         <div class="section-card">
-          <div style="overflow-x:auto;">
+          <div class="table-scroll">
             <table class="data-table">
               <thead>
                 <tr>
@@ -121,6 +125,20 @@
             </div>
           </div>
           <p class="hint">Leave the window blank to show it immediately until you turn it off.</p>
+          <div class="field">
+            <label for="announcement-video">Video (optional)</label>
+            <div class="video-current" id="announcement-video-current" hidden>
+              <span data-icon="video"></span>
+              <span id="announcement-video-name"></span>
+              <button type="button" class="btn btn-secondary btn-sm" id="announcement-video-remove">Remove video</button>
+            </div>
+            <input type="file" id="announcement-video" accept="video/mp4,video/webm" />
+            <p class="hint">A tutorial or walkthrough, MP4 or WebM, up to 500 MB. It plays inside the announcement for everyone it reaches.</p>
+            <div class="upload-progress" id="announcement-video-progress" hidden>
+              <div class="upload-progress-track"><div class="upload-progress-bar" id="announcement-video-bar"></div></div>
+              <span id="announcement-video-percent">0%</span>
+            </div>
+          </div>
           <label class="checkbox-row" style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
             <input type="checkbox" id="announcement-active" checked />
             <span>Active (visible to users)</span>
@@ -131,8 +149,8 @@
     </div>
   </div>
 
-  <script src="js/api.js"></script>
-  <script src="js/icons.js"></script>
-  <script src="js/admin-announcements.js"></script>
+  <script src="js/api.js?v=2026-10-05e"></script>
+  <script src="js/icons.js?v=2026-10-05e"></script>
+  <script src="js/admin-announcements.js?v=2026-10-05e"></script>
 </body>
 </html>

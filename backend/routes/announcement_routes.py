@@ -1,6 +1,8 @@
+import os
+import re
 from datetime import datetime
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, current_app, request, jsonify, send_file
 
 from extensions import db
 from models.announcement import Announcement, ANNOUNCEMENT_TYPES
@@ -10,6 +12,33 @@ from routes.auth_routes import login_required, admin_required, current_user
 from services.notify import notify_many
 
 announcement_bp = Blueprint("announcements", __name__)
+
+# A tutorial video arrives in chunks: gunicorn stops any one request after
+# 120 s, which a single large upload over a school connection would outlast.
+MAX_VIDEO_BYTES = 500 * 1024 * 1024
+_UPLOAD_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+
+
+def _video_kind(head):
+    """"mp4" or "webm" from a file's first bytes, or None for anything else:
+    the extension a browser reports is not trusted."""
+    if head[4:8] == b"ftyp":
+        return "mp4"
+    if head[:4] == b"\x1a\x45\xdf\xa3":
+        return "webm"
+    return None
+
+
+def _video_dir():
+    folder = os.path.join(current_app.config["UPLOAD_FOLDER"], "videos")
+    os.makedirs(os.path.join(folder, "tmp"), exist_ok=True)
+    return folder
+
+
+def _remove_video(announcement):
+    if announcement.video_path and os.path.isfile(announcement.video_path):
+        os.remove(announcement.video_path)
+    announcement.video_path = announcement.video_name = announcement.video_size = None
 
 
 def _parse_dt(value):
@@ -218,6 +247,7 @@ def delete_announcement(announcement_id):
     announcement = Announcement.query.get_or_404(announcement_id)
     if not _can_manage_announcement(user, announcement):
         return jsonify({"status": "error", "message": "You can only delete your own announcements."}), 403
+    _remove_video(announcement)
     db.session.delete(announcement)
     db.session.commit()
     return jsonify({"status": "ok"})
@@ -323,6 +353,93 @@ def admin_update_announcement(announcement_id):
 @admin_required
 def admin_delete_announcement(announcement_id):
     announcement = Announcement.query.get_or_404(announcement_id)
+    _remove_video(announcement)
     db.session.delete(announcement)
     db.session.commit()
     return jsonify({"status": "ok"})
+
+
+# ---- A tutorial video on an announcement ----
+
+def _bad_upload(part, message):
+    for path in (part, part + ".n"):
+        if os.path.exists(path):
+            os.remove(path)
+    return jsonify({"status": "error", "message": message}), 400
+
+
+@announcement_bp.post("/admin/announcements/<int:announcement_id>/video/chunks")
+@admin_required
+def admin_upload_video_chunk(announcement_id):
+    """One chunk of a video, in order. The last one is checked (a real MP4 or
+    WebM, within the size limit) and then becomes the announcement's video,
+    replacing any earlier one. A bad upload leaves nothing behind."""
+    announcement = Announcement.query.get_or_404(announcement_id)
+    upload_id = request.form.get("upload_id") or ""
+    chunk = request.files.get("chunk")
+    try:
+        index = int(request.form.get("index", ""))
+        total = int(request.form.get("total", ""))
+    except ValueError:
+        index = total = -1
+    if not _UPLOAD_ID_RE.match(upload_id) or chunk is None or total < 1 or not 0 <= index < total:
+        return jsonify({"status": "error", "message": "That upload didn't arrive properly. Try again."}), 400
+
+    folder = _video_dir()
+    part = os.path.join(folder, "tmp", f"{announcement_id}-{upload_id}.part")
+    received = 0
+    if index > 0 and os.path.exists(part + ".n"):
+        with open(part + ".n") as fh:
+            received = int(fh.read() or 0)
+    if index != received:
+        return _bad_upload(part, "Parts of the video arrived out of order. Try the upload again.")
+
+    data = chunk.read()
+    if (os.path.getsize(part) if index > 0 and os.path.exists(part) else 0) + len(data) > MAX_VIDEO_BYTES:
+        return _bad_upload(part, f"Videos can be up to {MAX_VIDEO_BYTES // (1024 * 1024)} MB.")
+    with open(part, "ab" if index > 0 else "wb") as fh:
+        fh.write(data)
+    with open(part + ".n", "w") as fh:
+        fh.write(str(index + 1))
+
+    if index < total - 1:
+        return jsonify({"status": "ok", "received": index + 1})
+
+    with open(part, "rb") as fh:
+        kind = _video_kind(fh.read(12))
+    if kind is None:
+        return _bad_upload(part, "That file isn't an MP4 or WebM video.")
+    os.remove(part + ".n")
+    dest = os.path.join(folder, f"announcement-{announcement.id}.{kind}")
+    if announcement.video_path and announcement.video_path != dest and os.path.isfile(announcement.video_path):
+        os.remove(announcement.video_path)
+    os.replace(part, dest)
+    announcement.video_path = dest
+    announcement.video_name = (request.form.get("filename") or f"video.{kind}")[:255]
+    announcement.video_size = os.path.getsize(dest)
+    db.session.commit()
+    return jsonify({"status": "ok", "announcement": announcement.to_dict()})
+
+
+@announcement_bp.delete("/admin/announcements/<int:announcement_id>/video")
+@admin_required
+def admin_delete_video(announcement_id):
+    announcement = Announcement.query.get_or_404(announcement_id)
+    _remove_video(announcement)
+    db.session.commit()
+    return jsonify({"status": "ok", "announcement": announcement.to_dict()})
+
+
+@announcement_bp.get("/announcements/<int:announcement_id>/video")
+@login_required
+def watch_video(announcement_id):
+    """The video, for whoever the announcement reaches. conditional=True
+    answers Range requests, so the player can seek without downloading it all."""
+    user = current_user()
+    announcement = Announcement.query.get_or_404(announcement_id)
+    allowed = (user.role == "admin" or announcement.author_id == user.id
+               or announcement.section_id is None
+               or announcement.section_id in _visible_section_ids(user))
+    if not allowed or not announcement.video_path or not os.path.isfile(announcement.video_path):
+        return jsonify({"status": "error", "message": "Video not found."}), 404
+    return send_file(announcement.video_path, conditional=True)

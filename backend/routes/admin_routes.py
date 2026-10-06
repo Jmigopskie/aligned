@@ -140,6 +140,16 @@ def delete_user(user_id):
     if user.role == "admin" and User.query.filter_by(role="admin").count() <= 1:
         return jsonify({"status": "error", "message": "You can't delete the last remaining admin."}), 400
 
+    # The built-in formats and guides need an owner (both foreign keys are
+    # NOT NULL) and are seeded under the first admin, so they pass to the
+    # admin doing the deleting instead of blocking the delete.
+    from models.course_guide import CourseGuide
+    from models.format import LessonPlanFormat
+    LessonPlanFormat.query.filter_by(owner_id=user.id, is_builtin=True).update({"owner_id": acting_admin.id})
+    CourseGuide.query.filter_by(uploader_id=user.id, is_builtin=True).update({"uploader_id": acting_admin.id})
+    db.session.flush()
+    db.session.expire(user)
+
     db.session.delete(user)
     db.session.commit()
     return jsonify({"status": "ok"})

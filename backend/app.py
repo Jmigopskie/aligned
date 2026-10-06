@@ -112,6 +112,17 @@ def _migrate_user_columns():
     _add_column("users", "avatar_path", "VARCHAR(255)")
     _add_column("users", "banner_path", "VARCHAR(255)")
 
+    # The owl's onboarding tour is for accounts made from now on. Only when the
+    # column is first added are the accounts already there marked as done: on
+    # every later boot it already exists, so new accounts keep their blank.
+    from sqlalchemy import inspect, text
+    had_column = "onboarded_at" in {c["name"] for c in inspect(db.engine).get_columns("users")} \
+        if "users" in inspect(db.engine).get_table_names() else True
+    _add_column("users", "onboarded_at", "DATETIME")
+    if not had_column:
+        db.session.execute(text("UPDATE users SET onboarded_at = CURRENT_TIMESTAMP WHERE onboarded_at IS NULL"))
+        db.session.commit()
+
 
 def _migrate_course_guide_columns():
     """Add the file_hash column (used to dedupe uploads) to databases
@@ -140,8 +151,54 @@ def _migrate_course_guide_columns():
 def _migrate_format_columns():
     """Add the template_docx_path column (the auto-converted, fillable copy
     of a PDF-sourced reference format) to databases created before this
-    feature existed."""
+    feature existed, and the columns that mark a seeded built-in format."""
     _add_column("lesson_plan_formats", "template_docx_path", "VARCHAR(255)")
+    _add_column("lesson_plan_formats", "is_builtin", "BOOLEAN NOT NULL DEFAULT 0")
+    _add_column("lesson_plan_formats", "builtin_key", "VARCHAR(64)")
+    _add_column("lesson_plan_formats", "description", "VARCHAR(255)")
+    _add_unique_index("lesson_plan_formats", "uq_lesson_plan_formats_builtin_key", "builtin_key")
+
+
+def _migrate_course_guide_builtin_columns():
+    """Columns describing an official DepEd guide seeded from backend/builtin."""
+    for column, ddl_type in (
+        ("is_builtin", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("builtin_key", "VARCHAR(64)"),
+        ("doc_type", "VARCHAR(20)"),
+        ("grade_band", "VARCHAR(20)"),
+        ("grades", "VARCHAR(20)"),
+        ("curriculum", "VARCHAR(20)"),
+        ("source_url", "VARCHAR(500)"),
+        ("retrieved_at", "DATE"),
+    ):
+        _add_column("course_guides", column, ddl_type)
+    _add_unique_index("course_guides", "uq_course_guides_builtin_key", "builtin_key")
+
+
+def _add_unique_index(table: str, name: str, column: str):
+    """CREATE UNIQUE INDEX, tolerating it already being there.
+
+    Same race as _add_column: every gunicorn worker boots at once, so two can
+    both find the index missing. The loser's "already exists" (SQLite) or
+    "duplicate key name" (MySQL 1061) means the index is in place, which is all
+    this wants. The seeder relies on the index to stop two workers inserting the
+    same built-in twice. NULLs never collide, so teachers' rows are unaffected.
+    """
+    from sqlalchemy import inspect, text
+    from sqlalchemy.exc import DatabaseError
+
+    inspector = inspect(db.engine)
+    if table not in inspector.get_table_names():
+        return
+    if name in {ix["name"] for ix in inspector.get_indexes(table)}:
+        return
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(text(f"CREATE UNIQUE INDEX {name} ON {table} ({column})"))
+    except DatabaseError as exc:
+        message = str(exc).lower()
+        if "already exists" not in message and "duplicate key name" not in message:
+            raise
 
 
 def _migrate_format_field_columns():
@@ -150,6 +207,8 @@ def _migrate_format_field_columns():
     editor) to databases created before this feature existed."""
     _add_column("format_fields", "anchor_index", "INTEGER")
     _add_column("format_fields", "role", "VARCHAR(10)")
+    # The day names of a weekly field; see FormatField.parts.
+    _add_column("format_fields", "parts", "TEXT")
 
 
 def _migrate_section_columns():
@@ -164,6 +223,10 @@ def _migrate_announcement_columns():
     one of their own sections instead of everyone) to databases created
     before this feature existed."""
     _add_column("announcements", "section_id", "INTEGER")
+    # An attached tutorial video.
+    _add_column("announcements", "video_path", "VARCHAR(500)")
+    _add_column("announcements", "video_name", "VARCHAR(255)")
+    _add_column("announcements", "video_size", "BIGINT")
 
 
 def _ensure_default_admin(app):
@@ -234,12 +297,18 @@ def create_app():
         db.create_all()
         _migrate_lesson_plan_columns()
         _migrate_user_columns()
+        # Before _migrate_course_guide_columns: its backfill queries the full
+        # CourseGuide model, which fails on a database missing these columns.
+        _migrate_course_guide_builtin_columns()
         _migrate_course_guide_columns()
         _migrate_format_columns()
         _migrate_format_field_columns()
         _migrate_announcement_columns()
         _migrate_section_columns()
         _ensure_default_admin(app)
+
+        from services.builtins import seed_builtins
+        seed_builtins()
 
     @app.get("/api/health")
     def health():

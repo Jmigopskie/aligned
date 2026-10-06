@@ -65,6 +65,7 @@ const Api = {
     apiFetch("/api/login", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => apiFetch("/api/logout", { method: "POST" }),
   me: () => apiFetch("/api/me"),
+  markOnboarded: () => apiFetch("/api/me/onboarded", { method: "POST" }),
   updateMe: (payload) =>
     apiFetch("/api/me", { method: "PATCH", body: JSON.stringify(payload) }),
   changePassword: (currentPassword, newPassword) =>
@@ -112,8 +113,15 @@ const Api = {
 
   formatSourceUrl: (formatId) => `${API_URL}/api/formats/${formatId}/source`,
 
-  searchCourseGuides: (subject) =>
-    apiFetch(`/api/course-guides?subject=${encodeURIComponent(subject || "")}`),
+  // A string searches by subject, as before; an object passes any of
+  // subject, q, grade_band, doc_type and prefer_grade_band.
+  searchCourseGuides: (params) => {
+    const query = new URLSearchParams();
+    Object.entries(typeof params === "string" || !params ? { subject: params || "" } : params)
+      .forEach(([k, v]) => { if (v) query.set(k, v); });
+    return apiFetch(`/api/course-guides?${query}`);
+  },
+  courseGuideFileUrl: (guideId) => `${API_URL}/api/course-guides/${guideId}/file`,
   uploadCourseGuide: (file, subject, title) => {
     const form = new FormData();
     form.append("file", file);
@@ -282,6 +290,28 @@ const Api = {
     apiFetch(`/api/admin/announcements/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   adminDeleteAnnouncement: (id) =>
     apiFetch(`/api/admin/announcements/${id}`, { method: "DELETE" }),
+  adminDeleteAnnouncementVideo: (id) =>
+    apiFetch(`/api/admin/announcements/${id}/video`, { method: "DELETE" }),
+  // Sends a video in 5 MB pieces: the server stops any one request after two
+  // minutes, which a large file over a school connection would outlast.
+  // onProgress(fraction) after each piece. Resolves with the updated announcement.
+  async adminUploadAnnouncementVideo(id, file, onProgress) {
+    const CHUNK = 5 * 1024 * 1024;
+    const total = Math.max(1, Math.ceil(file.size / CHUNK));
+    const uploadId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    let data = null;
+    for (let index = 0; index < total; index++) {
+      const form = new FormData();
+      form.append("upload_id", uploadId);
+      form.append("index", String(index));
+      form.append("total", String(total));
+      form.append("filename", file.name);
+      form.append("chunk", file.slice(index * CHUNK, (index + 1) * CHUNK), "chunk");
+      data = await apiFetch(`/api/admin/announcements/${id}/video/chunks`, { method: "POST", body: form });
+      if (onProgress) onProgress((index + 1) / total);
+    }
+    return data.announcement;
+  },
 
   // Notifications
   listNotifications: () => apiFetch("/api/notifications"),
@@ -457,6 +487,8 @@ async function requireAuth() {
     const data = await Api.me();
     cacheUser(data.user);
     loadAnnouncementBanner();
+    addHelpButton();
+    loadTourIfDue(data.user);
     wireNotificationBell();
     hidePageTransition();
     return data.user;
@@ -513,7 +545,7 @@ function wireNotificationBell() {
 
   function renderPanel(items) {
     if (!items.length) {
-      panel.innerHTML = `<div class="notif-empty">You're all caught up — no notifications yet.</div>`;
+      panel.innerHTML = `<div class="notif-empty">You're all caught up. No notifications yet.</div>`;
       return;
     }
     panel.innerHTML = `
@@ -609,6 +641,47 @@ const ANNOUNCEMENT_TYPE_LABEL = {
 // known announcements immediately, then reconciling once the real fetch
 // resolves, means the shift only ever happens on genuine changes (a new
 // announcement, one expiring) instead of on every single page load.
+// The owl's tour (js/owl-tour.js) is fetched only when it has something to do:
+// a tour already under way on another tab, or a new account (or "Replay the
+// tour") arriving on its landing page.
+function loadTourIfDue(user) {
+  let underWay = false;
+  try {
+    underWay = !!sessionStorage.getItem("alignedTour");
+  } catch (err) {
+    underWay = false;
+  }
+  const page = location.pathname.split("/").pop();
+  const landing = page === (user.role === "admin" ? "admin-dashboard.html" : "dashboard.html");
+  const replay = new URLSearchParams(location.search).get("tour") === "1";
+  if (!underWay && !(landing && (replay || !user.onboarded))) return;
+  if (typeof OwlTour !== "undefined") {
+    OwlTour.run(user);
+    return;
+  }
+  const script = document.createElement("script");
+  script.src = "js/owl-tour.js?v=2026-10-05e";
+  script.onload = () => OwlTour.run(user);
+  document.body.appendChild(script);
+}
+
+// The Help and FAQ button, first in the top bar of every signed-in page. Added
+// here rather than in each page's markup so no page can be missed. The icon is
+// inlined because api.js loads on pages that never load icons.js.
+function addHelpButton() {
+  const actions = document.querySelector(".topbar-actions");
+  if (!actions || document.getElementById("help-btn")) return;
+  const link = document.createElement("a");
+  link.id = "help-btn";
+  link.className = "icon-btn";
+  link.href = "faq.html";
+  link.title = "Help and FAQ";
+  link.setAttribute("aria-label", "Help and FAQ");
+  if (location.pathname.endsWith("/faq.html")) link.setAttribute("aria-current", "page");
+  link.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>`;
+  actions.insertBefore(link, actions.firstChild);
+}
+
 function loadAnnouncementBanner() {
   const shell = document.querySelector(".dash-shell");
   if (!shell) return;
@@ -643,8 +716,9 @@ function loadAnnouncementBanner() {
           <div class="announcement-banner-body">
             <strong>${escapeHtml(a.title)}</strong>
             <span>${escapeHtml(a.message)}</span>
+            ${a.has_video ? `<a class="announcement-banner-video" href="announcements.html#announcement-${a.id}">Watch the video</a>` : ""}
           </div>
-          <button type="button" class="announcement-banner-close" aria-label="Dismiss">&times;</button>
+          <button type="button" class="announcement-banner-close" aria-label="Dismiss"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         </div>`
       )
       .join("");
@@ -705,13 +779,13 @@ const OWL_GUIDE_STEPS = {
   "plan-ready": { pose: "check", text: "Setup is complete. Open “Generate & review” when you are ready to write the plan." },
   "plan-mode": { pose: "idea", text: "Two ways to write it: let me draft the whole plan, or take it field by field in guided mode." },
   "plan-guided": { pose: "point", text: "Guided mode: you write each field, and the next one opens once the current one is filled. Ask me in the chat for help with a field." },
-  "plan-full": { pose: "think", text: "Writing your plan now. This takes a moment — the fields fill in as each one is finished." },
+  "plan-full": { pose: "think", text: "Writing your plan now. This takes a moment. The fields fill in as each one is finished." },
   "plan-done": { pose: "celebrate", text: "The plan is written. Read it through, change anything you like, then save it." },
   "plan-saved": { pose: "celebrate", text: "Saved. You can export it as a Word file whenever you need a copy." },
 
   // Lesson plan format making
-  "format-source": { pose: "wave", text: "A format is the layout your plans are printed in. Upload a blank copy of yours, or start from an empty sheet." },
-  "format-cleanup": { pose: "check", text: "This is a live copy of your document. Fix any typos and delete what you do not need — the fillable fields are worked out for you when you save." },
+  "format-source": { pose: "wave", text: "A format is the layout your plans are printed in. Upload a blank copy of yours and AlignED finds the fields." },
+  "format-cleanup": { pose: "check", text: "This is a live copy of your document. Fix any typos and delete what you do not need. The fillable fields are worked out for you when you save." },
   "format-blank": { pose: "point", text: "Add a row for each field your format needs, in the order they appear on the page." },
 };
 
@@ -724,6 +798,10 @@ const OwlGuide = {
   // it for the rest of the page, instead of springing back each time.
   _pos: { x: 0, y: 0 },
   VISIBLE_MS: 5000,
+  // Docked: during Guided mode the owl stays on screen beside the chat
+  // instead of leaving after one line. See dock().
+  _docked: false,
+  _moveListeners: [],
 
   _build() {
     const el = document.createElement("div");
@@ -738,10 +816,12 @@ const OwlGuide = {
         <p id="owl-guide-message" aria-live="polite"></p>
         <button type="button" class="owl-guide-close" aria-label="Dismiss the guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       </div>
-      <img class="owl-guide-img" id="owl-guide-img" src="img/owl/alan-idle.png" alt="" />`;
+      <span class="owl-guide-figure">
+        <img class="owl-guide-img" id="owl-guide-img" src="img/owl/alan-idle.png" alt="" />
+      </span>`;
     document.body.appendChild(el);
 
-    el.querySelector(".owl-guide-close").addEventListener("click", () => this.hide());
+    el.querySelector(".owl-guide-close").addEventListener("click", () => (this._tour ? this._tour.onSkip() : this.hide()));
 
     // Hold still while it is being read or moved — a message that vanishes
     // mid-sentence is worse than one that never appeared. Bound to each part
@@ -857,6 +937,7 @@ const OwlGuide = {
     this._pos.y = Math.min(Math.max(y, minY), maxY);
     el.style.setProperty("--owl-x", `${this._pos.x}px`);
     el.style.setProperty("--owl-y", `${this._pos.y}px`);
+    this._moveListeners.forEach((fn) => fn());
   },
 
   _pause() {
@@ -870,7 +951,49 @@ const OwlGuide = {
 
   _arm() {
     clearTimeout(this._timer);
+    // A tour step stays until the reader moves on.
+    if (this._tour) return;
     this._timer = setTimeout(() => this.hide(), this.VISIBLE_MS);
+  },
+
+  // One step of a guided tour: the line, a counter, and Back / Next / Skip.
+  // tour = { index, total, onBack, onNext, onSkip }. The close button skips.
+  tourStep(spec, tour) {
+    const el = this._el || this._build();
+    this._tour = tour;
+    el.classList.add("is-touring");
+    this.show(spec);
+    let bar = el.querySelector(".owl-tour-controls");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.className = "owl-tour-controls";
+      this._bubble().appendChild(bar);
+    }
+    const last = tour.index === tour.total - 1;
+    const nextLabel = tour.nextLabel || (last ? "Finish" : "Next");
+    bar.innerHTML = `
+      <span class="owl-tour-count">${tour.index + 1} of ${tour.total}</span>
+      <button type="button" class="owl-tour-skip" data-tour="skip">Skip tour</button>
+      ${tour.onBack ? '<button type="button" class="btn btn-secondary btn-sm" data-tour="back">Back</button>' : ""}
+      <button type="button" class="btn btn-primary btn-sm" data-tour="next">${nextLabel}</button>`;
+    bar.hidden = false;
+    bar.querySelector('[data-tour="next"]').addEventListener("click", tour.onNext);
+    bar.querySelector('[data-tour="skip"]').addEventListener("click", tour.onSkip);
+    const back = bar.querySelector('[data-tour="back"]');
+    if (back) back.addEventListener("click", tour.onBack);
+    bar.querySelector('[data-tour="next"]').focus({ preventScroll: true });
+  },
+
+  endTour() {
+    this._tour = null;
+    if (this._el) this._el.classList.remove("is-touring");
+    const bar = this._el && this._el.querySelector(".owl-tour-controls");
+    if (bar) bar.hidden = true;
+    this.hide();
+  },
+
+  _bubble() {
+    return this._el && this._el.querySelector(".owl-guide-bubble");
   },
 
   // show("plan-setup") for a scripted step, or show({pose, text}) for a line
@@ -881,21 +1004,76 @@ const OwlGuide = {
     const el = this._el || this._build();
     el.querySelector("#owl-guide-message").textContent = spec.text;
     el.querySelector("#owl-guide-img").src = `img/owl/alan-${spec.pose || "idle"}.png`;
+    this._cancelLeave();
     el.classList.remove("is-leaving");
     el.hidden = false;
+    // Docked beside the chat, the chat is his voice: a line only changes his
+    // pose, since a bubble would sit on top of the chat bar.
+    this._bubble().hidden = this._docked;
     this._moveTo(this._pos.x, this._pos.y);
     this._arm();
   },
 
+  // Docked, only the speech bubble goes away; the owl himself stays for as
+  // long as Guided mode lasts.
   hide() {
     this._pause();
     if (!this._el || this._el.hidden) return;
+    if (this._docked) {
+      this._bubble().hidden = true;
+      return;
+    }
     const el = this._el;
     el.classList.add("is-leaving");
-    setTimeout(() => {
+    clearTimeout(this._leaveTimer);
+    this._leaveTimer = setTimeout(() => {
       el.hidden = true;
       el.classList.remove("is-leaving");
     }, 200);
+  },
+
+  // A fade-out still in flight must not hide an owl that was shown or docked
+  // again in the meantime (leaving Guided mode and coming straight back).
+  _cancelLeave() {
+    clearTimeout(this._leaveTimer);
+    this._leaveTimer = null;
+  },
+
+  // Guided mode: the owl stays on screen next to the chat (which has its own
+  // Open and Hide button) instead of leaving after five seconds. He is still
+  // only a companion: dragging moves him and the chat follows, but clicking
+  // him does nothing to the chat.
+  dock() {
+    const el = this._el || this._build();
+    this._cancelLeave();
+    el.classList.remove("is-leaving");
+    el.hidden = false;
+    if (this._docked) return;
+    this._docked = true;
+    el.classList.add("is-docked");
+    this._bubble().hidden = true;
+    this._pause();
+    this._moveTo(this._pos.x, this._pos.y);
+  },
+
+  undock() {
+    if (!this._docked) return;
+    this._docked = false;
+    this._el.classList.remove("is-docked");
+    this._bubble().hidden = false;
+    this.hide();
+  },
+
+  // Where the owl is drawn right now, for placing the chat beside him.
+  rect() {
+    if (!this._el || this._el.hidden) return null;
+    const box = this._el.querySelector("#owl-guide-img").getBoundingClientRect();
+    return box.width ? box : null;
+  },
+
+  // Called after every drag, nudge or window resize that moves him.
+  onMove(fn) {
+    if (!this._moveListeners.includes(fn)) this._moveListeners.push(fn);
   },
 };
 
@@ -965,3 +1143,60 @@ if (document.readyState === "loading") {
 } else {
   wirePasswordToggles();
 }
+
+// Lets a table read as a stack of cards at phone width: each cell carries its
+// column's header as data-label, which the CSS prints beside the value. Rows
+// are rendered by each page's own script, at different times, so this
+// watches for them rather than asking every page to call it.
+// The scale that fits a document page to its panel's width, never past its
+// true size. The page's width comes from the .docx, in points.
+function docFitScale(wrapEl) {
+  const page = wrapEl.querySelector(".lp-doc[data-page-width]");
+  if (!page) return 1;
+  const pageWidth = (parseFloat(page.dataset.pageWidth) * 96) / 72;
+  const cs = getComputedStyle(wrapEl);
+  const available = wrapEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  if (!(pageWidth > 0) || !(available > 0)) return 1;
+  return Math.min(1, available / pageWidth);
+}
+
+// Fits a read-only document preview (no zoom toolbar) to its panel, and keeps
+// it fitted when the panel resizes or first becomes visible in a modal.
+function fitDocPage(wrapEl) {
+  const apply = () => wrapEl.style.setProperty("--doc-zoom", String(docFitScale(wrapEl)));
+  apply();
+  if (window.ResizeObserver && !wrapEl._docFitObserver) {
+    wrapEl._docFitObserver = new ResizeObserver(apply);
+    wrapEl._docFitObserver.observe(wrapEl);
+  }
+}
+
+function labelTableCells(root = document) {
+  root.querySelectorAll("table.data-table").forEach((table) => {
+    // Pages hide whole columns per tab with the hidden attribute, on the th
+    // and its cells alike, so both sides skip hidden ones to stay aligned.
+    const heads = Array.from(table.querySelectorAll("thead th")).filter((th) => !th.hidden).map((th) => th.textContent.trim());
+    table.querySelectorAll("tbody tr").forEach((tr) => {
+      Array.from(tr.children).filter((td) => !td.hidden).forEach((td, i) => {
+        if (td.colSpan > 1) td.classList.add("cell-full");
+        else if (heads[i] && !td.hasAttribute("data-label")) td.setAttribute("data-label", heads[i]);
+      });
+    });
+  });
+}
+
+(function watchTables() {
+  let queued = false;
+  const run = () => {
+    queued = false;
+    labelTableCells();
+  };
+  // Batched to one pass per frame: a page filling a table fires a mutation
+  // per row, and labelling is cheap but not free.
+  new MutationObserver(() => {
+    if (!queued) {
+      queued = true;
+      requestAnimationFrame(run);
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
+})();

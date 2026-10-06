@@ -41,10 +41,26 @@ const DOC_HIGHLIGHTS = [
   { cls: "hl-cyan", label: "Cyan", swatch: "#A5F3FC" },
 ];
 
-// Zoom steps, as multipliers of the document's natural size. A fixed ladder
-// rather than free zooming, so the − and + buttons always land somewhere sane.
+// Zoom steps, as multipliers of the page's true size (100% is what Word shows
+// at 100%). A fixed ladder, so − and + always land somewhere sane.
 const DOC_ZOOM_STEPS = [0.5, 0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
-const DOC_ZOOM_DEFAULT_INDEX = 4; // 1.0
+// "Fit": the page scaled to the panel's width, never past 100%. The default.
+const DOC_ZOOM_FIT = -1;
+
+// The ladder step one notch in `direction` (+1 in, -1 out) from `scale`, or
+// null when there is none. A phone's Fit (about 19%) sits below every step, so
+// zooming out from it stays put rather than jumping up to 50%.
+function docZoomStepIndex(scale, direction) {
+  if (direction > 0) {
+    const next = DOC_ZOOM_STEPS.findIndex((s) => s > scale + 0.001);
+    return next === -1 ? null : next;
+  }
+  let next = null;
+  DOC_ZOOM_STEPS.forEach((s, i) => {
+    if (s < scale - 0.001) next = i;
+  });
+  return next;
+}
 
 function docColorMenu(kind, options) {
   const items = options
@@ -117,7 +133,7 @@ function renderDocToolbar({ variant }) {
     <div class="doc-toolbar-sep"></div>
     <div class="doc-toolbar-group">
       <button type="button" class="doc-tool-btn" data-zoom="out" data-icon="zoomOut" title="Zoom out"></button>
-      <button type="button" class="doc-tool-btn doc-zoom-readout" data-zoom="reset" title="Reset zoom to 100%">100%</button>
+      <button type="button" class="doc-tool-btn doc-zoom-readout" data-zoom="reset" title="Fit the page to the panel">Fit</button>
       <button type="button" class="doc-tool-btn" data-zoom="in" data-icon="zoomIn" title="Zoom in"></button>
       <button type="button" class="doc-tool-btn" data-fullscreen="toggle" data-icon="expand" title="Fullscreen"></button>
     </div>
@@ -150,9 +166,7 @@ function paintDocToolbarIcons(toolbarEl) {
 // Zoom and fullscreen
 // ---------------------------------------------------------------------------
 
-// Scales the document without reflowing the page around it: the wrapper keeps
-// the scaled height so scrollbars stay correct, which a bare transform on the
-// page would get wrong.
+// Zoom (a ladder of steps, plus Fit) and fullscreen for a document page.
 function initDocViewControls({ toolbarEl, wrapEl, stageEl, storageKey }) {
   // What goes fullscreen. The toolbar has to be inside it or it vanishes the
   // moment fullscreen starts, so callers pass the element containing both.
@@ -160,48 +174,60 @@ function initDocViewControls({ toolbarEl, wrapEl, stageEl, storageKey }) {
   // removed when the stage was introduced, so fsEl is always the stage.
   const fsEl = stageEl;
 
-  let zoomIndex = DOC_ZOOM_DEFAULT_INDEX;
+  let zoomIndex = DOC_ZOOM_FIT;
 
   const readout = toolbarEl.querySelector(".doc-zoom-readout");
   const fullscreenBtn = toolbarEl.querySelector("[data-fullscreen=toggle]");
 
   // Remembered per page so a teacher who works zoomed in doesn't have to set
   // it again every visit. A failure here is ignored: private mode and blocked
-  // storage must not stop the document from rendering.
-  if (storageKey) {
+  // storage must not stop the document from rendering. The key is new with
+  // Fit: the old one held "100%" for everyone, saved on every visit.
+  const zoomKey = storageKey ? `${storageKey}/2` : null;
+  if (zoomKey) {
     try {
-      const saved = parseInt(localStorage.getItem(storageKey), 10);
-      if (!Number.isNaN(saved) && saved >= 0 && saved < DOC_ZOOM_STEPS.length) zoomIndex = saved;
+      const saved = parseInt(localStorage.getItem(zoomKey), 10);
+      if (!Number.isNaN(saved) && saved >= DOC_ZOOM_FIT && saved < DOC_ZOOM_STEPS.length) zoomIndex = saved;
     } catch (err) {
-      /* storage unavailable; the default zoom applies */
+      /* storage unavailable; Fit applies */
     }
   }
 
+  function currentScale() {
+    return zoomIndex === DOC_ZOOM_FIT ? docFitScale(wrapEl) : DOC_ZOOM_STEPS[zoomIndex];
+  }
+
   function applyZoom() {
-    const scale = DOC_ZOOM_STEPS[zoomIndex];
+    const scale = currentScale();
     wrapEl.style.setProperty("--doc-zoom", String(scale));
-    wrapEl.classList.toggle("is-zoomed", scale !== 1);
-    if (readout) readout.textContent = `${Math.round(scale * 100)}%`;
-    if (storageKey) {
+    const pct = `${Math.round(scale * 100)}%`;
+    if (readout) readout.textContent = zoomIndex === DOC_ZOOM_FIT ? `Fit ${pct}` : pct;
+    if (zoomKey) {
       try {
-        localStorage.setItem(storageKey, String(zoomIndex));
+        localStorage.setItem(zoomKey, String(zoomIndex));
       } catch (err) {
         /* storage unavailable; the zoom still applies for this visit */
       }
     }
   }
 
-  function setZoom(next) {
-    zoomIndex = Math.max(0, Math.min(DOC_ZOOM_STEPS.length - 1, next));
+  function setZoom(index) {
+    zoomIndex = Math.max(DOC_ZOOM_FIT, Math.min(DOC_ZOOM_STEPS.length - 1, index));
     applyZoom();
+  }
+
+  // − and + step along the ladder from wherever the page is now, Fit included.
+  function stepZoom(direction) {
+    const next = docZoomStepIndex(currentScale(), direction);
+    if (next !== null) setZoom(next);
   }
 
   toolbarEl.querySelectorAll("[data-zoom]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const action = btn.dataset.zoom;
-      if (action === "in") setZoom(zoomIndex + 1);
-      else if (action === "out") setZoom(zoomIndex - 1);
-      else setZoom(DOC_ZOOM_DEFAULT_INDEX);
+      if (action === "in") stepZoom(1);
+      else if (action === "out") stepZoom(-1);
+      else setZoom(DOC_ZOOM_FIT);
     });
   });
 
@@ -211,10 +237,17 @@ function initDocViewControls({ toolbarEl, wrapEl, stageEl, storageKey }) {
     (event) => {
       if (!event.ctrlKey) return;
       event.preventDefault();
-      setZoom(zoomIndex + (event.deltaY < 0 ? 1 : -1));
+      stepZoom(event.deltaY < 0 ? 1 : -1);
     },
     { passive: false }
   );
+
+  // Fit follows the panel: a resize, fullscreen, or a new document loaded in.
+  const refit = () => {
+    if (zoomIndex === DOC_ZOOM_FIT) applyZoom();
+  };
+  if (window.ResizeObserver) new ResizeObserver(refit).observe(wrapEl);
+  new MutationObserver(refit).observe(wrapEl, { childList: true });
 
   // The native Fullscreen API on the wrapper, so the document fills the screen
   // with its own toolbar still reachable. The fallback class covers browsers

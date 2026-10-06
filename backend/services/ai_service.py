@@ -203,9 +203,24 @@ def _field_directive(field):
     return ""
 
 
+def _weekly_directive(field):
+    """A weekly field answers once per day. The model is told how many parts
+    and which days, and to return them as an array in that order, so each day's
+    answer can go into its own cell of the plan."""
+    names = getattr(field, "parts_list", None) or []
+    if field.field_type != "weekly" or not names:
+        return ""
+    return (
+        f" Return a JSON array of exactly {len(names)} strings, one per day in this "
+        f"order: {', '.join(names)}. Each day's entry follows the same rules as a "
+        "prose field. Make the days build on each other across the week; repeat an "
+        "entry only when it genuinely stays the same."
+    )
+
+
 def _schema_block(fields):
     return "\n".join(
-        f"- {f.field_key} ({f.field_type}): {f.ai_hint or f.label}{_field_directive(f)}"
+        f"- {f.field_key} ({f.field_type}): {f.ai_hint or f.label}{_field_directive(f)}{_weekly_directive(f)}"
         for f in fields
     )
 
@@ -536,6 +551,15 @@ def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
     lesson = _lesson_block(context, guide_excerpt(course_guide_text, context))
     written = {k: v for k, v in (prior_values or {}).items() if v and k != field.field_key}
     current = (prior_values or {}).get(field.field_key) or ""
+    names = getattr(field, "parts_list", None) or []
+    weekly_note = ""
+    if field.field_type == "weekly" and names:
+        # A weekly field is answered one day (one cell) at a time in the editor,
+        # so a suggestion is one day's answer, never the whole week at once.
+        parts = current if isinstance(current, list) else [current]
+        current = "; ".join(f"{n}: {p}" for n, p in zip(names, parts) if str(p or "").strip())
+        weekly_note = (f"\nThis field has one answer per day ({', '.join(names)}). "
+                       "Every \"use\" choice is the answer for a single day, not the whole week.")
     turns = "\n".join(f"{'Teacher' if t.get('role') == 'teacher' else 'Owl'}: {t.get('text', '')}" for t in history)
     typed = f'What the teacher has typed in it so far: "{current}"' if str(current).strip() else "The field is still empty."
     task = f"""
@@ -543,7 +567,7 @@ Fields already written (do not repeat them):
 {json.dumps(written)}
 
 The teacher is writing the field "{field.label}" ({field.field_type}).
-{f"What belongs in it: {field.ai_hint}" if field.ai_hint else ""}{_field_directive(field)}
+{f"What belongs in it: {field.ai_hint}" if field.ai_hint else ""}{_field_directive(field)}{weekly_note}
 {typed}
 
 {f"Conversation so far:{chr(10)}{turns}{chr(10)}" if turns else ""}Teacher: {message}

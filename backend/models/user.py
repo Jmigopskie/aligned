@@ -14,6 +14,9 @@ class User(db.Model):
     avatar_path = db.Column(db.String(255))
     banner_path = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # When the owl's first-sign-in tour was finished or skipped; blank means a
+    # new account that hasn't seen it yet.
+    onboarded_at = db.Column(db.DateTime, nullable=True)
 
     formats = db.relationship("LessonPlanFormat", backref="owner", lazy=True)
     lesson_plans = db.relationship("LessonPlan", backref="user", lazy=True)
@@ -51,4 +54,5 @@ class User(db.Model):
             "avatar_url": f"/api/avatars/{self.id}" if self.avatar_path else None,
             "banner_url": f"/api/banners/{banner_owner.id}" if banner_owner else None,
             "created_at": iso_utc(self.created_at),
+            "onboarded": self.onboarded_at is not None,
         }
