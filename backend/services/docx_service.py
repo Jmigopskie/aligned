@@ -1,5 +1,7 @@
+import base64
 import copy
 import html as html_lib
+import io
 import html.parser as _html_parser
 import logging
 import os
@@ -8,8 +10,9 @@ from datetime import datetime
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_COLOR_INDEX
-from docx.shared import Pt, RGBColor
-from docx.oxml.ns import qn
+from docx.shared import Emu, Inches, Pt, RGBColor
+from docx.oxml import OxmlElement, parse_xml
+from docx.oxml.ns import nsdecls, qn
 from docx.table import Table
 from docx.text.hyperlink import Hyperlink
 from docx.text.paragraph import Paragraph
@@ -498,6 +501,75 @@ def _run_style_css(run):
 
     return ";".join(parts)
 
+def _in_fallback(node):
+    # A drawing wrapped in mc:AlternateContent appears twice (Choice and
+    # Fallback); only the Choice copy is the real picture.
+    parent = node.getparent()
+    while parent is not None:
+        if parent.tag.endswith("}Fallback"):
+            return True
+        parent = parent.getparent()
+    return False
+
+
+def _paragraph_drawings(p_el):
+    return [d for d in p_el.iter(qn("w:drawing")) if not _in_fallback(d)]
+
+
+def _owning_run(node):
+    while node is not None and node.tag != qn("w:r"):
+        node = node.getparent()
+    return node
+
+
+def _run_has_drawing(run):
+    return any(True for _ in run._r.iter(qn("w:drawing")))
+
+
+def _text_width_emu(doc):
+    sec = doc.sections[-1]
+    try:
+        return int(sec.page_width - sec.left_margin - sec.right_margin)
+    except TypeError:
+        return int(Inches(6))
+
+
+_ALIGN_NAME = {WD_ALIGN_PARAGRAPH.CENTER: "center", WD_ALIGN_PARAGRAPH.RIGHT: "right"}
+
+
+def _drawing_figure_html(para, drawing, n):
+    """One picture as the canvas's image markup, embedded as a data URI so the
+    builder can show it without a second request per picture."""
+    blip = next(drawing.iter(qn("a:blip")), None)
+    rid = blip.get(qn("r:embed")) if blip is not None else None
+    part = para.part.related_parts.get(rid) if rid else None
+    if part is None:
+        return ""
+    extent = next(drawing.iter(qn("wp:extent")), None)
+    cx = int(extent.get("cx")) if extent is not None else 0
+    pct = max(10, min(100, round(cx * 100 / _text_width_emu(para.part.document)))) if cx else 50
+
+    anchor = drawing.find(qn("wp:anchor"))
+    if anchor is not None:
+        side = next(anchor.iter(qn("wp:align")), None)
+        wrap = "right" if side is not None and side.text == "right" else "left"
+    else:
+        wrap = "inline"
+    try:
+        align = _ALIGN_NAME.get(para.alignment, "left")
+    except Exception:
+        align = "left"
+    # Word writes <a:ln><a:noFill/></a:ln> for "no line", so only a line that
+    # isn't explicitly empty counts as a border.
+    ln = next(drawing.iter(qn("a:ln")), None)
+    border = " img-border" if ln is not None and ln.find(qn("a:noFill")) is None else ""
+
+    src = f"data:{part.content_type};base64,{base64.b64encode(part.blob).decode('ascii')}"
+    return (
+        f'<span class="lp-img img-align-{align} img-wrap-{wrap}{border}" data-docx-image="{n}" '
+        f'data-width-pct="{pct}" contenteditable="false"><img src="{src}" alt=""></span>'
+    )
+
 def _run_html(run):
     text = run.text
     if not text:
@@ -517,6 +589,7 @@ def _render_runs_html(para):
     though para.text (used for anchor/heading detection) does include it.
     """
     out = []
+    drawings = _paragraph_drawings(para._p)
     for item in para.iter_inner_content():
         if isinstance(item, Hyperlink):
             inner = "".join(_run_html(r) for r in item.runs)
@@ -526,6 +599,9 @@ def _render_runs_html(para):
             out.append(f'<a href="{href}" target="_blank" rel="noopener">{inner}</a>' if href else inner)
         else:
             out.append(_run_html(item))
+            for d in item._r.iter(qn("w:drawing")):
+                if d in drawings:
+                    out.append(_drawing_figure_html(para, d, drawings.index(d)))
     return "".join(out)
 
 def _render_html_paragraph(doc, p_el, slots, index_by_el_id=None):
@@ -536,7 +612,9 @@ def _render_html_paragraph(doc, p_el, slots, index_by_el_id=None):
         classes += " lp-candidate"
     style_attr = _paragraph_align_style(para)
     style_attr = f' style="{style_attr.strip()}"' if style_attr else ""
-    inner = _render_runs_html(para) if text.strip() else "&nbsp;"
+    inner = _render_runs_html(para)
+    if not text.strip() and "lp-img" not in inner:
+        inner = "&nbsp;"
 
     anchor_attr = ""
     if index_by_el_id is not None:

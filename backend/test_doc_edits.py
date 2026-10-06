@@ -28,6 +28,42 @@ from models.format import LessonPlanFormat
 from models.lesson_plan import LessonPlan
 from services import docx_service
 
+import io
+import tempfile
+from PIL import Image
+from docx.shared import Inches
+
+
+def png_stream(color=(30, 90, 200)):
+    buf = io.BytesIO()
+    Image.new("RGB", (60, 30), color).save(buf, "PNG")
+    buf.seek(0)
+    return buf
+
+
+def doc_with_picture():
+    """A document whose second line is a picture, saved to disk, since the
+    canvas renderer reads a path just as the builder does."""
+    doc = Document()
+    doc.add_paragraph("Header line")
+    doc.add_paragraph().add_run().add_picture(png_stream(), width=Inches(3))
+    doc.add_paragraph("After the picture")
+    path = os.path.join(tempfile.mkdtemp(), "pic.docx")
+    doc.save(path)
+    return path
+
+
+def check_pictures_render():
+    html = docx_service.render_reference_html(doc_with_picture())["html"]
+    assert 'class="lp-img' in html, html[:400]
+    assert 'data-docx-image="0"' in html
+    assert "data:image/png;base64," in html
+    # 3in of a 6in text column (Letter, 1in margins)
+    assert 'data-width-pct="50"' in html, html
+    # The picture stays inside its own anchored line.
+    assert 'data-anchor-index="1"><span class="lp-img' in html.replace("\n", "")
+    print("  pictures render OK")
+
 
 def check_applier():
     """The core: replay edits onto a document by position."""
@@ -126,4 +162,5 @@ def check_round_trip():
 check_applier()
 check_applier_is_defensive()
 check_round_trip()
+check_pictures_render()
 print("doc edits OK")
