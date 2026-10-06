@@ -476,6 +476,9 @@ textarea::placeholder {
 
 .btn-primary:hover:not(:disabled) {
   background: var(--primary-hover);
+  /* a:hover recolours links to --primary-hover, which on an <a class="btn
+     btn-primary"> (Export as Word) made the label vanish into the fill. */
+  color: #FFFFFF;
 }
 
 /* A button that is an <a> must not take the link hover colour, which is the
@@ -2927,17 +2930,6 @@ body.auth-page::after {
   max-width: 920px;
 }
 
-.doc-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 16px;
-  flex-wrap: wrap;
-  padding-bottom: 14px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid var(--border);
-}
-
 .doc-toolbar-views {
   display: flex;
   gap: 6px;
@@ -3238,12 +3230,14 @@ body.auth-page::after {
   margin: 10px 0 12px;
 }
 
+/* One toolbar for both document screens. It wraps rather than pushing the
+   document sideways, and every control is a 40px target. */
 .doc-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  padding: 6px 8px;
+  gap: 6px;
+  padding: 8px 10px;
   margin-bottom: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -3253,36 +3247,42 @@ body.auth-page::after {
 .doc-toolbar-group {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .doc-toolbar-sep {
   width: 1px;
   align-self: stretch;
-  margin: 4px 4px;
+  margin: 6px 4px;
   background: var(--border);
 }
 
 .doc-tool-btn {
-  min-width: 30px;
-  height: 30px;
-  padding: 0 8px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-heading);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
+}
+
+.doc-tool-btn:focus-visible,
+.doc-tool-select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
 }
 
 .doc-tool-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
 }
 
 .doc-tool-btn:hover {
@@ -3305,11 +3305,11 @@ body.auth-page::after {
 }
 
 .doc-tool-select {
-  height: 30px;
+  height: 40px;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0 6px;
-  font-size: 12.5px;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 14px;
   background: var(--surface);
   color: var(--text-heading);
 }
@@ -3828,21 +3828,27 @@ body.auth-page::after {
   pointer-events: none;
 }
 
+/* Alan with his lesson plan. A slow, small bob reads as calm work rather
+   than impatience; the loader is on screen only for a moment. */
 .page-transition img {
-  width: 64px;
+  width: 88px;
   height: auto;
-  animation: page-transition-bob 0.9s ease-in-out infinite;
+  animation: page-transition-bob 1.6s ease-in-out infinite;
 }
 
 @keyframes page-transition-bob {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-9px); }
+  50% { transform: translateY(-6px); }
 }
 
 .page-transition span {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-body);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition img { animation: none; }
 }
 
 /* ---- Guide owl: a companion that reacts to where you are in building the
@@ -4556,13 +4562,6 @@ body.owl-chat-shown .dash-main {
    size/colour vocabulary that the Word export also understands.
    --------------------------------------------------------------------------- */
 
-/* The toolbar can now hold a lot of controls, so it wraps rather than pushing
-   the document sideways, and sticks to the top of a fullscreen document. */
-.doc-toolbar {
-  flex-wrap: wrap;
-  row-gap: 6px;
-}
-
 .doc-tool-menu-wrap {
   position: relative;
   display: inline-flex;
@@ -4586,12 +4585,13 @@ body.owl-chat-shown .dash-main {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 8px;
+  min-height: 36px;
+  padding: 6px 10px;
   background: none;
   border: none;
   border-radius: var(--radius-sm);
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--text-heading);
   text-align: left;
   cursor: pointer;
@@ -4610,8 +4610,8 @@ body.owl-chat-shown .dash-main {
 }
 
 .doc-zoom-readout {
-  min-width: 48px;
-  font-size: 11px;
+  min-width: 56px;
+  font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -4719,97 +4719,6 @@ body.owl-chat-shown .dash-main {
   max-height: none;
   background: var(--bg);
   border-radius: 0;
-}
-
-/* ---------------------------------------------------------------------------
-   Building Proficiency: what to generate
-   --------------------------------------------------------------------------- */
-
-.generate-scope {
-  /* Warm paper (--bg) instead of --surface: the panel sits directly on the
-     white .generate-panel, so it needs its own tone to read as a distinct
-     group rather than a second, redundant white-on-white frame. */
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.generate-scope-auto {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: var(--text-body);
-}
-
-.generate-scope-list {
-  padding: 0;
-  margin: 0;
-  border: none;
-  /* Fieldsets get an implicit min-inline-size: min-content in Firefox, which
-     can force the grid below wider than its container at narrow widths. */
-  min-width: 0;
-}
-
-.generate-scope-list legend {
-  padding: 0;
-  margin-bottom: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-heading);
-}
-
-#generate-scope-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 6px 10px;
-}
-
-/* "Lesson Title and Session No. are yours to fill in": its own row above the
-   student's own fields. */
-.generate-scope-note {
-  grid-column: 1 / -1;
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: var(--text-body);
-}
-
-.generate-scope-option {
-  display: flex;
-  align-items: start;
-  gap: 8px;
-  padding: 5px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  line-height: 1.35;
-  color: var(--text-heading);
-  cursor: pointer;
-  transition: background-color 0.12s ease;
-}
-
-/* No border and no fill at rest. Boxing each of nine checkboxes made a wall of
-   identical pills, and since every option starts ticked, a checked tint covered
-   the lot, so neither marked anything out. The checkbox is the state; the row
-   only lights up under the pointer or keyboard. */
-.generate-scope-option:hover {
-  background: var(--surface);
-}
-
-.generate-scope-option:focus-within {
-  background: var(--surface);
-}
-
-.generate-scope-option input {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--primary);
-  margin: 0;
-  flex: 0 0 auto;
-}
-
-.generate-scope-option input:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
 }
 
 /* ---------------------------------------------------------------------------
@@ -6032,4 +5941,111 @@ body.owl-chat-shown .dash-main {
   outline-offset: 2px;
   border-radius: var(--radius-sm);
   box-shadow: 0 0 0 6px var(--primary-tint);
+/* ---- Pictures inside the document canvas ---- */
+.lp-img { display: block; position: relative; max-width: 100%; margin: 8px 0; line-height: 0; }
+.lp-img:not(.lp-img-docx) img { width: 100%; height: auto; display: block; }
+.lp-img.img-align-center { margin-left: auto; margin-right: auto; }
+.lp-img.img-align-right { margin-left: auto; }
+.lp-img.img-wrap-left { float: left; margin: 4px 16px 8px 0; }
+.lp-img.img-wrap-right { float: right; margin: 4px 0 8px 16px; }
+.lp-img.img-border img { outline: 1px solid #404040; }
+.lp-img-cap { display: block; line-height: 1.4; font-size: 0.82em; font-style: italic; padding-top: 4px; }
+.lp-img.img-align-center .lp-img-cap { text-align: center; }
+.lp-img.img-align-right .lp-img-cap { text-align: right; }
+.lp-img-selected { outline: 2px solid var(--primary); outline-offset: 2px; cursor: default; }
+.lp-img-handle { position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px; border-radius: 3px; background: var(--primary); border: 2px solid var(--surface); cursor: nwse-resize; touch-action: none; }
+
+/* A picture straight from the Word file keeps the layout's exact size and
+   position (its <img> carries them inline); the wrapper only marks it as
+   editable. Once the teacher restyles it, the wrapper loses .lp-img-docx and
+   it previews with the rules above. Kept after them so it wins on ties. */
+.lp-img.lp-img-docx { display: inline; position: static; float: none; margin: 0; max-width: none; line-height: inherit; }
+.lp-img-docx.lp-img-selected { outline: none; }
+.lp-img-docx.lp-img-selected > img { outline: 2px solid var(--primary); outline-offset: 2px; }
+.lp-img-docx .lp-img-handle { display: none; }
+
+/* The floating bar for the selected picture. Fixed, so it can live inside the
+   document stage and stay visible when the stage goes fullscreen. */
+.doc-img-bar { position: fixed; z-index: 1001; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 4px; max-width: min(560px, calc(100vw - 16px)); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); }
+.doc-img-bar[hidden] { display: none; }
+.doc-img-btn { min-width: 36px; height: 36px; padding: 0 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text-heading); font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.doc-img-btn svg { width: 18px; height: 18px; }
+.doc-img-btn:hover { background: var(--bg); }
+.doc-img-btn[aria-pressed="true"] { border-color: var(--primary); color: var(--primary); background: var(--bg); }
+.doc-img-btn[data-act="delete"] { color: var(--danger); }
+.doc-img-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.doc-img-sep { width: 1px; align-self: stretch; margin: 4px; background: var(--border); }
+
+/* ---- Pre-generate field review: which fields Alan writes ---- */
+.gen-review-dialog { max-width: 520px; }
+.gen-review-intro { margin: 0 0 12px; font-size: 13.5px; line-height: 1.5; color: var(--text-body); }
+.gen-review-bulk { display: flex; gap: 16px; margin: 0 0 12px; }
+.link-btn { padding: 0; border: none; background: none; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.link-btn:hover { text-decoration-thickness: 2px; }
+.link-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+.gen-review-group { border: 0; padding: 0; margin: 0 0 16px; min-width: 0; }
+.gen-review-group legend { padding: 0; margin-bottom: 4px; font-weight: 700; font-size: 12px; letter-spacing: 0.02em; color: var(--text-heading); }
+.gen-review-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.gen-review-label { font-size: 14px; line-height: 1.35; color: var(--text-heading); }
+.gen-review-note { margin-left: 8px; font-size: 11.5px; color: var(--text-body); font-style: italic; white-space: nowrap; }
+.seg { display: inline-flex; flex-shrink: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg label { position: relative; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: inline-block; min-height: 36px; padding: 8px 12px; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--text-body); }
+.seg label + label span { border-left: 1px solid var(--border); }
+.seg input:checked + span { background: var(--primary); color: #fff; }
+.seg input[value="static"]:checked + span { background: #475569; }
+.seg input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: -3px; }
+.gen-review-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.gen-review-footer #gen-review-hint { margin-right: auto; }
+
+/* On a wide screen the popup docks right, so the highlighted document stays
+   in view beside it rather than hidden behind it. */
+@media (min-width: 1100px) {
+  .gen-review-overlay { justify-content: flex-end; padding: 16px; background: rgba(31, 41, 55, 0.18); }
+  .gen-review-dialog { height: 100%; max-height: none; }
+  .gen-review-dialog .modal-body { flex: 1; }
+}
+
+.lp-field-review-gen { outline: 2px solid var(--primary); outline-offset: 2px; }
+.lp-field-review-static,
+.lp-field-static:not(.lp-filled) {
+  position: relative;
+  background: rgba(71, 85, 105, 0.06);
+  outline: 1px dashed #64748B;
+  outline-offset: 2px;
+}
+.lp-field-review-static::after,
+.lp-field-static:not(.lp-filled)::after {
+  content: "static";
+  position: absolute;
+  top: -9px;
+  right: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #475569;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  font-style: normal;
+}
+.lp-field-review-pulse { animation: review-pulse 0.9s ease-out 1; }
+@keyframes review-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(28, 92, 78, 0.45); }
+  100% { box-shadow: 0 0 0 12px rgba(28, 92, 78, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .lp-field-review-pulse { animation: none; } }
+
+/* ---- Generation loader: Alan beside the per-section progress ---- */
+.gen-loader { display: flex; align-items: center; gap: 24px; padding: 20px 24px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.gen-loader[hidden] { display: none; }
+.gen-loader-owl { width: 88px; height: auto; flex-shrink: 0; animation: page-transition-bob 1.6s ease-in-out infinite; }
+.gen-loader-body { flex: 1; min-width: 0; }
+.gen-loader-title { display: block; margin-bottom: 10px; font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--text-heading); }
+.gen-loader .generation-progress { padding: 0; border: none; background: none; max-width: none; }
+@media (prefers-reduced-motion: reduce) { .gen-loader-owl { animation: none; } }
+@media (max-width: 520px) {
+  .gen-loader { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .gen-loader-owl { width: 64px; }
 }

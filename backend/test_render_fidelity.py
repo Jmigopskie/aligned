@@ -229,7 +229,8 @@ def check_pictures():
     styles = re.findall(r'<img src="data:image/png;base64,[A-Za-z0-9+/=]+" alt="" style="([^"]*)">', html)
     assert "position:absolute" in styles[0] and "left:45.46pt" in styles[0], styles
     assert "position:absolute" in styles[1] and "left:-2.8pt" in styles[1], styles
-    holder_style = re.search(r'<p class="lp-p" style="([^"]*)"[^>]*><img', html).group(1)
+    # The picture may sit in the canvas's editable-picture wrapper.
+    holder_style = re.search(r'<p class="lp-p" style="([^"]*)"[^>]*>(?:<span class="lp-img[^>]*>)?<img', html).group(1)
     assert "min-height:47pt" in holder_style, holder_style
     print("  pictures OK")
 

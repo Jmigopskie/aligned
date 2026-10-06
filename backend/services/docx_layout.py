@@ -621,15 +621,18 @@ class Layout:
     def pictures(self, r_el):
         """<img> tags for the pictures in a run ("" for none). A picture the
         browser can't show (EMF/WMF) or can't be read is left out."""
+        return "".join(self.drawing_html(d) for d in r_el.findall(qn("w:drawing")))
+
+    def drawing_html(self, drawing):
+        """The <img> for one w:drawing ("" if it can't be shown)."""
         out = []
-        for drawing in r_el.findall(qn("w:drawing")):
-            for frame in drawing:
-                if not isinstance(frame.tag, str):
-                    continue
-                try:
-                    out.append(self._picture(frame))
-                except Exception:
-                    _log.debug("Picture unreadable; left out.", exc_info=True)
+        for frame in drawing:
+            if not isinstance(frame.tag, str):
+                continue
+            try:
+                out.append(self._picture(frame))
+            except Exception:
+                _log.debug("Picture unreadable; left out.", exc_info=True)
         return "".join(out)
 
     def _picture(self, frame):

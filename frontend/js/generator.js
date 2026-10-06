@@ -102,13 +102,11 @@ const stepControls = document.getElementById("step-controls");
 const sectionNav = document.getElementById("section-nav");
 const stepProgressLabel = document.getElementById("step-progress-label");
 const generateFullBtn = document.getElementById("generate-full-btn");
-const generateScope = document.getElementById("generate-scope");
-const generateScopeAuto = document.getElementById("generate-scope-auto");
-const generateScopeOptions = document.getElementById("generate-scope-options");
 const generationProgressEl = document.getElementById("generation-progress");
 const ownFieldsNote = document.getElementById("own-fields-note");
 const ownFieldsNoteText = document.getElementById("own-fields-note-text");
 const ownFieldsGenerateBtn = document.getElementById("own-fields-generate-btn");
+const generationProgressList = document.getElementById("generation-progress-list");
 const stepContinueBtn = document.getElementById("step-continue-btn");
 const stepClearBtn = document.getElementById("step-clear-btn");
 const resultsEl = document.getElementById("results");
@@ -278,7 +276,7 @@ function owlRow(avatarState) {
 function addOwlTyping() {
   const { row, body } = owlRow("thinking");
   row.classList.add("is-typing");
-  body.innerHTML = '<div class="owl-bubble"><span class="owl-dots" aria-label="The owl is typing"><i></i><i></i><i></i></span></div>';
+  body.innerHTML = '<div class="owl-bubble"><span class="owl-dots" aria-label="Alan is typing"><i></i><i></i><i></i></span></div>';
   owlChatLog.appendChild(row);
   scrollChatToEnd();
   return row;
@@ -655,7 +653,7 @@ function renderHistoryList() {
   const entries = Object.entries(chat.threads).filter(([, turns]) => turns.length);
   if (!entries.length) {
     owlChatHistoryList.innerHTML =
-      '<p class="owl-chat-history-empty">Nothing saved yet. Conversations you have with the owl about each field are kept here so you can read them back.</p>';
+      '<p class="owl-chat-history-empty">Nothing saved yet. Conversations you have with Alan about each field are kept here so you can read them back.</p>';
     return;
   }
 
@@ -1126,109 +1124,58 @@ function hasValue(value) {
   return Array.isArray(value) ? value.some((v) => String(v == null ? "" : v).trim()) : !!String(value == null ? "" : value).trim();
 }
 
-// Which thinking-heavy fields the teacher wants written for them. Remembered per
-// format, because a teacher who always writes their own Flow should only have to
-// say so once. Ticked by default so a teacher who never opens this panel gets
-// what they got before the panel existed.
-const SCOPE_PREFIX = "alignedGenScope:v1:";
+// Which fields Alan must leave alone ("static"), remembered per format so a
+// teacher who always writes their own Flow says so once. The student's own
+// fields (role "self": lesson title, session number) start static, as they
+// always have; every other field starts as Generate.
+const SCOPE_V1 = "alignedGenScope:v1:";      // old checklist: heavy fields unticked
+const SELF_SCOPE_PREFIX = "alignedGenSelf:v1:"; // old checklist: own fields ticked
+const SCOPE_V2 = "alignedGenScope:v2:";      // { static: [...], seen: [...] }
+let staticKeys = new Set();
 
-function scopeStorageKey() {
-  return `${SCOPE_PREFIX}${fmt.id}`;
-}
-
-function readScopeChoice() {
+function readJson(key, fallback) {
   try {
-    const raw = localStorage.getItem(scopeStorageKey());
-    return raw ? JSON.parse(raw) : null;
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
   } catch (err) {
-    return null;
+    return fallback;
   }
 }
 
-function writeScopeChoice(excluded) {
-  try {
-    localStorage.setItem(scopeStorageKey(), JSON.stringify(excluded));
-  } catch (err) {
-    /* private mode or quota: the choice just won't persist */
-  }
-}
-
-// The student's own fields they asked the AI to write anyway. Kept apart from
-// the excluded list above because these start unticked, not ticked.
-const SELF_SCOPE_PREFIX = "alignedGenSelf:v1:";
-
-function readSelfTicks() {
-  try {
-    return JSON.parse(localStorage.getItem(`${SELF_SCOPE_PREFIX}${fmt.id}`) || "[]");
-  } catch (err) {
-    return [];
-  }
-}
-
-function writeSelfTicks(keys) {
-  try {
-    localStorage.setItem(`${SELF_SCOPE_PREFIX}${fmt.id}`, JSON.stringify(keys));
-  } catch (err) {
-    /* private mode or quota: the choice just won't persist */
-  }
-}
-
-function scopeOption(key, checked) {
-  const field = fieldByKey(key);
-  return `
-    <label class="generate-scope-option">
-      <input type="checkbox" data-scope-key="${escapeHtml(key)}" ${checked ? "checked" : ""} />
-      <span>${escapeHtml(field ? field.label : key)}</span>
-    </label>`;
-}
-
-function renderGenerateScope() {
-  const heavy = heavyFieldKeys();
-  const easy = easyFieldKeys();
-  const own = selfFieldKeys();
-
-  // Nothing to choose between means the old all-or-nothing behaviour, so the
-  // panel stays out of the way.
-  if (!heavy.length && !own.length) {
-    generateScope.hidden = true;
-    return;
-  }
-
-  generateScope.hidden = false;
-  generateScopeAuto.textContent = easy.length
-    ? `${easy.length} straightforward ${easy.length === 1 ? "field" : "fields"} will be filled in automatically.`
-    : "";
-
-  // Previously excluded heavy keys stay excluded; anything new starts ticked.
-  // The student's own fields start unticked and stay as they last left them.
-  const excluded = new Set(readScopeChoice() || []);
-  const ownTicked = new Set(readSelfTicks());
-  const ownLabels = own.map((key) => (fieldByKey(key) || {}).label || key);
-
-  generateScopeOptions.innerHTML =
-    heavy.map((key) => scopeOption(key, !excluded.has(key))).join("") +
-    (own.length
-      ? `<p class="generate-scope-note">${escapeHtml(joinLabels(ownLabels))} ${own.length === 1 ? "is" : "are"} yours to fill in. Tick ${own.length === 1 ? "it" : "them"} if you want me to write ${own.length === 1 ? "it" : "them"} too.</p>` +
-        own.map((key) => scopeOption(key, ownTicked.has(key))).join("")
-      : "");
-
-  const ownSet = new Set(own);
-  generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((box) => {
-    box.addEventListener("change", () => {
-      const nextExcluded = [];
-      const nextOwn = [];
-      generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((b) => {
-        const key = b.dataset.scopeKey;
-        if (ownSet.has(key)) {
-          if (b.checked) nextOwn.push(key);
-        } else if (!b.checked) {
-          nextExcluded.push(key);
-        }
-      });
-      writeScopeChoice(nextExcluded);
-      writeSelfTicks(nextOwn);
+function loadStaticKeys() {
+  const all = fieldsInDocumentOrder().map((f) => f.field_key);
+  const own = new Set(selfFieldKeys());
+  const saved = readJson(SCOPE_V2 + fmt.id, null);
+  let stat;
+  let seen;
+  if (saved && Array.isArray(saved.static)) {
+    stat = new Set(saved.static);
+    seen = new Set(saved.seen || []);
+  } else {
+    // First visit since the popup: carry the old checklist's choices over.
+    const ownTicked = new Set(readJson(SELF_SCOPE_PREFIX + fmt.id, []));
+    stat = new Set(readJson(SCOPE_V1 + fmt.id, []));
+    selfFieldKeys().forEach((k) => {
+      if (!ownTicked.has(k)) stat.add(k);
     });
+    seen = new Set(all);
+  }
+  // A field added to the format since the last visit gets its role's default.
+  all.forEach((k) => {
+    if (!seen.has(k) && own.has(k)) stat.add(k);
   });
+  staticKeys = new Set(all.filter((k) => stat.has(k)));
+}
+
+function saveStaticKeys() {
+  try {
+    localStorage.setItem(SCOPE_V2 + fmt.id, JSON.stringify({
+      static: [...staticKeys],
+      seen: fieldsInDocumentOrder().map((f) => f.field_key),
+    }));
+  } catch (err) {
+    /* private mode or quota: the choice just won't persist */
+  }
 }
 
 // "Lesson Title and Session No." / "A, B and C".
@@ -1237,15 +1184,19 @@ function joinLabels(labels) {
   return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
 
-// The keys to generate: every quick field, plus the heavy ones still ticked.
-// The page sends the full list rather than letting the server add the easy
-// fields, so "generate exactly what was asked for" is the only rule in play.
+// Every field not kept static, in document order. The page sends the full list
+// rather than letting the server decide, so "generate exactly what was asked
+// for" is the only rule in play.
 function selectedGenerateKeys() {
-  const ticked = [];
-  generateScopeOptions.querySelectorAll("[data-scope-key]").forEach((box) => {
-    if (box.checked) ticked.push(box.dataset.scopeKey);
+  return fieldsInDocumentOrder().map((f) => f.field_key).filter((k) => !staticKeys.has(k));
+}
+
+// Empty static fields keep a hatched "static" look after the popup closes, so
+// the teacher can see which blanks are theirs to write.
+function paintStaticMarks() {
+  liveDocWrap.querySelectorAll("[data-field-key]").forEach((el) => {
+    el.classList.toggle("lp-field-static", staticKeys.has(el.dataset.fieldKey));
   });
-  return easyFieldKeys().concat(ticked);
 }
 
 function isFieldComplete(key) {
@@ -1580,6 +1531,18 @@ function sanitizeRichValueHtml(node) {
     const tag = child.tagName;
     if (tag === "BR") {
       out += "<br>";
+    } else if (tag === "SPAN" && child.classList.contains("lp-img")) {
+      // Only pictures a student uploaded (an id of the exact shape the server
+      // issues). Rebuilt from the vocabulary rather than copied, so the resize
+      // handle, inline styles and any src never get stored.
+      const id = child.dataset.imgId || "";
+      if (!/^[0-9a-f]{32}$/.test(id)) return;
+      const s = readDocImage(child);
+      const cap = child.querySelector(".lp-img-cap");
+      const capHtml = cap && cap.textContent.trim() ? `<span class="lp-img-cap">${sanitizeRichValueHtml(cap)}</span>` : "";
+      out += `<span class="lp-img img-align-${s.align} img-wrap-${s.wrap}${s.border ? " img-border" : ""}" data-img-id="${id}" data-width-pct="${s.width_pct}" contenteditable="false"><img src="${docImageUrl(id)}" alt="">${capHtml}</span>`;
+    } else if (tag === "SPAN" && child.classList.contains("lp-img-handle")) {
+      return;
     } else if (tag === "SPAN") {
       // Kept only for the vocabulary classes, and only those: the class
       // attribute is rebuilt from the allowlist rather than copied, so nothing
@@ -1598,7 +1561,7 @@ function sanitizeRichValueHtml(node) {
 
 function syncFieldFromEl(el) {
   storeSlot(el, el.textContent, sanitizeRichValueHtml(el));
-  el.classList.toggle("lp-filled", !!el.textContent.trim());
+  el.classList.toggle("lp-filled", !!el.textContent.trim() || !!el.querySelector(".lp-img"));
 }
 
 // The value-map half of clearing a field: shared by clearField() below and by
@@ -1909,6 +1872,58 @@ function wireLiveDocToolbar() {
 
   liveDocWrap.addEventListener("keyup", updateLiveDocToolbarStates);
   liveDocWrap.addEventListener("mouseup", updateLiveDocToolbarStates);
+
+  // Pictures a student adds while editing a field. The format's own pictures
+  // belong to the template, so only pictures inside a field are theirs to change.
+  const fieldOf = (fig) => fig.closest("[data-field-key]");
+  initDocImageTools({
+    rootEl: liveDocWrap,
+    selectable: (fig) => !!fig.dataset.imgId && !!fieldOf(fig),
+    onChange: (fig) => {
+      const f = fieldOf(fig);
+      if (f) {
+        syncFieldFromEl(f);
+        markDirty();
+      }
+    },
+    onDelete: (fig) => {
+      const f = fieldOf(fig);
+      fig.remove();
+      if (f) {
+        syncFieldFromEl(f);
+        markDirty();
+      }
+    },
+  });
+
+  let imageTargetRange = null;
+  initDocImageInsert({
+    toolbarEl: liveDocToolbar,
+    beforePick: () => {
+      if (!activeFieldEl()) {
+        showToast("Click into a field first, then choose Insert image.", true);
+        return false;
+      }
+      const sel = window.getSelection();
+      imageTargetRange = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+      return true;
+    },
+    onUploaded: (res) => {
+      const range = imageTargetRange;
+      if (!range) return;
+      const node = range.startContainer;
+      const field = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement).closest("[data-field-key]");
+      if (!field) return;
+      const tpl = document.createElement("template");
+      tpl.innerHTML = docImageMarkup({ id: res.id });
+      range.collapse(false);
+      range.insertNode(tpl.content.firstChild);
+      hydrateDocImages(field);
+      field.classList.add("lp-filled");
+      syncFieldFromEl(field);
+      markDirty();
+    },
+  });
 }
 
 function sleep(ms) {
@@ -2187,6 +2202,8 @@ function paintRestoredValues(blankMissing = false) {
       const text = valueForSlot(el);
       if (rich) {
         el.innerHTML = rich;
+        hydrateDocImages(el);
+        el.querySelectorAll(".lp-img-cap").forEach((c) => { c.contentEditable = "true"; });
         el.classList.add("lp-filled");
       } else if (text.trim()) {
         el.textContent = text;
@@ -2420,7 +2437,7 @@ function baseGenerationPayload() {
 
 function renderProgress(sectionStates) {
   generationProgressEl.hidden = false;
-  generationProgressEl.innerHTML = sectionStates
+  generationProgressList.innerHTML = sectionStates
     .map((s) => {
       const icon = s.status === "done" ? Icons.check
         : s.status === "active" ? Icons.moreHorizontal
@@ -2435,7 +2452,6 @@ function renderProgress(sectionStates) {
     .join("");
 }
 
-generateFullBtn.addEventListener("click", () => runGeneration(selectedGenerateKeys()));
 
 // "Generate these too": only the student's own fields that are still blank,
 // leaving everything already written untouched.
@@ -2516,6 +2532,134 @@ async function runGeneration(includeKeys) {
   }
 }
 
+generateFullBtn.addEventListener("click", () => {
+  if (!updateGate()) {
+    showError("Fill in the cooperating teacher, subject, and course guide first.");
+    return;
+  }
+  openReview();
+});
+
+// ---- Field review: before generating, the teacher picks which fields Alan
+// writes. The document behind the popup marks each field as it is chosen. ----
+const reviewOverlay = document.getElementById("gen-review-overlay");
+const reviewList = document.getElementById("gen-review-list");
+const reviewConfirm = document.getElementById("gen-review-confirm");
+const reviewHint = document.getElementById("gen-review-hint");
+
+function reviewRowMarkup(f) {
+  const key = escapeHtml(f.field_key);
+  const label = escapeHtml(f.label || f.field_key);
+  const isStatic = staticKeys.has(f.field_key);
+  const filled = isFieldComplete(f.field_key) ? '<span class="gen-review-note">has content</span>' : "";
+  return `
+    <div class="gen-review-row" data-review-key="${key}">
+      <span class="gen-review-label">${label}${filled}</span>
+      <div class="seg" role="radiogroup" aria-label="${label}">
+        <label><input type="radio" name="rv-${key}" value="gen" ${isStatic ? "" : "checked"}><span>Generate</span></label>
+        <label><input type="radio" name="rv-${key}" value="static" ${isStatic ? "checked" : ""}><span>Keep static</span></label>
+      </div>
+    </div>`;
+}
+
+function renderReviewList() {
+  const fields = fieldsInDocumentOrder();
+  const groups = [
+    ["Quick fields", fields.filter((f) => f.role !== "heavy" && f.role !== "self")],
+    ["Needs real thinking", fields.filter((f) => f.role === "heavy")],
+    ["Yours to fill in", fields.filter((f) => f.role === "self")],
+  ].filter(([, list]) => list.length);
+  reviewList.innerHTML = groups
+    .map(([title, list]) => `<fieldset class="gen-review-group"><legend>${title}</legend>${list.map(reviewRowMarkup).join("")}</fieldset>`)
+    .join("");
+  syncReview();
+}
+
+function syncReview() {
+  const n = selectedGenerateKeys().length;
+  reviewConfirm.disabled = n === 0;
+  reviewConfirm.textContent = n ? `Generate ${n} field${n === 1 ? "" : "s"}` : "Generate";
+  reviewHint.textContent = n ? "" : "Set at least one field to Generate, or fill the plan in yourself.";
+  liveDocWrap.querySelectorAll("[data-field-key]").forEach((el) => {
+    const isStatic = staticKeys.has(el.dataset.fieldKey);
+    el.classList.toggle("lp-field-review-gen", !isStatic);
+    el.classList.toggle("lp-field-review-static", isStatic);
+  });
+}
+
+reviewList.addEventListener("change", (e) => {
+  const row = e.target.closest("[data-review-key]");
+  if (!row) return;
+  if (e.target.value === "static") staticKeys.add(row.dataset.reviewKey);
+  else staticKeys.delete(row.dataset.reviewKey);
+  saveStaticKeys();
+  syncReview();
+});
+
+// Pointing at a row shows where that field is in the document behind.
+function pulseField(key) {
+  const el = liveDocWrap.querySelector(`[data-field-key="${CSS.escape(key)}"]`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.remove("lp-field-review-pulse");
+  void el.offsetWidth; // restart the animation
+  el.classList.add("lp-field-review-pulse");
+}
+
+reviewList.addEventListener("mouseover", (e) => {
+  const row = e.target.closest("[data-review-key]");
+  if (row && row.dataset.reviewKey !== reviewList.dataset.lastPulse) {
+    reviewList.dataset.lastPulse = row.dataset.reviewKey;
+    pulseField(row.dataset.reviewKey);
+  }
+});
+reviewList.addEventListener("focusin", (e) => {
+  const row = e.target.closest("[data-review-key]");
+  if (row) pulseField(row.dataset.reviewKey);
+});
+
+document.querySelectorAll("[data-review-all]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    staticKeys = btn.dataset.reviewAll === "static"
+      ? new Set(fieldsInDocumentOrder().map((f) => f.field_key))
+      : new Set();
+    saveStaticKeys();
+    renderReviewList();
+  });
+});
+
+let reviewReturnFocus = null;
+
+function openReview() {
+  reviewReturnFocus = document.activeElement;
+  delete reviewList.dataset.lastPulse;
+  renderReviewList();
+  reviewOverlay.hidden = false;
+  const first = reviewOverlay.querySelector(".gen-review-row input:checked") || reviewConfirm;
+  first.focus();
+}
+
+function closeReview() {
+  reviewOverlay.hidden = true;
+  liveDocWrap.querySelectorAll(".lp-field-review-gen, .lp-field-review-static, .lp-field-review-pulse")
+    .forEach((el) => el.classList.remove("lp-field-review-gen", "lp-field-review-static", "lp-field-review-pulse"));
+  paintStaticMarks();
+  if (reviewReturnFocus && reviewReturnFocus.focus) reviewReturnFocus.focus();
+}
+
+document.getElementById("gen-review-close").addEventListener("click", closeReview);
+document.getElementById("gen-review-cancel").addEventListener("click", closeReview);
+reviewOverlay.addEventListener("click", (e) => {
+  if (e.target === reviewOverlay) closeReview();
+});
+reviewOverlay.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeReview();
+});
+reviewConfirm.addEventListener("click", () => {
+  closeReview();
+  runGeneration(selectedGenerateKeys());
+});
+
 // What the owl says once generation stops. The server only reports on the
 // fields it was asked for (`missing`/`missing_labels`), so an empty
 // `missing_labels` no longer means the plan is finished by itself: fields the
@@ -2584,7 +2728,7 @@ function reportGenerationOutcome(finalEvent, requestedKeys) {
     const extra = yoursLabels.length - 3;
     const list = extra > 0 ? `${shown}, and ${extra} more` : shown;
     messages.push(
-      `${list} ${yoursLabels.length === 1 ? "is" : "are"} still blank because you kept ${yoursLabels.length === 1 ? "it" : "them"} off my list. Fill ${yoursLabels.length === 1 ? "it" : "them"} in whenever you are ready.`
+      `${list} ${yoursLabels.length === 1 ? "is" : "are"} still blank because you kept ${yoursLabels.length === 1 ? "it" : "them"} static. Fill ${yoursLabels.length === 1 ? "it" : "them"} in whenever you are ready.`
     );
   }
 
@@ -2592,7 +2736,8 @@ function reportGenerationOutcome(finalEvent, requestedKeys) {
 
   // Draw attention to the actual empty fields rather than only naming them,
   // whichever bucket (or both) they came from.
-  highlightEmptyFields([...missingKeys, ...yoursKeys, ...ownKeys]);
+  highlightEmptyFields(missingKeys);
+  paintStaticMarks();
 }
 
 // Marks the still-empty fields in whichever editor this format uses, so the
@@ -2796,7 +2941,7 @@ function wireDocCanvasEditing() {
     el.setAttribute("data-placeholder", "Not generated yet");
     el.addEventListener("input", () => {
       storeSlot(el, el.textContent);
-      el.classList.toggle("lp-filled", !!el.textContent.trim());
+      el.classList.toggle("lp-filled", !!el.textContent.trim() || !!el.querySelector(".lp-img"));
       markDirty();
       renderResults();
       if (mode === "step") renderStepFieldNav();
@@ -3039,9 +3184,10 @@ async function init() {
     // falls back to walking everything.
     stepFieldKeys = heavy.length ? heavy : fieldsInDocumentOrder().map((f) => f.field_key);
     stepIndex = 0;
-    renderGenerateScope();
+    loadStaticKeys();
 
     await initLiveDocView();
+    paintStaticMarks();
 
     // Bring back anything left from a previous visit before the page is
     // shown, so the teacher never sees their work blank out and refill. A

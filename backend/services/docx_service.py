@@ -1,5 +1,7 @@
+import base64
 import copy
 import html as html_lib
+import io
 import html.parser as _html_parser
 import logging
 import os
@@ -8,8 +10,9 @@ from datetime import datetime
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_COLOR_INDEX
-from docx.shared import Pt, RGBColor
-from docx.oxml.ns import qn
+from docx.shared import Emu, Inches, Pt, RGBColor
+from docx.oxml import OxmlElement, parse_xml
+from docx.oxml.ns import nsdecls, qn
 from docx.table import Table
 from docx.text.hyperlink import Hyperlink
 from docx.text.paragraph import Paragraph
@@ -131,7 +134,27 @@ def apply_content_edits(template_path, edits):
         and 0 <= e["anchor_index"] < len(items)
     })
 
+    from services import image_store  # local: docx_service must import without an app
+
     applied = 0
+    # Inserts first, so a picture placed after a line that is also being
+    # deleted still lands (it's attached to the line's element, not its index).
+    for edit in edits:
+        if edit.get("action") != "insert_image":
+            continue
+        idx = edit.get("anchor_index")
+        if not isinstance(idx, int) or not (0 <= idx < len(items)):
+            continue
+        path = image_store.image_path(edit.get("image_id"))
+        if not path:
+            continue  # the upload is gone; skip it rather than fail the save
+        new_p = OxmlElement("w:p")
+        items[idx]["el"].addnext(new_p)
+        _place_picture(doc, new_p, path, edit)
+        if edit.get("caption"):
+            _insert_caption_after(doc, new_p, edit["caption"], edit.get("align"))
+        applied += 1
+
     for edit in edits:
         idx = edit.get("anchor_index")
         if not isinstance(idx, int) or not (0 <= idx < len(items)):
@@ -141,6 +164,12 @@ def apply_content_edits(template_path, edits):
         action = edit.get("action")
 
         if action == "delete":
+            target = edit.get("move_images_to")
+            if isinstance(target, int) and 0 <= target < len(items) and target != idx:
+                for d in _paragraph_drawings(el):
+                    run = _owning_run(d)
+                    if run is not None:
+                        items[target]["el"].append(run)
             cell = item["cell"]
             if cell is not None and len(cell.paragraphs) <= 1:
                 # Word requires at least one paragraph per cell — clear it
@@ -184,12 +213,32 @@ def apply_doc_edits(doc, items, edits):
             continue
         if not (0 <= idx < len(items)):
             continue
+        # Picture edits belong to the format builder; from a plan they are
+        # ignored rather than trusted, so stray keys can't break an export.
+        edit = {k: v for k, v in edit.items() if k not in ("image_format", "remove_images")}
         _apply_paragraph_edit(doc, items[idx]["el"], edit)
         applied += 1
     return applied
 
 
 def _apply_paragraph_edit(doc, el, edit):
+    # Picture edits come only from the format builder (sanitized in
+    # format_routes); a plan's doc_edits never carry these keys.
+    if "image_format" in edit or "remove_images" in edit:
+        drawings = _paragraph_drawings(el)  # indices are against the original order
+        for spec in edit.get("image_format") or []:
+            if 0 <= spec["n"] < len(drawings):
+                blob = _drawing_blob(doc, drawings[spec["n"]])
+                if blob is not None:
+                    _place_picture(doc, el, blob, spec, replace_drawing=drawings[spec["n"]])
+                    if spec.get("caption"):
+                        _insert_caption_after(doc, el, spec["caption"], spec.get("align"))
+        for n in edit.get("remove_images") or []:
+            if 0 <= n < len(drawings):
+                run = _owning_run(drawings[n])
+                if run is not None and run.getparent() is not None:
+                    run.getparent().remove(run)
+
     if "text" in edit:
         _set_paragraph_text(doc, el, edit["text"])
 
@@ -511,8 +560,158 @@ def _style_attr(css):
 # The only links a document may carry: never javascript: or data:.
 _SAFE_HREF_RE = re.compile(r"^(https?:|mailto:)", re.IGNORECASE)
 
+def _in_fallback(node):
+    # A drawing wrapped in mc:AlternateContent appears twice (Choice and
+    # Fallback); only the Choice copy is the real picture.
+    parent = node.getparent()
+    while parent is not None:
+        if parent.tag.endswith("}Fallback"):
+            return True
+        parent = parent.getparent()
+    return False
+
+
+def _paragraph_drawings(p_el):
+    return [d for d in p_el.iter(qn("w:drawing")) if not _in_fallback(d)]
+
+
+def _owning_run(node):
+    while node is not None and node.tag != qn("w:r"):
+        node = node.getparent()
+    return node
+
+
+def _run_has_drawing(run):
+    return any(True for _ in run._r.iter(qn("w:drawing")))
+
+
+def _text_width_emu(doc):
+    sec = doc.sections[-1]
+    try:
+        return int(sec.page_width - sec.left_margin - sec.right_margin)
+    except TypeError:
+        return int(Inches(6))
+
+
+_ALIGN_NAME = {WD_ALIGN_PARAGRAPH.CENTER: "center", WD_ALIGN_PARAGRAPH.RIGHT: "right"}
+_ALIGN_FROM_NAME = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER, "right": WD_ALIGN_PARAGRAPH.RIGHT}
+
+
+def _make_floating(run_el, side):
+    """Turn an inline picture into one text wraps around (Word's Square wrap),
+    held to the left or right of the column."""
+    inline = next(run_el.iter(qn("wp:inline")), None)
+    if inline is None:
+        return
+    extent = inline.find(qn("wp:extent"))
+    anchor = parse_xml(
+        f'<wp:anchor {nsdecls("wp")} distT="0" distB="0" distL="114300" distR="114300" simplePos="0" '
+        'relativeHeight="251658240" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">'
+        '<wp:simplePos x="0" y="0"/>'
+        f'<wp:positionH relativeFrom="column"><wp:align>{side}</wp:align></wp:positionH>'
+        '<wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>'
+        f'<wp:extent cx="{extent.get("cx")}" cy="{extent.get("cy")}"/>'
+        '<wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapSquare wrapText="bothSides"/></wp:anchor>'
+    )
+    anchor.append(inline.find(qn("wp:docPr")))
+    anchor.append(parse_xml(f'<wp:cNvGraphicFramePr {nsdecls("wp")}/>'))
+    anchor.append(inline.find(qn("a:graphic")))
+    inline.getparent().replace(inline, anchor)
+
+
+def _add_picture_border(run_el):
+    sppr = next(run_el.iter(qn("pic:spPr")), None)
+    if sppr is None:
+        return
+    for old in sppr.findall(qn("a:ln")):
+        sppr.remove(old)
+    sppr.append(parse_xml(f'<a:ln {nsdecls("a")} w="9525"><a:solidFill><a:srgbClr val="404040"/></a:solidFill></a:ln>'))
+
+
+def _place_picture(doc, para_el, source, spec, replace_drawing=None):
+    """Write one picture into the paragraph with the teacher's size, alignment,
+    wrap and border. With replace_drawing, it takes that picture's place."""
+    para = Paragraph(para_el, doc)
+    run = para.add_run()
+    run.add_picture(source, width=Emu(int(_text_width_emu(doc) * spec["width_pct"] / 100)))
+    if replace_drawing is not None:
+        old = _owning_run(replace_drawing)
+        old.addprevious(run._r)  # lxml moves the element
+        old.getparent().remove(old)
+    para.alignment = _ALIGN_FROM_NAME.get(spec.get("align"), WD_ALIGN_PARAGRAPH.LEFT)
+    if spec.get("wrap") in ("left", "right"):
+        _make_floating(run._r, spec["wrap"])
+    if spec.get("border"):
+        _add_picture_border(run._r)
+
+
+def _insert_caption_after(doc, para_el, text, align):
+    new_p = OxmlElement("w:p")
+    para_el.addnext(new_p)
+    para = Paragraph(new_p, doc)
+    run = para.add_run(text)
+    run.italic = True
+    run.font.size = Pt(9)
+    para.alignment = _ALIGN_FROM_NAME.get(align, WD_ALIGN_PARAGRAPH.LEFT)
+    return new_p
+
+
+def _drawing_blob(doc, drawing):
+    blip = next(drawing.iter(qn("a:blip")), None)
+    rid = blip.get(qn("r:embed")) if blip is not None else None
+    part = doc.part.related_parts.get(rid) if rid else None
+    return io.BytesIO(part.blob) if part is not None else None
+
+
+# The only picture types the canvas offers for editing: python-docx can
+# re-embed them on restyle. Anything else (EMF/WMF, SVG, WebP, or a hostile
+# type string in [Content_Types].xml) is drawn as the layout draws it, or not
+# at all, but never offered for restyling.
+_EDITABLE_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif"}
+
+
+def _wrap_docx_picture(doc, p_el, drawing, n, img_html):
+    """Wrap the layout's faithful <img> for one picture in the canvas's picture
+    marker, so the builder can select, restyle or delete it. The <img> keeps
+    the layout's exact size and position until the teacher changes it."""
+    if not img_html:
+        return ""
+    blip = next(drawing.iter(qn("a:blip")), None)
+    rid = blip.get(qn("r:embed")) if blip is not None else None
+    part = doc.part.related_parts.get(rid) if rid else None
+    if part is None or part.content_type not in _EDITABLE_IMAGE_TYPES:
+        return img_html
+    extent = next(drawing.iter(qn("wp:extent")), None)
+    cx = int(extent.get("cx")) if extent is not None else 0
+    pct = max(10, min(100, round(cx * 100 / _text_width_emu(doc)))) if cx else 50
+
+    anchor = drawing.find(qn("wp:anchor"))
+    if anchor is not None:
+        side = next(anchor.iter(qn("wp:align")), None)
+        wrap = "right" if side is not None and side.text == "right" else "left"
+    else:
+        wrap = "inline"
+    try:
+        align = _ALIGN_NAME.get(Paragraph(p_el, doc).alignment, "left")
+    except Exception:
+        align = "left"
+    # Word writes <a:ln><a:noFill/></a:ln> for "no line", so only a line that
+    # isn't explicitly empty counts as a border.
+    ln = next(drawing.iter(qn("a:ln")), None)
+    border = " img-border" if ln is not None and ln.find(qn("a:noFill")) is None else ""
+    return (
+        f'<span class="lp-img lp-img-docx img-align-{align} img-wrap-{wrap}{border}" data-docx-image="{n}" '
+        f'data-width-pct="{pct}" contenteditable="false">{img_html}</span>'
+    )
+
+
 def _run_html(run, layout, p_el):
-    pictures = layout.pictures(run._r)
+    drawings = _paragraph_drawings(p_el)
+    pictures = "".join(
+        _wrap_docx_picture(layout.doc, p_el, d, drawings.index(d), layout.drawing_html(d))
+        for d in run._r.findall(qn("w:drawing"))
+        if d in drawings
+    )
     text = run.text
     if not text:
         return pictures
@@ -1101,6 +1300,10 @@ class _RichLineParser(_html_parser.HTMLParser):
     def __init__(self):
         super().__init__()
         self.lines = [{"runs": [], "list": None}]
+        # A picture being read (<span class="lp-img">), and whether the text
+        # arriving belongs to its caption. A picture becomes its own line.
+        self.image = None
+        self.in_caption = False
         self.list_stack = []
         self.bold = 0
         self.italic = 0
@@ -1136,6 +1339,31 @@ class _RichLineParser(_html_parser.HTMLParser):
                 self.lines[-1]["list"] = list_type
         elif tag == "span":
             classes = set((dict(attrs).get("class") or "").split())
+            a = dict(attrs)
+            if "lp-img" in classes and self.image is None:
+                try:
+                    pct = max(10, min(100, int(a.get("data-width-pct") or 50)))
+                except ValueError:
+                    pct = 50
+
+                def pick(prefix, allowed, default):
+                    return next((c[len(prefix):] for c in classes
+                                 if c.startswith(prefix) and c[len(prefix):] in allowed), default)
+
+                self.image = {
+                    "id": a.get("data-img-id") or "",
+                    "width_pct": pct,
+                    "align": pick("img-align-", ("left", "center", "right"), "left"),
+                    "wrap": pick("img-wrap-", ("inline", "left", "right"), "inline"),
+                    "border": "img-border" in classes,
+                    "caption": [],
+                }
+                self.span_stack.append({"img": True})
+                return
+            if "lp-img-cap" in classes and self.image is not None:
+                self.in_caption = True
+                self.span_stack.append({"cap": True})
+                return
             self.span_stack.append({
                 "size": next((c for c in classes if c in _FONT_SIZE_BY_CLASS), None),
                 "color": next((c for c in classes if c in _FONT_COLOR_BY_CLASS), None),
@@ -1152,14 +1380,34 @@ class _RichLineParser(_html_parser.HTMLParser):
         elif tag in ("ul", "ol") and self.list_stack:
             self.list_stack.pop()
         elif tag == "span" and self.span_stack:
-            self.span_stack.pop()
+            frame = self.span_stack.pop()
+            if frame.get("cap"):
+                self.in_caption = False
+            elif frame.get("img"):
+                img, self.image = self.image, None
+                caption = img.pop("caption")
+                if self.lines[-1]["runs"]:
+                    self._new_line()
+                self.lines[-1]["image"] = img
+                if caption:
+                    self._new_line()
+                    self.lines[-1]["runs"] = caption
+                    self.lines[-1]["align"] = img["align"]
+                self._new_line()
 
     def handle_data(self, data):
         if not data:
             return
+        if self.image is not None:
+            if self.in_caption:
+                self.image["caption"].append({"text": data, "bold": bool(self.bold), "italic": True,
+                                              "underline": bool(self.underline), "size": "fs-sm",
+                                              "color": None, "highlight": None})
+            return
+
         def innermost(key):
             for frame in reversed(self.span_stack):
-                if frame[key]:
+                if frame.get(key):
                     return frame[key]
             return None
 
@@ -1179,7 +1427,7 @@ def parse_rich_value(html_str):
     dropping any line left with no actual text (a stray <br>/<li>)."""
     parser = _RichLineParser()
     parser.feed(html_str or "")
-    lines = [l for l in parser.lines if any(r["text"].strip() for r in l["runs"])]
+    lines = [l for l in parser.lines if l.get("image") or any(r["text"].strip() for r in l["runs"])]
     if not lines:
         lines = [{"runs": [{"text": "-", "bold": False, "italic": False, "underline": False,
                             "size": None, "color": None, "highlight": None}], "list": None}]
@@ -1198,8 +1446,19 @@ def _set_paragraph_rich(doc, para_el, line, template_run=None):
     own bold/italic/underline) into the paragraph instead of one plain
     string, and applies a bullet/numbered list style when the line came from
     an <li>."""
+    if line.get("image"):
+        from services import image_store  # local: docx_service must import without an app
+        para = Paragraph(para_el, doc)
+        for r in para.runs:
+            if not _run_has_drawing(r):
+                r.text = ""
+        path = image_store.image_path(line["image"]["id"])
+        if path:  # a missing upload is skipped rather than failing the export
+            _place_picture(doc, para_el, path, line["image"])
+        return
+
     para = Paragraph(para_el, doc)
-    existing = list(para.runs)
+    existing = [r for r in para.runs if not _run_has_drawing(r)]
     runs = line["runs"] or [{"text": "", "bold": False, "italic": False, "underline": False,
                              "size": None, "color": None, "highlight": None}]
 
@@ -1224,10 +1483,24 @@ def _set_paragraph_rich(doc, para_el, line, template_run=None):
             except Exception:
                 pass
 
+    # A picture's caption line follows the picture's alignment.
+    if line.get("align"):
+        para.alignment = _ALIGN_FROM_NAME.get(line["align"])
+
+def _without_drawings(p_el):
+    for d in _paragraph_drawings(p_el):
+        run = _owning_run(d)
+        if run is not None and run.getparent() is not None:
+            run.getparent().remove(run)
+    return p_el
+
 def _fill_paragraphs_rich(doc, paragraphs, lines):
     els = [p._p for p in paragraphs]
-    template_el = els[0]
-    template_run = Paragraph(template_el, doc).runs[0] if Paragraph(template_el, doc).runs else None
+    # Copied before line 0 is written into it, and without its pictures, so a
+    # picture on line 0 (or one already in the template) isn't repeated into
+    # every later line.
+    template_el = _without_drawings(copy.deepcopy(els[0]))
+    template_run = Paragraph(els[0], doc).runs[0] if Paragraph(els[0], doc).runs else None
 
     for i, line in enumerate(lines):
         if i < len(els):
@@ -1284,6 +1557,8 @@ def _replace_block_region_rich(doc, anchor_el, boundary_el, lines):
         (el for el in region_els if el.tag == qn("w:p") and _element_text(doc, el)),
         None,
     )
+    if template_el is not None:
+        template_el = _without_drawings(copy.deepcopy(template_el))
     template_run = None
     if template_el is not None:
         p = Paragraph(template_el, doc)
@@ -1593,7 +1868,9 @@ def _value_lines(value):
 
 def _set_paragraph_text(doc, para_el, text):
     para = Paragraph(para_el, doc)
-    runs = para.runs
+    # run.text = ... clears the whole run, drawing included, so a run carrying
+    # a picture is never used as the text carrier.
+    runs = [r for r in para.runs if not _run_has_drawing(r)]
     if runs:
         runs[0].text = text
         for extra in runs[1:]:
@@ -1631,6 +1908,8 @@ def _replace_block_region(doc, anchor_el, boundary_el, value):
         (el for el in region_els if el.tag == qn("w:p") and _element_text(doc, el)),
         None,
     )
+    if template_el is not None:
+        template_el = _without_drawings(copy.deepcopy(template_el))
 
     lines = _value_lines(value)
     if template_el is not None:

@@ -10,6 +10,12 @@ const API_URL = (() => {
   return "";
 })();
 
+// Built from the id, never taken from stored markup, so a saved plan can't point
+// an <img> anywhere else.
+function docImageUrl(id) {
+  return `${API_URL}/api/images/${encodeURIComponent(id)}`;
+}
+
 class ApiError extends Error {
   constructor(message, status) {
     super(message);
@@ -87,6 +93,11 @@ const Api = {
   deleteBanner: () => apiFetch("/api/me/banner", { method: "DELETE" }),
 
   listFormats: () => apiFetch("/api/formats"),
+  uploadImage: (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiFetch("/api/images", { method: "POST", body: form });
+  },
   scanFormat: (file) => {
     const form = new FormData();
     form.append("file", file);

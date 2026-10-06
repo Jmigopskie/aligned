@@ -8,11 +8,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-10-05e" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-06b" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
-    <img src="img/owl/alan-idle.png" alt="" />
+    <img src="img/owl/alan-loading.png" alt="" />
     <span>Loading&hellip;</span>
   </div>
   <div class="dash-shell">
@@ -212,7 +212,7 @@
             <section class="panel generate-panel">
               <div class="setup-intro">
                 <h2>Generate content</h2>
-                <p class="text-sm mt-0">Let AI write the whole plan at once, or write it yourself field by field with the owl's help.</p>
+                <p class="text-sm mt-0">Let AI write the whole plan at once, or write it yourself field by field with Alan's help.</p>
               </div>
 
               <div class="mode-switch" id="mode-switch">
@@ -221,17 +221,16 @@
               </div>
 
               <section id="full-controls" class="mt-24">
-                <div id="generate-scope" class="generate-scope" hidden>
-                  <p class="generate-scope-auto" id="generate-scope-auto"></p>
-                  <fieldset class="generate-scope-list">
-                    <legend>Also write these for me?</legend>
-                    <div id="generate-scope-options"></div>
-                  </fieldset>
-                </div>
                 <div class="generator-actions">
                   <button type="button" id="generate-full-btn" class="btn btn-primary">Generate full plan</button>
                 </div>
-                <div id="generation-progress" class="generation-progress mt-16" hidden></div>
+                <div id="generation-progress" class="gen-loader mt-16" hidden aria-live="polite">
+                  <img src="img/owl/alan-loading.png" alt="" class="gen-loader-owl" />
+                  <div class="gen-loader-body">
+                    <strong class="gen-loader-title">Alan is writing your plan&hellip;</strong>
+                    <div id="generation-progress-list" class="generation-progress"></div>
+                  </div>
+                </div>
                 <div id="own-fields-note" class="alert alert-info mt-16" role="status" hidden>
                   <span id="own-fields-note-text"></span>
                   <button type="button" id="own-fields-generate-btn" class="btn btn-secondary btn-sm">Generate these too</button>
@@ -240,7 +239,7 @@
 
               <section id="step-controls" class="mt-24" hidden>
                 <p class="text-sm mt-0" style="margin-bottom:12px;">
-                  Walk through the fields that need real thinking, one at a time. Ask the owl in the chat
+                  Walk through the fields that need real thinking, one at a time. Ask Alan in the chat
                   for help, and tap a suggestion to add it to the field. The rest are quick fields you can
                   fill in directly, in any order, whenever you like.
                 </p>
@@ -293,13 +292,13 @@
     </div>
   </div>
 
-  <section class="owl-chat is-collapsed" id="owl-chat" aria-label="Chat with the owl" hidden>
+  <section class="owl-chat is-collapsed" id="owl-chat" aria-label="Chat with Alan" hidden>
     <div class="owl-chat-resizer" id="owl-chat-resizer" role="separator" aria-orientation="vertical"
          tabindex="0" aria-label="Resize the chat panel. Use the left and right arrow keys."></div>
     <header class="owl-chat-head">
       <img class="owl-chat-avatar" src="img/owl/alan-idle.png" alt="" />
       <div class="owl-chat-title">
-        <strong>Ask the owl</strong>
+        <strong>Ask Alan</strong>
         <span id="owl-chat-field">Guided mode</span>
       </div>
       <button type="button" class="owl-chat-toggle" id="owl-chat-history-btn" aria-pressed="false">History</button>
@@ -320,7 +319,7 @@
       </div>
 
       <form class="owl-chat-form" id="owl-chat-form" autocomplete="off">
-        <label class="sr-only" for="owl-chat-input">Message the owl</label>
+        <label class="sr-only" for="owl-chat-input">Message Alan</label>
         <input type="text" id="owl-chat-input" maxlength="500" placeholder="Ask about this field&hellip;" />
         <button type="submit" class="btn btn-primary btn-sm" id="owl-chat-send">Send</button>
       </form>
@@ -337,9 +336,31 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-10-05e"></script>
-  <script src="js/icons.js?v=2026-10-05e"></script>
-  <script src="js/doc-toolbar.js?v=2026-10-05e"></script>
-  <script src="js/generator.js?v=2026-10-05e"></script>
+  <div class="modal-overlay gen-review-overlay" id="gen-review-overlay" hidden>
+    <div class="modal-dialog gen-review-dialog" role="dialog" aria-modal="true" aria-labelledby="gen-review-title">
+      <div class="modal-header">
+        <h2 id="gen-review-title">Which fields should Alan write?</h2>
+        <button type="button" class="modal-close" id="gen-review-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="gen-review-intro">Fields set to <strong>Keep static</strong> stay exactly as they are. Alan won't write in them, and you can still type in them yourself. Each field is marked in your document as you choose.</p>
+        <div class="gen-review-bulk">
+          <button type="button" class="link-btn" data-review-all="gen">Generate all</button>
+          <button type="button" class="link-btn" data-review-all="static">Keep all static</button>
+        </div>
+        <div id="gen-review-list"></div>
+      </div>
+      <div class="gen-review-footer">
+        <span class="text-sm" id="gen-review-hint"></span>
+        <button type="button" class="btn btn-secondary" id="gen-review-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="gen-review-confirm">Generate</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js?v=2026-10-06b"></script>
+  <script src="js/icons.js?v=2026-10-06b"></script>
+  <script src="js/doc-toolbar.js?v=2026-10-06b"></script>
+  <script src="js/generator.js?v=2026-10-06b"></script>
 </body>
 </html>
