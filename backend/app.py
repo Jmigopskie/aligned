@@ -215,6 +215,7 @@ def create_app():
     from routes.admin_routes import admin_bp
     from routes.announcement_routes import announcement_bp
     from routes.notification_routes import notification_bp
+    from routes.image_routes import image_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api")
     app.register_blueprint(format_bp, url_prefix="/api")
@@ -224,6 +225,7 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix="/api")
     app.register_blueprint(announcement_bp, url_prefix="/api")
     app.register_blueprint(notification_bp, url_prefix="/api")
+    app.register_blueprint(image_bp, url_prefix="/api")
 
     with app.app_context():
         # Import models so db.create_all() knows about every table,
