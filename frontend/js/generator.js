@@ -1193,8 +1193,14 @@ function selectedGenerateKeys() {
 
 // Empty static fields keep a hatched "static" look after the popup closes, so
 // the teacher can see which blanks are theirs to write.
+// The placeholder says so too, instead of a tag that would sit on top of it.
+function setStaticLook(el, isStatic) {
+  el.setAttribute("data-placeholder", isStatic ? "Static: yours to fill in" : "Not generated yet");
+}
+
 function paintStaticMarks() {
   liveDocWrap.querySelectorAll("[data-field-key]").forEach((el) => {
+    setStaticLook(el, staticKeys.has(el.dataset.fieldKey));
     el.classList.toggle("lp-field-static", staticKeys.has(el.dataset.fieldKey));
   });
 }
@@ -2582,6 +2588,7 @@ function syncReview() {
   reviewHint.textContent = n ? "" : "Set at least one field to Generate, or fill the plan in yourself.";
   liveDocWrap.querySelectorAll("[data-field-key]").forEach((el) => {
     const isStatic = staticKeys.has(el.dataset.fieldKey);
+    setStaticLook(el, isStatic);
     el.classList.toggle("lp-field-review-gen", !isStatic);
     el.classList.toggle("lp-field-review-static", isStatic);
   });

@@ -137,6 +137,7 @@ def apply_content_edits(template_path, edits):
     from services import image_store  # local: docx_service must import without an app
 
     applied = 0
+    last_inserted = {}
     # Inserts first, so a picture placed after a line that is also being
     # deleted still lands (it's attached to the line's element, not its index).
     for edit in edits:
@@ -149,10 +150,13 @@ def apply_content_edits(template_path, edits):
         if not path:
             continue  # the upload is gone; skip it rather than fail the save
         new_p = OxmlElement("w:p")
-        items[idx]["el"].addnext(new_p)
+        # After whatever was already inserted after this line, so two
+        # pictures added after the same line keep the order they were added in.
+        last_inserted.get(idx, items[idx]["el"]).addnext(new_p)
         _place_picture(doc, new_p, path, edit)
+        last_inserted[idx] = new_p
         if edit.get("caption"):
-            _insert_caption_after(doc, new_p, edit["caption"], edit.get("align"))
+            last_inserted[idx] = _insert_caption_after(doc, new_p, edit["caption"], edit.get("align"))
         applied += 1
 
     for edit in edits:
@@ -226,13 +230,30 @@ def _apply_paragraph_edit(doc, el, edit):
     # format_routes); a plan's doc_edits never carry these keys.
     if "image_format" in edit or "remove_images" in edit:
         drawings = _paragraph_drawings(el)  # indices are against the original order
+        # A picture sharing its line with text gets a line of its own when it
+        # is restyled, so its alignment never drags the text along with it.
+        shares_text = bool(_text_outside_drawings(el).strip())
+        after = el
         for spec in edit.get("image_format") or []:
             if 0 <= spec["n"] < len(drawings):
                 blob = _drawing_blob(doc, drawings[spec["n"]])
-                if blob is not None:
+                if blob is None:
+                    continue
+                if shares_text:
+                    old = _owning_run(drawings[spec["n"]])
+                    if old is not None and old.getparent() is not None:
+                        old.getparent().remove(old)
+                    target = OxmlElement("w:p")
+                    after.addnext(target)
+                    _place_picture(doc, target, blob, spec)
+                    after = target
+                else:
                     _place_picture(doc, el, blob, spec, replace_drawing=drawings[spec["n"]])
-                    if spec.get("caption"):
-                        _insert_caption_after(doc, el, spec["caption"], spec.get("align"))
+                    target = el
+                if spec.get("caption"):
+                    cap = _insert_caption_after(doc, target, spec["caption"], spec.get("align"))
+                    if shares_text:
+                        after = cap
         for n in edit.get("remove_images") or []:
             if 0 <= n < len(drawings):
                 run = _owning_run(drawings[n])
@@ -1458,6 +1479,7 @@ def _set_paragraph_rich(doc, para_el, line, template_run=None):
         return
 
     para = Paragraph(para_el, doc)
+    _strip_text_from_drawing_runs(para)
     existing = [r for r in para.runs if not _run_has_drawing(r)]
     runs = line["runs"] or [{"text": "", "bold": False, "italic": False, "underline": False,
                              "size": None, "color": None, "highlight": None}]
@@ -1866,8 +1888,23 @@ def _value_lines(value):
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     return lines or ["-"]
 
+def _text_outside_drawings(p_el):
+    return "".join(t.text or "" for t in p_el.iter(qn("w:t")))
+
+
+def _strip_text_from_drawing_runs(para):
+    """Some producers put a line's text in the same run as its picture. That
+    text is cleared here so the caller's new text replaces it rather than
+    landing next to it; the picture itself is left alone."""
+    for r in para.runs:
+        if _run_has_drawing(r):
+            for t in r._r.findall(qn("w:t")):
+                r._r.remove(t)
+
+
 def _set_paragraph_text(doc, para_el, text):
     para = Paragraph(para_el, doc)
+    _strip_text_from_drawing_runs(para)
     # run.text = ... clears the whole run, drawing included, so a run carrying
     # a picture is never used as the text carrier.
     runs = [r for r in para.runs if not _run_has_drawing(r)]

@@ -6012,25 +6012,9 @@ body.owl-chat-shown .dash-main {
 .lp-field-review-gen { outline: 2px solid var(--primary); outline-offset: 2px; }
 .lp-field-review-static,
 .lp-field-static:not(.lp-filled) {
-  position: relative;
   background: rgba(71, 85, 105, 0.06);
   outline: 1px dashed #64748B;
   outline-offset: 2px;
-}
-.lp-field-review-static::after,
-.lp-field-static:not(.lp-filled)::after {
-  content: "static";
-  position: absolute;
-  top: -9px;
-  right: 4px;
-  padding: 0 4px;
-  border-radius: 3px;
-  background: #475569;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 16px;
-  font-style: normal;
 }
 .lp-field-review-pulse { animation: review-pulse 0.9s ease-out 1; }
 @keyframes review-pulse {
@@ -6050,4 +6034,16 @@ body.owl-chat-shown .dash-main {
 @media (max-width: 520px) {
   .gen-loader { flex-direction: column; align-items: flex-start; gap: 12px; }
   .gen-loader-owl { width: 64px; }
+}
+
+/* Alan steps aside from the action buttons: a small peek in his corner that
+   never takes a click, and no bubble. See OwlGuide._watchCovering(). */
+.owl-guide .owl-guide-figure,
+.owl-guide .owl-guide-bubble { transition: transform 0.25s ease, opacity 0.2s ease, visibility 0.2s; }
+.owl-guide.is-peeking .owl-guide-bubble { opacity: 0; visibility: hidden; }
+.owl-guide.is-peeking .owl-guide-figure { transform: translate(12%, 34%) scale(0.5); transform-origin: bottom right; }
+.owl-guide.is-peeking .owl-guide-figure,
+.owl-guide.is-peeking .owl-guide-figure * { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .owl-guide .owl-guide-figure, .owl-guide .owl-guide-bubble { transition: none; }
 }

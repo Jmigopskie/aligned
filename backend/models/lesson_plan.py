@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 
 from extensions import db, iso_utc
+from services.rich_html import sanitize_rich_values
 
 class LessonPlan(db.Model):
     __tablename__ = "lesson_plans"
@@ -71,10 +72,15 @@ class LessonPlan(db.Model):
         self.field_values = json.dumps(values)
 
     def get_rich_values(self):
-        return json.loads(self.rich_field_values or "{}")
+        # Cleaned on the way out as well as in, so a row saved before the server
+        # cleaned anything can't carry script to whoever opens the plan.
+        try:
+            return sanitize_rich_values(json.loads(self.rich_field_values or "{}"))
+        except ValueError:
+            return {}
 
     def set_rich_values(self, values: dict):
-        self.rich_field_values = json.dumps(values or {})
+        self.rich_field_values = json.dumps(sanitize_rich_values(values or {}))
 
     def get_doc_edits(self):
         """The document edits, or [] when there are none.
@@ -118,10 +124,17 @@ class LessonPlan(db.Model):
             value = json.loads(self.mode_values or "{}")
         except ValueError:
             return {}
-        return value if isinstance(value, dict) else {}
+        if not isinstance(value, dict):
+            return {}
+        if "rich_field_values" in value:
+            value["rich_field_values"] = sanitize_rich_values(value["rich_field_values"])
+        return value
 
     def set_mode_values(self, values: dict):
-        self.mode_values = json.dumps(values or {})
+        values = dict(values or {})
+        if "rich_field_values" in values:
+            values["rich_field_values"] = sanitize_rich_values(values["rich_field_values"])
+        self.mode_values = json.dumps(values)
 
     def to_dict(self):
         return {

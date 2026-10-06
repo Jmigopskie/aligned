@@ -850,7 +850,40 @@ const OwlGuide = {
     this._wireDrag(el, owl);
     window.addEventListener("resize", () => this._moveTo(this._pos.x, this._pos.y));
     this._el = el;
+    this._watchCovering(el);
     return el;
+  },
+
+  // Alan must never sit on top of the page's action buttons (Save, Export).
+  // When his box overlaps an action row he steps aside: the bubble hides and he
+  // shrinks to a small peek in his corner that clicks pass straight through.
+  // He comes back as soon as the row is clear of him again.
+  _watchCovering(el) {
+    const check = () => {
+      if (el.hidden) return;
+      const me = el.getBoundingClientRect(); // children's peek transform doesn't change this box
+      const covering = Array.from(document.querySelectorAll(".generator-footer:not([hidden]), [data-owl-avoid]"))
+        .some((row) => {
+          const r = row.getBoundingClientRect();
+          return r.width && r.height && r.left < me.right && r.right > me.left && r.top < me.bottom && r.bottom > me.top;
+        });
+      el.classList.toggle("is-peeking", covering);
+    };
+    let queued = false;
+    const soon = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        check();
+      });
+    };
+    window.addEventListener("scroll", soon, { passive: true, capture: true });
+    window.addEventListener("resize", soon);
+    // ponytail: a slow poll also catches rows that appear without a scroll
+    // (the footer un-hiding after generation); a MutationObserver if this ever costs.
+    setInterval(soon, 800);
+    soon();
   },
 
   _wireDrag(el, handle) {
