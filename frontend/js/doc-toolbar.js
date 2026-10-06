@@ -116,6 +116,11 @@ function renderDocToolbar({ variant }) {
     </div>
     <div class="doc-toolbar-sep"></div>
     <div class="doc-toolbar-group">
+      <button type="button" class="doc-tool-btn" data-image-insert="1" data-icon="image" title="Insert image"></button>
+      <input type="file" data-image-input accept="image/png,image/jpeg,image/gif,image/webp" hidden />
+    </div>
+    <div class="doc-toolbar-sep"></div>
+    <div class="doc-toolbar-group">
       <button type="button" class="doc-tool-btn" data-zoom="out" data-icon="zoomOut" title="Zoom out"></button>
       <button type="button" class="doc-tool-btn doc-zoom-readout" data-zoom="reset" title="Reset zoom to 100%">100%</button>
       <button type="button" class="doc-tool-btn" data-zoom="in" data-icon="zoomIn" title="Zoom in"></button>
@@ -138,6 +143,10 @@ function renderDocToolbar({ variant }) {
 // Paints the SVG for every button that asked for one by name, so the markup
 // above can stay declarative instead of interpolating icon strings.
 function paintDocToolbarIcons(toolbarEl) {
+  // Icon-only buttons need a spoken name; title alone isn't reliably announced.
+  toolbarEl.querySelectorAll("button[title]:not([aria-label])").forEach((btn) => {
+    btn.setAttribute("aria-label", btn.title);
+  });
   toolbarEl.querySelectorAll("[data-icon]").forEach((btn) => {
     const icon = Icons[btn.dataset.icon];
     if (!icon) return;
@@ -315,5 +324,236 @@ function initDocToolbarMenus({ toolbarEl, onPick }) {
 
   document.addEventListener("click", (event) => {
     if (!toolbarEl.contains(event.target)) closeAll(null);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Images: one markup, one image bar, used by the builder and the generator.
+// The vocabulary is closed for the same reason the font sizes are: the Word
+// export reproduces exactly these properties and nothing else.
+// ---------------------------------------------------------------------------
+
+const DOC_IMG_ALIGNS = ["left", "center", "right"];
+const DOC_IMG_WRAPS = ["inline", "left", "right"];
+
+function docImageMarkup({ id, widthPct = 50, align = "center", wrap = "inline", border = false, caption = "" }) {
+  const cap = caption ? `<span class="lp-img-cap" contenteditable="true">${escapeHtml(caption)}</span>` : "";
+  return `<span class="lp-img img-align-${align} img-wrap-${wrap}${border ? " img-border" : ""}" data-img-id="${escapeHtml(id)}" data-width-pct="${widthPct}" contenteditable="false"><img src="${docImageUrl(id)}" alt="">${cap}</span>`;
+}
+
+function docImgClassValue(fig, prefix, allowed, fallback) {
+  const cls = Array.from(fig.classList).find((c) => c.startsWith(prefix));
+  const val = cls ? cls.slice(prefix.length) : fallback;
+  return allowed.includes(val) ? val : fallback;
+}
+
+function readDocImage(fig) {
+  const cap = fig.querySelector(".lp-img-cap");
+  return {
+    width_pct: Math.max(10, Math.min(100, parseInt(fig.dataset.widthPct, 10) || 50)),
+    align: docImgClassValue(fig, "img-align-", DOC_IMG_ALIGNS, "left"),
+    wrap: docImgClassValue(fig, "img-wrap-", DOC_IMG_WRAPS, "inline"),
+    border: fig.classList.contains("img-border"),
+    caption: cap ? cap.textContent.trim() : "",
+  };
+}
+
+function hydrateDocImages(rootEl) {
+  rootEl.querySelectorAll(".lp-img").forEach((fig) => {
+    fig.style.width = `${readDocImage(fig).width_pct}%`;
+    const img = fig.querySelector("img");
+    if (fig.dataset.imgId && img) img.src = docImageUrl(fig.dataset.imgId);
+  });
+}
+
+function setDocImgClass(fig, prefix, value) {
+  Array.from(fig.classList).filter((c) => c.startsWith(prefix)).forEach((c) => fig.classList.remove(c));
+  fig.classList.add(prefix + value);
+}
+
+// `selectable(fig)` says which pictures this page lets the teacher change;
+// `onChange(fig)` / `onDelete(fig)` persist the result in the page's own model.
+function initDocImageTools({ rootEl, selectable = () => true, onChange, onDelete }) {
+  const bar = document.createElement("div");
+  bar.className = "doc-img-bar";
+  bar.setAttribute("role", "toolbar");
+  bar.setAttribute("aria-label", "Image options");
+  bar.hidden = true;
+  const btn = (act, val, label, html) =>
+    `<button type="button" class="doc-img-btn" data-act="${act}" data-val="${val}" aria-label="${label}" title="${label}">${html}</button>`;
+  bar.innerHTML = [
+    btn("w", 25, "Small", "S"), btn("w", 50, "Medium", "M"), btn("w", 75, "Large", "L"), btn("w", 100, "Full width", "Full"),
+    '<span class="doc-img-sep"></span>',
+    btn("align", "left", "Align left", Icons.alignLeft), btn("align", "center", "Align centre", Icons.alignCenter), btn("align", "right", "Align right", Icons.alignRight),
+    '<span class="doc-img-sep"></span>',
+    btn("wrap", "inline", "In line with text", "Inline"), btn("wrap", "left", "Wrap text, image left", "Wrap L"), btn("wrap", "right", "Wrap text, image right", "Wrap R"),
+    '<span class="doc-img-sep"></span>',
+    btn("border", "", "Border", "Border"), btn("caption", "", "Caption", "Caption"),
+    btn("delete", "", "Delete image", Icons.trash),
+  ].join("");
+  // Inside the document's stage when there is one, so it stays visible when
+  // the stage goes fullscreen; fixed-positioned against the viewport.
+  (rootEl.closest(".doc-stage") || document.body).appendChild(bar);
+
+  let selected = null;
+
+  function place() {
+    if (!selected) return;
+    const r = selected.getBoundingClientRect();
+    const h = bar.offsetHeight;
+    const top = r.top - h - 8 >= 8 ? r.top - h - 8 : r.bottom + 8;
+    bar.style.top = `${top}px`;
+    bar.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - bar.offsetWidth - 8))}px`;
+  }
+
+  function syncBar() {
+    const s = readDocImage(selected);
+    bar.querySelectorAll("[data-act]").forEach((b) => {
+      const { act, val } = b.dataset;
+      const on = (act === "w" && Number(val) === s.width_pct) || (act === "align" && val === s.align)
+        || (act === "wrap" && val === s.wrap) || (act === "border" && s.border)
+        || (act === "caption" && !!selected.querySelector(".lp-img-cap"));
+      if (act !== "delete") b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  function select(fig) {
+    deselect();
+    selected = fig;
+    fig.classList.add("lp-img-selected");
+    const handle = document.createElement("span");
+    handle.className = "lp-img-handle";
+    handle.setAttribute("aria-hidden", "true");
+    fig.appendChild(handle);
+    bar.hidden = false;
+    syncBar();
+    place();
+  }
+
+  function deselect() {
+    if (!selected) return;
+    selected.classList.remove("lp-img-selected");
+    selected.querySelectorAll(".lp-img-handle").forEach((h) => h.remove());
+    selected = null;
+    bar.hidden = true;
+  }
+
+  function changed() {
+    hydrateDocImages(selected.parentElement || rootEl);
+    syncBar();
+    place();
+    onChange(selected);
+  }
+
+  rootEl.addEventListener("click", (e) => {
+    const fig = e.target.closest(".lp-img");
+    if (fig && rootEl.contains(fig) && selectable(fig)) {
+      if (e.target.closest(".lp-img-cap")) return; // typing a caption, not selecting
+      select(fig);
+    } else {
+      deselect();
+    }
+  });
+  document.addEventListener("click", (e) => {
+    if (selected && !rootEl.contains(e.target) && !bar.contains(e.target)) deselect();
+  });
+
+  bar.addEventListener("mousedown", (e) => e.preventDefault());
+  bar.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-act]");
+    if (!b || !selected) return;
+    const { act, val } = b.dataset;
+    if (act === "w") selected.dataset.widthPct = val;
+    else if (act === "align") setDocImgClass(selected, "img-align-", val);
+    else if (act === "wrap") setDocImgClass(selected, "img-wrap-", val);
+    else if (act === "border") selected.classList.toggle("img-border");
+    else if (act === "caption") {
+      const cap = selected.querySelector(".lp-img-cap");
+      if (cap) cap.remove();
+      else {
+        const c = document.createElement("span");
+        c.className = "lp-img-cap";
+        c.contentEditable = "true";
+        c.textContent = "Caption";
+        selected.insertBefore(c, selected.querySelector(".lp-img-handle"));
+        c.focus();
+        document.getSelection().selectAllChildren(c);
+      }
+    } else if (act === "delete") {
+      const fig = selected;
+      deselect();
+      onDelete(fig);
+      return;
+    }
+    changed();
+  });
+
+  // Corner drag: width as a share of the line the picture sits in, so the
+  // number means the same thing in the canvas and in the exported document.
+  rootEl.addEventListener("pointerdown", (e) => {
+    if (!e.target.classList.contains("lp-img-handle") || !selected) return;
+    e.preventDefault();
+    const fig = selected;
+    const box = (fig.parentElement || rootEl).getBoundingClientRect();
+    const left = fig.getBoundingClientRect().left;
+    const move = (ev) => {
+      const pct = Math.round(((ev.clientX - left) / box.width) * 100);
+      fig.dataset.widthPct = String(Math.max(10, Math.min(100, pct)));
+      fig.style.width = `${fig.dataset.widthPct}%`;
+      place();
+    };
+    const up = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      if (selected === fig) changed();
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (!selected) return;
+    if (e.key === "Escape") deselect();
+    else if ((e.key === "Delete" || e.key === "Backspace") && !(e.target.closest && e.target.closest(".lp-img-cap"))) {
+      e.preventDefault();
+      const fig = selected;
+      deselect();
+      onDelete(fig);
+    }
+  });
+  window.addEventListener("scroll", place, true);
+  window.addEventListener("resize", place);
+
+  return { deselect };
+}
+
+// The Image button: `beforePick()` may refuse (e.g. no line or field chosen
+// yet) and should remember where the picture goes, since the file dialog
+// takes the selection away; `onUploaded(result)` puts it there.
+function initDocImageInsert({ toolbarEl, beforePick, onUploaded }) {
+  const button = toolbarEl.querySelector("[data-image-insert]");
+  const input = toolbarEl.querySelector("[data-image-input]");
+  if (!button || !input) return;
+  button.addEventListener("mousedown", (e) => e.preventDefault());
+  button.addEventListener("click", () => {
+    if (beforePick && !beforePick()) return;
+    input.value = "";
+    input.click();
+  });
+  input.addEventListener("change", async () => {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("Images must be 5 MB or smaller.", true);
+      return;
+    }
+    button.disabled = true;
+    try {
+      onUploaded(await Api.uploadImage(file));
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      button.disabled = false;
+    }
   });
 }

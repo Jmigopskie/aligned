@@ -4757,3 +4757,29 @@ body.auth-page::after {
   background: transparent;
   box-shadow: inset 0 -1px 0 var(--primary-tint);
 }
+
+/* ---- Pictures inside the document canvas ---- */
+.lp-img { display: block; position: relative; max-width: 100%; margin: 8px 0; line-height: 0; }
+.lp-img img { width: 100%; height: auto; display: block; }
+.lp-img.img-align-center { margin-left: auto; margin-right: auto; }
+.lp-img.img-align-right { margin-left: auto; }
+.lp-img.img-wrap-left { float: left; margin: 4px 16px 8px 0; }
+.lp-img.img-wrap-right { float: right; margin: 4px 0 8px 16px; }
+.lp-img.img-border img { outline: 1px solid #404040; }
+.lp-img-cap { display: block; line-height: 1.4; font-size: 0.82em; font-style: italic; padding-top: 4px; }
+.lp-img.img-align-center .lp-img-cap { text-align: center; }
+.lp-img.img-align-right .lp-img-cap { text-align: right; }
+.lp-img-selected { outline: 2px solid var(--primary); outline-offset: 2px; cursor: default; }
+.lp-img-handle { position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px; border-radius: 3px; background: var(--primary); border: 2px solid var(--surface); cursor: nwse-resize; touch-action: none; }
+
+/* The floating bar for the selected picture. Fixed, so it can live inside the
+   document stage and stay visible when the stage goes fullscreen. */
+.doc-img-bar { position: fixed; z-index: 1001; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 4px; max-width: min(560px, calc(100vw - 16px)); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); }
+.doc-img-bar[hidden] { display: none; }
+.doc-img-btn { min-width: 36px; height: 36px; padding: 0 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text-heading); font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.doc-img-btn svg { width: 18px; height: 18px; }
+.doc-img-btn:hover { background: var(--bg); }
+.doc-img-btn[aria-pressed="true"] { border-color: var(--primary); color: var(--primary); background: var(--bg); }
+.doc-img-btn[data-act="delete"] { color: var(--danger); }
+.doc-img-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.doc-img-sep { width: 1px; align-self: stretch; margin: 4px; background: var(--border); }
