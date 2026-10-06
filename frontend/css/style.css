@@ -2743,17 +2743,6 @@ body.auth-page::after {
   max-width: 920px;
 }
 
-.doc-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 16px;
-  flex-wrap: wrap;
-  padding-bottom: 14px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid var(--border);
-}
-
 .doc-toolbar-views {
   display: flex;
   gap: 6px;
@@ -3049,12 +3038,14 @@ body.auth-page::after {
   margin: 10px 0 12px;
 }
 
+/* One toolbar for both document screens. It wraps rather than pushing the
+   document sideways, and every control is a 40px target. */
 .doc-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  padding: 6px 8px;
+  gap: 6px;
+  padding: 8px 10px;
   margin-bottom: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -3064,36 +3055,42 @@ body.auth-page::after {
 .doc-toolbar-group {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .doc-toolbar-sep {
   width: 1px;
   align-self: stretch;
-  margin: 4px 4px;
+  margin: 6px 4px;
   background: var(--border);
 }
 
 .doc-tool-btn {
-  min-width: 30px;
-  height: 30px;
-  padding: 0 8px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-heading);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
+}
+
+.doc-tool-btn:focus-visible,
+.doc-tool-select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
 }
 
 .doc-tool-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
 }
 
 .doc-tool-btn:hover {
@@ -3116,11 +3113,11 @@ body.auth-page::after {
 }
 
 .doc-tool-select {
-  height: 30px;
+  height: 40px;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0 6px;
-  font-size: 12.5px;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 14px;
   background: var(--surface);
   color: var(--text-heading);
 }
@@ -4354,13 +4351,6 @@ body.auth-page::after {
    size/colour vocabulary that the Word export also understands.
    --------------------------------------------------------------------------- */
 
-/* The toolbar can now hold a lot of controls, so it wraps rather than pushing
-   the document sideways, and sticks to the top of a fullscreen document. */
-.doc-toolbar {
-  flex-wrap: wrap;
-  row-gap: 6px;
-}
-
 .doc-tool-menu-wrap {
   position: relative;
   display: inline-flex;
@@ -4384,12 +4374,13 @@ body.auth-page::after {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 8px;
+  min-height: 36px;
+  padding: 6px 10px;
   background: none;
   border: none;
   border-radius: var(--radius-sm);
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--text-heading);
   text-align: left;
   cursor: pointer;
@@ -4408,8 +4399,8 @@ body.auth-page::after {
 }
 
 .doc-zoom-readout {
-  min-width: 48px;
-  font-size: 11px;
+  min-width: 56px;
+  font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
