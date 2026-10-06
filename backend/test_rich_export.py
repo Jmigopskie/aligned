@@ -13,6 +13,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+os.environ.setdefault("DATABASE_URL", "sqlite://")
 
 from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
@@ -130,6 +131,62 @@ def check_plain_text_unchanged():
     print("  plain text OK")
 
 
+import io
+import tempfile
+from PIL import Image
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
+
+from app import create_app
+
+
+def fig(image_id, cls="img-align-center img-wrap-inline", pct=50, caption=""):
+    cap = f'<span class="lp-img-cap">{caption}</span>' if caption else ""
+    return (f'Before<span class="lp-img {cls}" data-img-id="{image_id}" data-width-pct="{pct}">'
+            f'<img src="/api/images/{image_id}" alt="">{cap}</span>After')
+
+
+def check_image_lines_parse():
+    lines = docx_service.parse_rich_value(fig("a" * 32, "img-align-right img-wrap-left img-border", 30, "Fig <b>1</b>"))
+    texts = ["".join(r["text"] for r in l["runs"]) for l in lines]
+    assert texts == ["Before", "", "Fig 1", "After"], texts
+    assert lines[1]["image"] == {"id": "a" * 32, "width_pct": 30, "align": "right", "wrap": "left", "border": True}
+    assert lines[2]["align"] == "right" and lines[2]["runs"][0]["italic"]
+    print("  image lines parse OK")
+
+
+def check_image_exports():
+    app = create_app()
+    app.config.update(TESTING=True, UPLOAD_FOLDER=tempfile.mkdtemp())
+    with app.app_context():
+        from services import image_store
+        buf = io.BytesIO()
+        Image.new("RGB", (50, 50), (0, 0, 0)).save(buf, "PNG")
+        saved = image_store.save_image(buf.getvalue())
+        lines = docx_service.parse_rich_value(fig(saved["id"], "img-align-center img-wrap-right img-border", 40))
+        doc = Document()
+        para = doc.add_paragraph("placeholder")
+        docx_service._set_paragraph_rich(doc, para._p, lines[1])
+        d = next(para._p.iter(qn("w:drawing")))
+        assert d.find(qn("wp:anchor")) is not None
+        assert next(d.iter(qn("a:ln")), None) is not None
+        assert para.alignment == WD_ALIGN_PARAGRAPH.CENTER
+        assert para.text == "", "placeholder text replaced by the picture"
+    print("  image exports OK")
+
+
+def check_missing_image_is_skipped():
+    app = create_app()
+    app.config.update(TESTING=True, UPLOAD_FOLDER=tempfile.mkdtemp())
+    with app.app_context():
+        lines = docx_service.parse_rich_value(fig("b" * 32))
+        doc = Document()
+        para = doc.add_paragraph("placeholder")
+        docx_service._set_paragraph_rich(doc, para._p, lines[1])  # must not raise
+        assert next(para._p.iter(qn("w:drawing")), None) is None
+    print("  missing image skipped OK")
+
+
 check_marks_still_work()
 check_size()
 check_color()
@@ -138,4 +195,7 @@ check_combined_and_nested()
 check_unknown_class_is_ignored()
 check_lists_still_work()
 check_plain_text_unchanged()
+check_image_lines_parse()
+check_image_exports()
+check_missing_image_is_skipped()
 print("rich export OK")

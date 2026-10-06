@@ -1172,6 +1172,10 @@ class _RichLineParser(_html_parser.HTMLParser):
     def __init__(self):
         super().__init__()
         self.lines = [{"runs": [], "list": None}]
+        # A picture being read (<span class="lp-img">), and whether the text
+        # arriving belongs to its caption. A picture becomes its own line.
+        self.image = None
+        self.in_caption = False
         self.list_stack = []
         self.bold = 0
         self.italic = 0
@@ -1207,6 +1211,31 @@ class _RichLineParser(_html_parser.HTMLParser):
                 self.lines[-1]["list"] = list_type
         elif tag == "span":
             classes = set((dict(attrs).get("class") or "").split())
+            a = dict(attrs)
+            if "lp-img" in classes and self.image is None:
+                try:
+                    pct = max(10, min(100, int(a.get("data-width-pct") or 50)))
+                except ValueError:
+                    pct = 50
+
+                def pick(prefix, allowed, default):
+                    return next((c[len(prefix):] for c in classes
+                                 if c.startswith(prefix) and c[len(prefix):] in allowed), default)
+
+                self.image = {
+                    "id": a.get("data-img-id") or "",
+                    "width_pct": pct,
+                    "align": pick("img-align-", ("left", "center", "right"), "left"),
+                    "wrap": pick("img-wrap-", ("inline", "left", "right"), "inline"),
+                    "border": "img-border" in classes,
+                    "caption": [],
+                }
+                self.span_stack.append({"img": True})
+                return
+            if "lp-img-cap" in classes and self.image is not None:
+                self.in_caption = True
+                self.span_stack.append({"cap": True})
+                return
             self.span_stack.append({
                 "size": next((c for c in classes if c in _FONT_SIZE_BY_CLASS), None),
                 "color": next((c for c in classes if c in _FONT_COLOR_BY_CLASS), None),
@@ -1223,14 +1252,34 @@ class _RichLineParser(_html_parser.HTMLParser):
         elif tag in ("ul", "ol") and self.list_stack:
             self.list_stack.pop()
         elif tag == "span" and self.span_stack:
-            self.span_stack.pop()
+            frame = self.span_stack.pop()
+            if frame.get("cap"):
+                self.in_caption = False
+            elif frame.get("img"):
+                img, self.image = self.image, None
+                caption = img.pop("caption")
+                if self.lines[-1]["runs"]:
+                    self._new_line()
+                self.lines[-1]["image"] = img
+                if caption:
+                    self._new_line()
+                    self.lines[-1]["runs"] = caption
+                    self.lines[-1]["align"] = img["align"]
+                self._new_line()
 
     def handle_data(self, data):
         if not data:
             return
+        if self.image is not None:
+            if self.in_caption:
+                self.image["caption"].append({"text": data, "bold": bool(self.bold), "italic": True,
+                                              "underline": bool(self.underline), "size": "fs-sm",
+                                              "color": None, "highlight": None})
+            return
+
         def innermost(key):
             for frame in reversed(self.span_stack):
-                if frame[key]:
+                if frame.get(key):
                     return frame[key]
             return None
 
@@ -1250,7 +1299,7 @@ def parse_rich_value(html_str):
     dropping any line left with no actual text (a stray <br>/<li>)."""
     parser = _RichLineParser()
     parser.feed(html_str or "")
-    lines = [l for l in parser.lines if any(r["text"].strip() for r in l["runs"])]
+    lines = [l for l in parser.lines if l.get("image") or any(r["text"].strip() for r in l["runs"])]
     if not lines:
         lines = [{"runs": [{"text": "-", "bold": False, "italic": False, "underline": False,
                             "size": None, "color": None, "highlight": None}], "list": None}]
@@ -1269,6 +1318,17 @@ def _set_paragraph_rich(doc, para_el, line, template_run=None):
     own bold/italic/underline) into the paragraph instead of one plain
     string, and applies a bullet/numbered list style when the line came from
     an <li>."""
+    if line.get("image"):
+        from services import image_store  # local: docx_service must import without an app
+        para = Paragraph(para_el, doc)
+        for r in para.runs:
+            if not _run_has_drawing(r):
+                r.text = ""
+        path = image_store.image_path(line["image"]["id"])
+        if path:  # a missing upload is skipped rather than failing the export
+            _place_picture(doc, para_el, path, line["image"])
+        return
+
     para = Paragraph(para_el, doc)
     existing = [r for r in para.runs if not _run_has_drawing(r)]
     runs = line["runs"] or [{"text": "", "bold": False, "italic": False, "underline": False,
@@ -1294,6 +1354,10 @@ def _set_paragraph_rich(doc, para_el, line, template_run=None):
                 para.style = doc.styles[style_name]
             except Exception:
                 pass
+
+    # A picture's caption line follows the picture's alignment.
+    if line.get("align"):
+        para.alignment = _ALIGN_FROM_NAME.get(line["align"])
 
 def _fill_paragraphs_rich(doc, paragraphs, lines):
     els = [p._p for p in paragraphs]
