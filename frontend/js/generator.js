@@ -1307,6 +1307,18 @@ function sanitizeRichValueHtml(node) {
     const tag = child.tagName;
     if (tag === "BR") {
       out += "<br>";
+    } else if (tag === "SPAN" && child.classList.contains("lp-img")) {
+      // Only pictures a student uploaded (an id of the exact shape the server
+      // issues). Rebuilt from the vocabulary rather than copied, so the resize
+      // handle, inline styles and any src never get stored.
+      const id = child.dataset.imgId || "";
+      if (!/^[0-9a-f]{32}$/.test(id)) return;
+      const s = readDocImage(child);
+      const cap = child.querySelector(".lp-img-cap");
+      const capHtml = cap && cap.textContent.trim() ? `<span class="lp-img-cap">${sanitizeRichValueHtml(cap)}</span>` : "";
+      out += `<span class="lp-img img-align-${s.align} img-wrap-${s.wrap}${s.border ? " img-border" : ""}" data-img-id="${id}" data-width-pct="${s.width_pct}" contenteditable="false"><img src="${docImageUrl(id)}" alt="">${capHtml}</span>`;
+    } else if (tag === "SPAN" && child.classList.contains("lp-img-handle")) {
+      return;
     } else if (tag === "SPAN") {
       // Kept only for the vocabulary classes, and only those: the class
       // attribute is rebuilt from the allowlist rather than copied, so nothing
@@ -1326,7 +1338,7 @@ function sanitizeRichValueHtml(node) {
 function syncFieldFromEl(el) {
   fieldValues[el.dataset.fieldKey] = el.textContent;
   fieldRichValues[el.dataset.fieldKey] = sanitizeRichValueHtml(el);
-  el.classList.toggle("lp-filled", !!el.textContent.trim());
+  el.classList.toggle("lp-filled", !!el.textContent.trim() || !!el.querySelector(".lp-img"));
 }
 
 // The value-map half of clearing a field: shared by clearField() below and by
@@ -1633,6 +1645,58 @@ function wireLiveDocToolbar() {
 
   liveDocWrap.addEventListener("keyup", updateLiveDocToolbarStates);
   liveDocWrap.addEventListener("mouseup", updateLiveDocToolbarStates);
+
+  // Pictures a student adds while editing a field. The format's own pictures
+  // belong to the template, so only pictures inside a field are theirs to change.
+  const fieldOf = (fig) => fig.closest("[data-field-key]");
+  initDocImageTools({
+    rootEl: liveDocWrap,
+    selectable: (fig) => !!fig.dataset.imgId && !!fieldOf(fig),
+    onChange: (fig) => {
+      const f = fieldOf(fig);
+      if (f) {
+        syncFieldFromEl(f);
+        markDirty();
+      }
+    },
+    onDelete: (fig) => {
+      const f = fieldOf(fig);
+      fig.remove();
+      if (f) {
+        syncFieldFromEl(f);
+        markDirty();
+      }
+    },
+  });
+
+  let imageTargetRange = null;
+  initDocImageInsert({
+    toolbarEl: liveDocToolbar,
+    beforePick: () => {
+      if (!activeFieldEl()) {
+        showToast("Click into a field first, then choose Insert image.", true);
+        return false;
+      }
+      const sel = window.getSelection();
+      imageTargetRange = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+      return true;
+    },
+    onUploaded: (res) => {
+      const range = imageTargetRange;
+      if (!range) return;
+      const node = range.startContainer;
+      const field = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement).closest("[data-field-key]");
+      if (!field) return;
+      const tpl = document.createElement("template");
+      tpl.innerHTML = docImageMarkup({ id: res.id });
+      range.collapse(false);
+      range.insertNode(tpl.content.firstChild);
+      hydrateDocImages(field);
+      field.classList.add("lp-filled");
+      syncFieldFromEl(field);
+      markDirty();
+    },
+  });
 }
 
 function sleep(ms) {
@@ -1912,6 +1976,8 @@ function paintRestoredValues(blankMissing = false) {
       const text = Array.isArray(value) ? value.join("\n") : (value || "");
       if (rich) {
         el.innerHTML = rich;
+        hydrateDocImages(el);
+        el.querySelectorAll(".lp-img-cap").forEach((c) => { c.contentEditable = "true"; });
         el.classList.add("lp-filled");
       } else if (text.trim()) {
         el.textContent = text;
@@ -2488,7 +2554,7 @@ function wireDocCanvasEditing() {
     el.setAttribute("data-placeholder", "Not generated yet");
     el.addEventListener("input", () => {
       fieldValues[el.dataset.fieldKey] = el.textContent;
-      el.classList.toggle("lp-filled", !!el.textContent.trim());
+      el.classList.toggle("lp-filled", !!el.textContent.trim() || !!el.querySelector(".lp-img"));
       markDirty();
       renderResults();
       if (mode === "step") renderStepFieldNav();
