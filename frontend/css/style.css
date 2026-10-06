@@ -417,6 +417,9 @@ textarea::placeholder {
 
 .btn-primary:hover:not(:disabled) {
   background: var(--primary-hover);
+  /* a:hover recolours links to --primary-hover, which on an <a class="btn
+     btn-primary"> (Export as Word) made the label vanish into the fill. */
+  color: #FFFFFF;
 }
 
 .btn-secondary {
@@ -4734,8 +4737,8 @@ body.auth-page::after {
 .lp-field-review-static,
 .lp-field-static:not(.lp-filled) {
   position: relative;
-  background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(100, 116, 139, 0.12) 6px 12px);
-  outline: 1px dashed #94A3B8;
+  background: rgba(71, 85, 105, 0.06);
+  outline: 1px dashed #64748B;
   outline-offset: 2px;
 }
 .lp-field-review-static::after,

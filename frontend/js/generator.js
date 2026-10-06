@@ -2437,7 +2437,7 @@ function reportGenerationOutcome(finalEvent, requestedKeys) {
 
   // Draw attention to the actual empty fields rather than only naming them,
   // whichever bucket (or both) they came from.
-  highlightEmptyFields([...missingKeys, ...yoursKeys]);
+  highlightEmptyFields(missingKeys);
   paintStaticMarks();
 }
 
