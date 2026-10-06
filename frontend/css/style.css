@@ -3635,21 +3635,27 @@ body.auth-page::after {
   pointer-events: none;
 }
 
+/* Alan with his lesson plan. A slow, small bob reads as calm work rather
+   than impatience; the loader is on screen only for a moment. */
 .page-transition img {
-  width: 64px;
+  width: 88px;
   height: auto;
-  animation: page-transition-bob 0.9s ease-in-out infinite;
+  animation: page-transition-bob 1.6s ease-in-out infinite;
 }
 
 @keyframes page-transition-bob {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-9px); }
+  50% { transform: translateY(-6px); }
 }
 
 .page-transition span {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-body);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition img { animation: none; }
 }
 
 /* ---- Guide owl: a companion that reacts to where you are in building the
@@ -4753,3 +4759,16 @@ body.auth-page::after {
   100% { box-shadow: 0 0 0 12px rgba(28, 92, 78, 0); }
 }
 @media (prefers-reduced-motion: reduce) { .lp-field-review-pulse { animation: none; } }
+
+/* ---- Generation loader: Alan beside the per-section progress ---- */
+.gen-loader { display: flex; align-items: center; gap: 24px; padding: 20px 24px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.gen-loader[hidden] { display: none; }
+.gen-loader-owl { width: 88px; height: auto; flex-shrink: 0; animation: page-transition-bob 1.6s ease-in-out infinite; }
+.gen-loader-body { flex: 1; min-width: 0; }
+.gen-loader-title { display: block; margin-bottom: 10px; font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--text-heading); }
+.gen-loader .generation-progress { padding: 0; border: none; background: none; max-width: none; }
+@media (prefers-reduced-motion: reduce) { .gen-loader-owl { animation: none; } }
+@media (max-width: 520px) {
+  .gen-loader { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .gen-loader-owl { width: 64px; }
+}

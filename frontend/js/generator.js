@@ -103,6 +103,7 @@ const sectionNav = document.getElementById("section-nav");
 const stepProgressLabel = document.getElementById("step-progress-label");
 const generateFullBtn = document.getElementById("generate-full-btn");
 const generationProgressEl = document.getElementById("generation-progress");
+const generationProgressList = document.getElementById("generation-progress-list");
 const stepContinueBtn = document.getElementById("step-continue-btn");
 const stepClearBtn = document.getElementById("step-clear-btn");
 const resultsEl = document.getElementById("results");
@@ -268,7 +269,7 @@ function owlRow(avatarState) {
 function addOwlTyping() {
   const { row, body } = owlRow("thinking");
   row.classList.add("is-typing");
-  body.innerHTML = '<div class="owl-bubble"><span class="owl-dots" aria-label="The owl is typing"><i></i><i></i><i></i></span></div>';
+  body.innerHTML = '<div class="owl-bubble"><span class="owl-dots" aria-label="Alan is typing"><i></i><i></i><i></i></span></div>';
   owlChatLog.appendChild(row);
   scrollChatToEnd();
   return row;
@@ -558,7 +559,7 @@ function renderHistoryList() {
   const entries = Object.entries(chat.threads).filter(([, turns]) => turns.length);
   if (!entries.length) {
     owlChatHistoryList.innerHTML =
-      '<p class="owl-chat-history-empty">Nothing saved yet. Conversations you have with the owl about each field are kept here so you can read them back.</p>';
+      '<p class="owl-chat-history-empty">Nothing saved yet. Conversations you have with Alan about each field are kept here so you can read them back.</p>';
     return;
   }
 
@@ -2171,7 +2172,7 @@ function baseGenerationPayload() {
 
 function renderProgress(sectionStates) {
   generationProgressEl.hidden = false;
-  generationProgressEl.innerHTML = sectionStates
+  generationProgressList.innerHTML = sectionStates
     .map((s) => {
       const icon = s.status === "done" ? "✓" : s.status === "active" ? "…" : s.status === "retrying" ? "⟳" : "";
       return `
