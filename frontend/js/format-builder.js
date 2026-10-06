@@ -271,6 +271,8 @@ function snapshotContentState() {
   imageSnapshot = {};
   docBuilderCanvas.querySelectorAll("[data-anchor-index] .lp-img[data-docx-image]").forEach((fig) => {
     const idx = fig.closest("[data-anchor-index]").dataset.anchorIndex;
+    // Where the picture started: Backspace can carry it into another line.
+    fig.dataset.originAnchor = idx;
     imageSnapshot[`${idx}:${fig.dataset.docxImage}`] = readDocImage(fig);
   });
   updateSaveContentButton();
@@ -296,7 +298,15 @@ function buildContentEdits() {
     const idx = parseInt(key, 10);
     if (!present.has(idx)) deletes.add(idx);
   });
-  deletes.forEach((idx) => edits.push({ anchor_index: idx, action: "delete" }));
+  deletes.forEach((idx) => {
+    const edit = { anchor_index: idx, action: "delete" };
+    // A line merged into the one above takes its picture with it on screen; the
+    // file has to do the same, or deleting the line deletes the picture too.
+    const carried = docBuilderCanvas.querySelector(`.lp-img[data-origin-anchor="${idx}"]`);
+    const home = carried && carried.closest("[data-anchor-index]");
+    if (home && !markedDeletes.has(idx)) edit.move_images_to = parseInt(home.dataset.anchorIndex, 10);
+    edits.push(edit);
+  });
 
   docBuilderCanvas.querySelectorAll("[data-anchor-index]").forEach((el) => {
     const idx = parseInt(el.dataset.anchorIndex, 10);
@@ -323,7 +333,7 @@ function buildContentEdits() {
     const restyled = [];
     Object.keys(imageSnapshot).filter((k) => k.startsWith(`${idx}:`)).forEach((k) => {
       const n = parseInt(k.split(":")[1], 10);
-      const fig = el.querySelector(`.lp-img[data-docx-image="${n}"]`);
+      const fig = el.querySelector(`.lp-img[data-docx-image="${n}"][data-origin-anchor="${idx}"]`);
       if (!fig) {
         removed.push(n);
         return;

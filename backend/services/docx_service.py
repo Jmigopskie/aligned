@@ -160,6 +160,12 @@ def apply_content_edits(template_path, edits):
         action = edit.get("action")
 
         if action == "delete":
+            target = edit.get("move_images_to")
+            if isinstance(target, int) and 0 <= target < len(items) and target != idx:
+                for d in _paragraph_drawings(el):
+                    run = _owning_run(d)
+                    if run is not None:
+                        items[target]["el"].append(run)
             cell = item["cell"]
             if cell is not None and len(cell.paragraphs) <= 1:
                 # Word requires at least one paragraph per cell — clear it
@@ -203,6 +209,9 @@ def apply_doc_edits(doc, items, edits):
             continue
         if not (0 <= idx < len(items)):
             continue
+        # Picture edits belong to the format builder; from a plan they are
+        # ignored rather than trusted, so stray keys can't break an export.
+        edit = {k: v for k, v in edit.items() if k not in ("image_format", "remove_images")}
         _apply_paragraph_edit(doc, items[idx]["el"], edit)
         applied += 1
     return applied
@@ -641,13 +650,20 @@ def _drawing_blob(doc, drawing):
     return io.BytesIO(part.blob) if part is not None else None
 
 
+# The only picture types the canvas offers for editing: a browser can show them
+# and python-docx can re-embed them on restyle. Anything else (EMF/WMF logos,
+# or a hostile type string in [Content_Types].xml) is left untouched in the
+# file and not put into the page at all.
+_EDITABLE_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif"}
+
+
 def _drawing_figure_html(para, drawing, n):
     """One picture as the canvas's image markup, embedded as a data URI so the
     builder can show it without a second request per picture."""
     blip = next(drawing.iter(qn("a:blip")), None)
     rid = blip.get(qn("r:embed")) if blip is not None else None
     part = para.part.related_parts.get(rid) if rid else None
-    if part is None:
+    if part is None or part.content_type not in _EDITABLE_IMAGE_TYPES:
         return ""
     extent = next(drawing.iter(qn("wp:extent")), None)
     cx = int(extent.get("cx")) if extent is not None else 0
@@ -1359,10 +1375,20 @@ def _set_paragraph_rich(doc, para_el, line, template_run=None):
     if line.get("align"):
         para.alignment = _ALIGN_FROM_NAME.get(line["align"])
 
+def _without_drawings(p_el):
+    for d in _paragraph_drawings(p_el):
+        run = _owning_run(d)
+        if run is not None and run.getparent() is not None:
+            run.getparent().remove(run)
+    return p_el
+
 def _fill_paragraphs_rich(doc, paragraphs, lines):
     els = [p._p for p in paragraphs]
-    template_el = els[0]
-    template_run = Paragraph(template_el, doc).runs[0] if Paragraph(template_el, doc).runs else None
+    # Copied before line 0 is written into it, and without its pictures, so a
+    # picture on line 0 (or one already in the template) isn't repeated into
+    # every later line.
+    template_el = _without_drawings(copy.deepcopy(els[0]))
+    template_run = Paragraph(els[0], doc).runs[0] if Paragraph(els[0], doc).runs else None
 
     for i, line in enumerate(lines):
         if i < len(els):
@@ -1419,6 +1445,8 @@ def _replace_block_region_rich(doc, anchor_el, boundary_el, lines):
         (el for el in region_els if el.tag == qn("w:p") and _element_text(doc, el)),
         None,
     )
+    if template_el is not None:
+        template_el = _without_drawings(copy.deepcopy(template_el))
     template_run = None
     if template_el is not None:
         p = Paragraph(template_el, doc)
@@ -1761,6 +1789,8 @@ def _replace_block_region(doc, anchor_el, boundary_el, value):
         (el for el in region_els if el.tag == qn("w:p") and _element_text(doc, el)),
         None,
     )
+    if template_el is not None:
+        template_el = _without_drawings(copy.deepcopy(template_el))
 
     lines = _value_lines(value)
     if template_el is not None:

@@ -13,6 +13,10 @@ from flask import current_app
 from PIL import Image, UnidentifiedImageError
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
+# A small PNG can decode to gigabytes, so the pixel count is checked from the
+# header before anything is decoded. 40M pixels is far beyond any classroom
+# picture (a 12MP phone photo is 12M).
+MAX_IMAGE_PIXELS = 40_000_000
 _ID_RE = re.compile(r"^[0-9a-f]{32}$")
 _ACCEPTED = {"PNG", "JPEG", "GIF", "WEBP"}
 # python-docx embeds PNG and JPEG but not WebP, so anything else is re-encoded
@@ -41,6 +45,8 @@ def save_image(data):
         raise ValueError("Images must be 5 MB or smaller.")
     try:
         img = Image.open(io.BytesIO(data))
+        if img.width * img.height > MAX_IMAGE_PIXELS:
+            raise ValueError("That image is too large. Use one under 40 megapixels.")
         img.load()
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
         img = None

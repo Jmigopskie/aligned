@@ -390,6 +390,8 @@ def _sanitize_content_edits(raw_edits):
             continue
 
         edit = {"anchor_index": idx, "action": action}
+        if action == "delete" and isinstance(e.get("move_images_to"), int) and not isinstance(e.get("move_images_to"), bool):
+            edit["move_images_to"] = e["move_images_to"]
         if action == "insert_image":
             if not isinstance(e.get("image_id"), str) or not _IMG_ID_RE.match(e["image_id"]):
                 continue
