@@ -216,13 +216,6 @@
               </div>
 
               <section id="full-controls" class="mt-24">
-                <div id="generate-scope" class="generate-scope" hidden>
-                  <p class="generate-scope-auto" id="generate-scope-auto"></p>
-                  <fieldset class="generate-scope-list">
-                    <legend>Also write these for me?</legend>
-                    <div id="generate-scope-options"></div>
-                  </fieldset>
-                </div>
                 <div class="generator-actions">
                   <button type="button" id="generate-full-btn" class="btn btn-primary">Generate full plan</button>
                 </div>
@@ -325,6 +318,28 @@
         <button type="button" class="modal-close" id="preview-close" aria-label="Close preview">&times;</button>
       </div>
       <div class="modal-body" id="preview-body"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay gen-review-overlay" id="gen-review-overlay" hidden>
+    <div class="modal-dialog gen-review-dialog" role="dialog" aria-modal="true" aria-labelledby="gen-review-title">
+      <div class="modal-header">
+        <h2 id="gen-review-title">Which fields should Alan write?</h2>
+        <button type="button" class="modal-close" id="gen-review-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="gen-review-intro">Fields set to <strong>Keep static</strong> stay exactly as they are. Alan won't write in them, and you can still type in them yourself. Each field is marked in your document as you choose.</p>
+        <div class="gen-review-bulk">
+          <button type="button" class="link-btn" data-review-all="gen">Generate all</button>
+          <button type="button" class="link-btn" data-review-all="static">Keep all static</button>
+        </div>
+        <div id="gen-review-list"></div>
+      </div>
+      <div class="gen-review-footer">
+        <span class="text-sm" id="gen-review-hint"></span>
+        <button type="button" class="btn btn-secondary" id="gen-review-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="gen-review-confirm">Generate</button>
+      </div>
     </div>
   </div>
 

@@ -4533,88 +4533,6 @@ body.auth-page::after {
 }
 
 /* ---------------------------------------------------------------------------
-   Building Proficiency: what to generate
-   --------------------------------------------------------------------------- */
-
-.generate-scope {
-  /* Warm paper (--bg) instead of --surface: the panel sits directly on the
-     white .generate-panel, so it needs its own tone to read as a distinct
-     group rather than a second, redundant white-on-white frame. */
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.generate-scope-auto {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: var(--text-body);
-}
-
-.generate-scope-list {
-  padding: 0;
-  margin: 0;
-  border: none;
-  /* Fieldsets get an implicit min-inline-size: min-content in Firefox, which
-     can force the grid below wider than its container at narrow widths. */
-  min-width: 0;
-}
-
-.generate-scope-list legend {
-  padding: 0;
-  margin-bottom: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-heading);
-}
-
-#generate-scope-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 6px 10px;
-}
-
-.generate-scope-option {
-  display: flex;
-  align-items: start;
-  gap: 8px;
-  padding: 5px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  line-height: 1.35;
-  color: var(--text-heading);
-  cursor: pointer;
-  transition: background-color 0.12s ease;
-}
-
-/* No border and no fill at rest. Boxing each of nine checkboxes made a wall of
-   identical pills, and since every option starts ticked, a checked tint covered
-   the lot, so neither marked anything out. The checkbox is the state; the row
-   only lights up under the pointer or keyboard. */
-.generate-scope-option:hover {
-  background: var(--surface);
-}
-
-.generate-scope-option:focus-within {
-  background: var(--surface);
-}
-
-.generate-scope-option input {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--primary);
-  margin: 0;
-  flex: 0 0 auto;
-}
-
-.generate-scope-option input:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-/* ---------------------------------------------------------------------------
    Format builder: which mode writes each field
    --------------------------------------------------------------------------- */
 
@@ -4783,3 +4701,64 @@ body.auth-page::after {
 .doc-img-btn[data-act="delete"] { color: var(--danger); }
 .doc-img-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .doc-img-sep { width: 1px; align-self: stretch; margin: 4px; background: var(--border); }
+
+/* ---- Pre-generate field review: which fields Alan writes ---- */
+.gen-review-dialog { max-width: 520px; }
+.gen-review-intro { margin: 0 0 12px; font-size: 13.5px; line-height: 1.5; color: var(--text-body); }
+.gen-review-bulk { display: flex; gap: 16px; margin: 0 0 12px; }
+.link-btn { padding: 0; border: none; background: none; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.link-btn:hover { text-decoration-thickness: 2px; }
+.link-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+.gen-review-group { border: 0; padding: 0; margin: 0 0 16px; min-width: 0; }
+.gen-review-group legend { padding: 0; margin-bottom: 4px; font-weight: 700; font-size: 12px; letter-spacing: 0.02em; color: var(--text-heading); }
+.gen-review-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.gen-review-label { font-size: 14px; line-height: 1.35; color: var(--text-heading); }
+.gen-review-note { margin-left: 8px; font-size: 11.5px; color: var(--text-body); font-style: italic; white-space: nowrap; }
+.seg { display: inline-flex; flex-shrink: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg label { position: relative; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: inline-block; min-height: 36px; padding: 8px 12px; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--text-body); }
+.seg label + label span { border-left: 1px solid var(--border); }
+.seg input:checked + span { background: var(--primary); color: #fff; }
+.seg input[value="static"]:checked + span { background: #475569; }
+.seg input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: -3px; }
+.gen-review-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.gen-review-footer #gen-review-hint { margin-right: auto; }
+
+/* On a wide screen the popup docks right, so the highlighted document stays
+   in view beside it rather than hidden behind it. */
+@media (min-width: 1100px) {
+  .gen-review-overlay { justify-content: flex-end; padding: 16px; background: rgba(31, 41, 55, 0.18); }
+  .gen-review-dialog { height: 100%; max-height: none; }
+  .gen-review-dialog .modal-body { flex: 1; }
+}
+
+.lp-field-review-gen { outline: 2px solid var(--primary); outline-offset: 2px; }
+.lp-field-review-static,
+.lp-field-static:not(.lp-filled) {
+  position: relative;
+  background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(100, 116, 139, 0.12) 6px 12px);
+  outline: 1px dashed #94A3B8;
+  outline-offset: 2px;
+}
+.lp-field-review-static::after,
+.lp-field-static:not(.lp-filled)::after {
+  content: "static";
+  position: absolute;
+  top: -9px;
+  right: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #475569;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  font-style: normal;
+}
+.lp-field-review-pulse { animation: review-pulse 0.9s ease-out 1; }
+@keyframes review-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(28, 92, 78, 0.45); }
+  100% { box-shadow: 0 0 0 12px rgba(28, 92, 78, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .lp-field-review-pulse { animation: none; } }
