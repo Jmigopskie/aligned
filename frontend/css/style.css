@@ -5941,6 +5941,8 @@ body.owl-chat-shown .dash-main {
   outline-offset: 2px;
   border-radius: var(--radius-sm);
   box-shadow: 0 0 0 6px var(--primary-tint);
+}
+
 /* ---- Pictures inside the document canvas ---- */
 .lp-img { display: block; position: relative; max-width: 100%; margin: 8px 0; line-height: 0; }
 .lp-img:not(.lp-img-docx) img { width: 100%; height: auto; display: block; }
