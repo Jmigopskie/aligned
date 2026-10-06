@@ -159,8 +159,89 @@ def check_round_trip():
     print("  round trip OK")
 
 
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
+
+
+def drawings_in(doc):
+    return [d for d in doc.element.body.iter(qn("w:drawing"))]
+
+
+def check_text_edit_keeps_picture():
+    doc = Document()
+    p = doc.add_paragraph()
+    p.add_run().add_picture(png_stream(), width=Inches(2))
+    p.add_run("Caption-ish text")
+    items = docx_service._iter_items(doc)
+    docx_service.apply_doc_edits(doc, items, [{"anchor_index": 0, "text": "Renamed"}])
+    assert len(drawings_in(doc)) == 1, "a text edit must not delete the picture"
+    assert doc.paragraphs[0].text == "Renamed"
+    print("  text edit keeps picture OK")
+
+
+def check_picture_edits():
+    path = doc_with_picture()
+    docx_service.apply_content_edits(path, [
+        {"anchor_index": 1, "action": "format", "image_format": [
+            {"n": 0, "width_pct": 25, "align": "center", "wrap": "right", "border": True, "caption": "Fig 1"}]},
+    ])
+    doc = Document(path)
+    (d,) = drawings_in(doc)
+    assert d.find(qn("wp:anchor")) is not None, "wrap right makes it floating"
+    assert next(d.iter(qn("wp:align"))).text == "right"
+    assert next(d.iter(qn("a:ln")), None) is not None, "border"
+    cx = int(next(d.iter(qn("wp:extent"))).get("cx"))
+    assert abs(cx - docx_service._text_width_emu(doc) * 0.25) < 2, cx
+    assert doc.paragraphs[1].alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert doc.paragraphs[2].text == "Fig 1" and doc.paragraphs[2].runs[0].italic
+    print("  image_format OK")
+
+    docx_service.apply_content_edits(path, [{"anchor_index": 1, "action": "format", "remove_images": [0]}])
+    assert drawings_in(Document(path)) == [], "removed picture stays removed"
+    print("  remove_images OK")
+
+
+def check_insert_image():
+    app = create_app()
+    app.config.update(TESTING=True, UPLOAD_FOLDER=tempfile.mkdtemp())
+    with app.app_context():
+        from services import image_store
+        saved = image_store.save_image(png_stream().getvalue())
+        path = doc_with_picture()
+        docx_service.apply_content_edits(path, [
+            {"anchor_index": 0, "action": "insert_image", "image_id": saved["id"],
+             "width_pct": 50, "align": "left", "wrap": "inline", "border": False, "caption": ""},
+            {"anchor_index": 2, "action": "insert_image", "image_id": "f" * 32,  # no such file
+             "width_pct": 50, "align": "left", "wrap": "inline", "border": False, "caption": ""},
+        ])
+        doc = Document(path)
+        assert len(drawings_in(doc)) == 2, "original + the inserted one; the missing file is skipped"
+        assert doc.paragraphs[0].text == "Header line"
+        assert docx_service._paragraph_drawings(doc.paragraphs[1]._p), "inserted right after line 0"
+    print("  insert_image OK")
+
+
+def check_sanitizer_image_edits():
+    from routes.format_routes import _sanitize_content_edits
+    out = _sanitize_content_edits([
+        {"anchor_index": 1, "action": "format", "remove_images": [0, "x", -1],
+         "image_format": [{"n": 0, "width_pct": 999, "align": "diagonal", "wrap": "left", "border": 1, "caption": "c" * 999}]},
+        {"anchor_index": 2, "action": "insert_image", "image_id": "../etc", "width_pct": 50},
+        {"anchor_index": 2, "action": "insert_image", "image_id": "a" * 32, "width_pct": 5},
+    ])
+    assert out[0]["remove_images"] == [0]
+    f = out[0]["image_format"][0]
+    assert f == {"n": 0, "width_pct": 100, "align": "left", "wrap": "left", "border": True, "caption": "c" * 300}, f
+    assert len(out) == 2 and out[1]["image_id"] == "a" * 32 and out[1]["width_pct"] == 10
+    print("  sanitizer image edits OK")
+
+
 check_applier()
 check_applier_is_defensive()
 check_round_trip()
 check_pictures_render()
+check_text_edit_keeps_picture()
+check_picture_edits()
+check_insert_image()
+check_sanitizer_image_edits()
 print("doc edits OK")

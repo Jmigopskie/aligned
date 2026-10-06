@@ -130,7 +130,27 @@ def apply_content_edits(template_path, edits):
         and 0 <= e["anchor_index"] < len(items)
     })
 
+    from services import image_store  # local: docx_service must import without an app
+
     applied = 0
+    # Inserts first, so a picture placed after a line that is also being
+    # deleted still lands (it's attached to the line's element, not its index).
+    for edit in edits:
+        if edit.get("action") != "insert_image":
+            continue
+        idx = edit.get("anchor_index")
+        if not isinstance(idx, int) or not (0 <= idx < len(items)):
+            continue
+        path = image_store.image_path(edit.get("image_id"))
+        if not path:
+            continue  # the upload is gone; skip it rather than fail the save
+        new_p = OxmlElement("w:p")
+        items[idx]["el"].addnext(new_p)
+        _place_picture(doc, new_p, path, edit)
+        if edit.get("caption"):
+            _insert_caption_after(doc, new_p, edit["caption"], edit.get("align"))
+        applied += 1
+
     for edit in edits:
         idx = edit.get("anchor_index")
         if not isinstance(idx, int) or not (0 <= idx < len(items)):
@@ -189,6 +209,23 @@ def apply_doc_edits(doc, items, edits):
 
 
 def _apply_paragraph_edit(doc, el, edit):
+    # Picture edits come only from the format builder (sanitized in
+    # format_routes); a plan's doc_edits never carry these keys.
+    if "image_format" in edit or "remove_images" in edit:
+        drawings = _paragraph_drawings(el)  # indices are against the original order
+        for spec in edit.get("image_format") or []:
+            if 0 <= spec["n"] < len(drawings):
+                blob = _drawing_blob(doc, drawings[spec["n"]])
+                if blob is not None:
+                    _place_picture(doc, el, blob, spec, replace_drawing=drawings[spec["n"]])
+                    if spec.get("caption"):
+                        _insert_caption_after(doc, el, spec["caption"], spec.get("align"))
+        for n in edit.get("remove_images") or []:
+            if 0 <= n < len(drawings):
+                run = _owning_run(drawings[n])
+                if run is not None and run.getparent() is not None:
+                    run.getparent().remove(run)
+
     if "text" in edit:
         _set_paragraph_text(doc, el, edit["text"])
 
@@ -535,6 +572,73 @@ def _text_width_emu(doc):
 
 
 _ALIGN_NAME = {WD_ALIGN_PARAGRAPH.CENTER: "center", WD_ALIGN_PARAGRAPH.RIGHT: "right"}
+_ALIGN_FROM_NAME = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER, "right": WD_ALIGN_PARAGRAPH.RIGHT}
+
+
+def _make_floating(run_el, side):
+    """Turn an inline picture into one text wraps around (Word's Square wrap),
+    held to the left or right of the column."""
+    inline = next(run_el.iter(qn("wp:inline")), None)
+    if inline is None:
+        return
+    extent = inline.find(qn("wp:extent"))
+    anchor = parse_xml(
+        f'<wp:anchor {nsdecls("wp")} distT="0" distB="0" distL="114300" distR="114300" simplePos="0" '
+        'relativeHeight="251658240" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">'
+        '<wp:simplePos x="0" y="0"/>'
+        f'<wp:positionH relativeFrom="column"><wp:align>{side}</wp:align></wp:positionH>'
+        '<wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>'
+        f'<wp:extent cx="{extent.get("cx")}" cy="{extent.get("cy")}"/>'
+        '<wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapSquare wrapText="bothSides"/></wp:anchor>'
+    )
+    anchor.append(inline.find(qn("wp:docPr")))
+    anchor.append(parse_xml(f'<wp:cNvGraphicFramePr {nsdecls("wp")}/>'))
+    anchor.append(inline.find(qn("a:graphic")))
+    inline.getparent().replace(inline, anchor)
+
+
+def _add_picture_border(run_el):
+    sppr = next(run_el.iter(qn("pic:spPr")), None)
+    if sppr is None:
+        return
+    for old in sppr.findall(qn("a:ln")):
+        sppr.remove(old)
+    sppr.append(parse_xml(f'<a:ln {nsdecls("a")} w="9525"><a:solidFill><a:srgbClr val="404040"/></a:solidFill></a:ln>'))
+
+
+def _place_picture(doc, para_el, source, spec, replace_drawing=None):
+    """Write one picture into the paragraph with the teacher's size, alignment,
+    wrap and border. With replace_drawing, it takes that picture's place."""
+    para = Paragraph(para_el, doc)
+    run = para.add_run()
+    run.add_picture(source, width=Emu(int(_text_width_emu(doc) * spec["width_pct"] / 100)))
+    if replace_drawing is not None:
+        old = _owning_run(replace_drawing)
+        old.addprevious(run._r)  # lxml moves the element
+        old.getparent().remove(old)
+    para.alignment = _ALIGN_FROM_NAME.get(spec.get("align"), WD_ALIGN_PARAGRAPH.LEFT)
+    if spec.get("wrap") in ("left", "right"):
+        _make_floating(run._r, spec["wrap"])
+    if spec.get("border"):
+        _add_picture_border(run._r)
+
+
+def _insert_caption_after(doc, para_el, text, align):
+    new_p = OxmlElement("w:p")
+    para_el.addnext(new_p)
+    para = Paragraph(new_p, doc)
+    run = para.add_run(text)
+    run.italic = True
+    run.font.size = Pt(9)
+    para.alignment = _ALIGN_FROM_NAME.get(align, WD_ALIGN_PARAGRAPH.LEFT)
+    return new_p
+
+
+def _drawing_blob(doc, drawing):
+    blip = next(drawing.iter(qn("a:blip")), None)
+    rid = blip.get(qn("r:embed")) if blip is not None else None
+    part = doc.part.related_parts.get(rid) if rid else None
+    return io.BytesIO(part.blob) if part is not None else None
 
 
 def _drawing_figure_html(para, drawing, n):
@@ -1166,7 +1270,7 @@ def _set_paragraph_rich(doc, para_el, line, template_run=None):
     string, and applies a bullet/numbered list style when the line came from
     an <li>."""
     para = Paragraph(para_el, doc)
-    existing = list(para.runs)
+    existing = [r for r in para.runs if not _run_has_drawing(r)]
     runs = line["runs"] or [{"text": "", "bold": False, "italic": False, "underline": False,
                              "size": None, "color": None, "highlight": None}]
 
@@ -1553,7 +1657,9 @@ def _value_lines(value):
 
 def _set_paragraph_text(doc, para_el, text):
     para = Paragraph(para_el, doc)
-    runs = para.runs
+    # run.text = ... clears the whole run, drawing included, so a run carrying
+    # a picture is never used as the text carrier.
+    runs = [r for r in para.runs if not _run_has_drawing(r)]
     if runs:
         runs[0].text = text
         for extra in runs[1:]:

@@ -349,7 +349,26 @@ def delete_format(format_id):
     db.session.commit()
     return jsonify({"status": "ok"})
 
-_EDIT_ACTIONS = {"delete", "format"}
+_EDIT_ACTIONS = {"delete", "format", "insert_image"}
+_IMG_ALIGNS = {"left", "center", "right"}
+_IMG_WRAPS = {"inline", "left", "right"}
+_IMG_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _image_spec(raw):
+    """A picture's settings, clamped to what the Word export can reproduce."""
+    try:
+        pct = int(raw.get("width_pct", 50))
+    except (TypeError, ValueError):
+        pct = 50
+    caption = raw.get("caption") if isinstance(raw.get("caption"), str) else ""
+    return {
+        "width_pct": max(10, min(100, pct)),
+        "align": raw.get("align") if raw.get("align") in _IMG_ALIGNS else "left",
+        "wrap": raw.get("wrap") if raw.get("wrap") in _IMG_WRAPS else "inline",
+        "border": bool(raw.get("border")),
+        "caption": caption.strip()[:300],
+    }
 _ALIGN_VALUES = {"left", "center", "right", "justify"}
 _LIST_VALUES = {"bullet", "number"}
 
@@ -371,7 +390,21 @@ def _sanitize_content_edits(raw_edits):
             continue
 
         edit = {"anchor_index": idx, "action": action}
+        if action == "insert_image":
+            if not isinstance(e.get("image_id"), str) or not _IMG_ID_RE.match(e["image_id"]):
+                continue
+            edit.update(_image_spec(e), image_id=e["image_id"])
         if action == "format":
+            if isinstance(e.get("remove_images"), list):
+                edit["remove_images"] = [
+                    n for n in e["remove_images"] if isinstance(n, int) and not isinstance(n, bool) and n >= 0
+                ]
+            if isinstance(e.get("image_format"), list):
+                edit["image_format"] = [
+                    {"n": raw["n"], **_image_spec(raw)}
+                    for raw in e["image_format"]
+                    if isinstance(raw, dict) and isinstance(raw.get("n"), int) and raw["n"] >= 0
+                ]
             if "text" in e and isinstance(e["text"], str):
                 edit["text"] = e["text"]
             for key in ("bold", "italic", "underline"):
