@@ -132,7 +132,9 @@ let listEdits = {};       // anchor_index -> "bullet" | "number" | null, only se
 let sizeEdits = {};       // anchor_index -> "fs-sm" | "fs-md" | "fs-lg" | "fs-xl" | ""
 let colorEdits = {};      // anchor_index -> "fc-default" | "fc-red" | ...
 let highlightEdits = {};  // anchor_index -> "hl-none" | "hl-yellow" | ...
-let deletedAnchors = new Set();
+let markedDeletes = new Set(); // lines marked with the toolbar's Delete button
+let imageSnapshot = {};    // "anchor:n" -> readDocImage(fig) for the document's own pictures
+let lastFocusedAnchor = null; // where an inserted picture goes; the file dialog drops the selection
 
 function showError(message) {
   errorBox.textContent = message;
@@ -223,7 +225,17 @@ async function handleFileSelected(file) {
 function renderDocCanvas(html) {
   docBuilderCanvas.innerHTML = html;
   docBuilderCanvas.contentEditable = "true";
+  hydrateDocImages(docBuilderCanvas);
+  lastFocusedAnchor = null;
   snapshotContentState();
+}
+
+// A line's own text. A picture's caption is part of the picture, not the line,
+// so it must not make the line look edited.
+function lineTextWithoutImages(el) {
+  const clone = el.cloneNode(true);
+  clone.querySelectorAll(".lp-img").forEach((f) => f.remove());
+  return clone.textContent;
 }
 
 function normalizeAnchorText(raw) {
@@ -234,7 +246,7 @@ function extractAnchorState(el) {
   const cs = getComputedStyle(el);
   const align = cs.textAlign === "start" ? "left" : cs.textAlign;
   return {
-    text: normalizeAnchorText(el.textContent),
+    text: normalizeAnchorText(lineTextWithoutImages(el)),
     bold: parseInt(cs.fontWeight, 10) >= 600,
     italic: cs.fontStyle === "italic",
     underline: (cs.textDecorationLine || cs.textDecoration || "").includes("underline"),
@@ -249,12 +261,17 @@ function snapshotContentState() {
   sizeEdits = {};
   colorEdits = {};
   highlightEdits = {};
-  deletedAnchors = new Set();
+  markedDeletes = new Set();
   docBuilderCanvas.querySelectorAll(".doc-preview-h1, .doc-preview-h2, .doc-preview-h3, .doc-preview-bullet, .doc-preview-number, .doc-marked-delete")
     .forEach((el) => el.classList.remove("doc-preview-h1", "doc-preview-h2", "doc-preview-h3", "doc-preview-bullet", "doc-preview-number", "doc-marked-delete"));
   docBuilderCanvas.querySelectorAll("[data-anchor-index]").forEach((el) => {
     const idx = parseInt(el.dataset.anchorIndex, 10);
     contentSnapshot[idx] = extractAnchorState(el);
+  });
+  imageSnapshot = {};
+  docBuilderCanvas.querySelectorAll("[data-anchor-index] .lp-img[data-docx-image]").forEach((fig) => {
+    const idx = fig.closest("[data-anchor-index]").dataset.anchorIndex;
+    imageSnapshot[`${idx}:${fig.dataset.docxImage}`] = readDocImage(fig);
   });
   updateSaveContentButton();
 }
@@ -268,11 +285,22 @@ function getSelectedAnchorEls() {
 
 function buildContentEdits() {
   const edits = [];
-  deletedAnchors.forEach((idx) => edits.push({ anchor_index: idx, action: "delete" }));
+  const present = new Set();
+  docBuilderCanvas.querySelectorAll("[data-anchor-index]").forEach((el) => present.add(parseInt(el.dataset.anchorIndex, 10)));
+
+  // A line removed with Backspace/Delete is simply gone from the canvas; it has
+  // to be sent as a delete or the next render brings it straight back. Worked
+  // out fresh on every call, so undoing the Backspace un-deletes it too.
+  const deletes = new Set(markedDeletes);
+  Object.keys(contentSnapshot).forEach((key) => {
+    const idx = parseInt(key, 10);
+    if (!present.has(idx)) deletes.add(idx);
+  });
+  deletes.forEach((idx) => edits.push({ anchor_index: idx, action: "delete" }));
 
   docBuilderCanvas.querySelectorAll("[data-anchor-index]").forEach((el) => {
     const idx = parseInt(el.dataset.anchorIndex, 10);
-    if (deletedAnchors.has(idx)) return;
+    if (deletes.has(idx)) return;
 
     const before = contentSnapshot[idx];
     if (!before) return;
@@ -290,7 +318,28 @@ function buildContentEdits() {
     if (colorEdits[idx]) patch.color = colorEdits[idx];
     if (highlightEdits[idx]) patch.highlight = highlightEdits[idx];
 
+    // The document's own pictures in this line: removed, or restyled.
+    const removed = [];
+    const restyled = [];
+    Object.keys(imageSnapshot).filter((k) => k.startsWith(`${idx}:`)).forEach((k) => {
+      const n = parseInt(k.split(":")[1], 10);
+      const fig = el.querySelector(`.lp-img[data-docx-image="${n}"]`);
+      if (!fig) {
+        removed.push(n);
+        return;
+      }
+      const state = readDocImage(fig);
+      if (JSON.stringify(state) !== JSON.stringify(imageSnapshot[k])) restyled.push({ n, ...state });
+    });
+    if (removed.length) patch.remove_images = removed;
+    if (restyled.length) patch.image_format = restyled;
+
     if (Object.keys(patch).length) edits.push({ anchor_index: idx, action: "format", ...patch });
+
+    // New pictures the teacher inserted into this line go in right after it.
+    el.querySelectorAll(".lp-img[data-img-id]").forEach((fig) => {
+      edits.push({ anchor_index: idx, action: "insert_image", image_id: fig.dataset.imgId, ...readDocImage(fig) });
+    });
   });
 
   return edits;
@@ -430,49 +479,86 @@ if (docToolbar) {
     }
     anchors.forEach((el) => {
       const idx = parseInt(el.dataset.anchorIndex, 10);
-      if (deletedAnchors.has(idx)) {
-        deletedAnchors.delete(idx);
+      if (markedDeletes.has(idx)) {
+        markedDeletes.delete(idx);
         el.classList.remove("doc-marked-delete");
       } else {
-        deletedAnchors.add(idx);
+        markedDeletes.add(idx);
         el.classList.add("doc-marked-delete");
       }
     });
     updateSaveContentButton();
   });
 
-  docBuilderCanvas.addEventListener("keyup", updateToolbarActiveStates);
-  docBuilderCanvas.addEventListener("mouseup", updateToolbarActiveStates);
+  function rememberAnchor() {
+    lastFocusedAnchor = getSelectedAnchorEls().pop() || lastFocusedAnchor;
+  }
+
+  docBuilderCanvas.addEventListener("keyup", () => { updateToolbarActiveStates(); rememberAnchor(); });
+  docBuilderCanvas.addEventListener("mouseup", () => { updateToolbarActiveStates(); rememberAnchor(); });
   docBuilderCanvas.addEventListener("input", updateSaveContentButton);
 
-  docSaveContentBtn.addEventListener("click", async () => {
-    const edits = buildContentEdits();
-    if (!edits.length) return;
-
-    const deleteCount = edits.filter((e) => e.action === "delete").length;
-    const warning = deleteCount
-      ? `This permanently deletes ${deleteCount} line${deleteCount === 1 ? "" : "s"} from the document. This can't be undone. Continue?`
-      : "Save these changes into the document? This can't be undone.";
-    if (!confirm(warning)) return;
-
-    setButtonLoading(docSaveContentBtn, true, "Saving");
-    try {
-      if (editingFormatId) {
-        await Api.editFormatContent(editingFormatId, edits);
-        const refreshed = await Api.getFormatTemplateHtml(editingFormatId);
-        renderDocCanvas(refreshed.html);
-        showToast("Document updated — fields refreshed automatically.");
-      } else {
-        const data = await Api.editScannedContent(sourceTempToken, edits);
-        renderDocCanvas(data.preview_html);
-        showToast("Document updated.");
-      }
-    } catch (err) {
-      showError(err.message);
-    } finally {
-      setButtonLoading(docSaveContentBtn, false);
-    }
+  initDocImageTools({
+    rootEl: docBuilderCanvas,
+    onChange: () => updateSaveContentButton(),
+    onDelete: (fig) => {
+      fig.remove();
+      updateSaveContentButton();
+    },
   });
+
+  initDocImageInsert({
+    toolbarEl: docToolbar,
+    beforePick: () => {
+      rememberAnchor();
+      if (lastFocusedAnchor && docBuilderCanvas.contains(lastFocusedAnchor)) return true;
+      showToast("Click into the line the picture should follow, then choose Insert image.", true);
+      return false;
+    },
+    onUploaded: (res) => {
+      const anchor = lastFocusedAnchor;
+      if (!anchor || !docBuilderCanvas.contains(anchor)) return;
+      anchor.insertAdjacentHTML("beforeend", docImageMarkup({ id: res.id }));
+      hydrateDocImages(anchor);
+      updateSaveContentButton();
+    },
+  });
+
+  docSaveContentBtn.addEventListener("click", flushContentEdits);
+}
+
+// Applies the canvas edits. Returns false when there was something to save and
+// it didn't happen (the teacher cancelled, or the request failed), so callers
+// can stop instead of quietly leaving work behind.
+async function flushContentEdits() {
+  const edits = buildContentEdits();
+  if (!edits.length) return true;
+
+  const deleteCount = edits.filter((e) => e.action === "delete").length;
+  const warning = deleteCount
+    ? `This permanently deletes ${deleteCount} line${deleteCount === 1 ? "" : "s"} from the document. This can't be undone. Continue?`
+    : "Save these changes into the document? This can't be undone.";
+  if (!confirm(warning)) return false;
+
+  setButtonLoading(docSaveContentBtn, true, "Saving");
+  try {
+    if (editingFormatId) {
+      await Api.editFormatContent(editingFormatId, edits);
+      const refreshed = await Api.getFormatTemplateHtml(editingFormatId);
+      renderDocCanvas(refreshed.html);
+      showToast("Document updated — fields refreshed automatically.");
+    } else {
+      const data = await Api.editScannedContent(sourceTempToken, edits);
+      renderDocCanvas(data.preview_html);
+      showToast("Document updated.");
+    }
+    return true;
+  } catch (err) {
+    showError(err.message);
+    return false;
+  } finally {
+    setButtonLoading(docSaveContentBtn, false);
+  }
 }
 
 // ---- Manual (blank-start) row editor — unchanged flow for formats with no reference file ----
@@ -599,6 +685,9 @@ createFormatBtn.addEventListener("click", async () => {
   }
 
   const isDocBased = !docFieldEditor.hidden;
+  // Edits still waiting behind "Save changes to document" are applied first;
+  // saving the format must never quietly leave them behind.
+  if (isDocBased && !(await flushContentEdits())) return;
   const fields = isDocBased ? undefined : collectManualFields();
   if (!isDocBased && !fields.length) {
     showError("Add at least one field with a label.");
