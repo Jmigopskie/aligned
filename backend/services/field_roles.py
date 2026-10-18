@@ -18,12 +18,13 @@ or "objective".
 
 HEAVY = "heavy"
 EASY = "easy"
-# The student's own to write (the lesson's title, which session it is): never
-# filled in automatically, offered to the AI only if they tick it.
+# The student's own to write (which session of the term it is, which only
+# their schedule knows): never filled in automatically, offered to the AI only
+# if they tick it. The lesson title used to be here too, but it follows from
+# the topic, so the AI fills it like any other quick field.
 SELF = "self"
 
-_SELF_KEYWORDS = ("lesson title", "name of lesson", "session no", "session number", "no. of sessions",
-                  "no of sessions")
+_SELF_KEYWORDS = ("session no", "session number", "no. of sessions", "no of sessions")
 
 # Matched as plain substrings against "<field_key> <label>", lowercased with
 # underscores turned into spaces. Substrings rather than whole words so

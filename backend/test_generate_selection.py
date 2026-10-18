@@ -51,8 +51,10 @@ def stub_answers(answers, seen_keys):
 
 def run(include_keys):
     seen = []
-    stub_answers({k: f"content for {k}" for k in
-                  ["teacher", "sessions", "objectives", "flow", "assessment"]}, seen)
+    answers = {k: f"content for {k}" for k in ["teacher", "sessions", "flow", "assessment"]}
+    # An objectives field is only complete with at least three objectives.
+    answers["objectives"] = "Identify the parts\nExplain their use\nValue careful work"
+    stub_answers(answers, seen)
     events = list(ai_service.generate_full_streaming(
         {"topic": "Spreadsheets"}, FIELDS, course_guide_text="", include_keys=include_keys))
     final = [e for e in events if e["type"] == "complete"][-1]

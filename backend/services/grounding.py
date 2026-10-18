@@ -163,10 +163,12 @@ def _best_statement(line: str, statements):
 _OBJECTIVE_STEM = re.compile(r"^at the end of the (lesson|session|week)", re.I)
 
 
-def snap_text(value: str, guide_text: str) -> str:
+def snap_text(value: str, guide_text: str, strict: bool = True) -> str:
     """One field value rewritten to the guide's exact wording, line by line.
     A line is tried whole first and then sentence by sentence, because a prose
-    field arrives as one paragraph holding several statements."""
+    field arrives as one paragraph holding several statements. Strict drops a
+    line the guide doesn't contain; lenient (objectives) keeps it as written,
+    since DO 016 objectives are unpacked from the competency, not copied."""
     statements = _statements(guide_text)
     out = []
     for line in str(value or "").split("\n"):
@@ -177,6 +179,10 @@ def snap_text(value: str, guide_text: str) -> str:
             out.append(line)
             continue
         whole = _best_statement(line, statements)
+        if not strict:
+            if line not in out:
+                out.append(whole or line)
+            continue
         matches = [whole] if whole else [_best_statement(s, statements) for s in _SENTENCE.split(line)]
         for m in matches:
             if m and m not in out:
@@ -194,10 +200,13 @@ def snap_to_guide(values: dict, fields, guide_text: str) -> dict:
         if f.field_key not in out or not is_verbatim_field(f):
             continue
         value = out[f.field_key]
+        # Objectives (alone or combined with the competency) are unpacked by
+        # the teacher, so only lines that match a guide statement are snapped.
+        strict = not re.search(r"objective", _haystack(f), re.I)
         if isinstance(value, list):
-            out[f.field_key] = [snap_text(v, guide_text) for v in value]
+            out[f.field_key] = [snap_text(v, guide_text, strict) for v in value]
         else:
-            out[f.field_key] = snap_text(value, guide_text)
+            out[f.field_key] = snap_text(value, guide_text, strict)
     return out
 
 

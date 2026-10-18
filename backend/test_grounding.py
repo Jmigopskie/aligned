@@ -113,6 +113,27 @@ got = grounding.keep_given_logistics(
     [school, date, grade_section, allot, competency], ctx)
 assert got == {"school": "", "date": "", "gs": "Grade 7 - Campos", "ta": "60 minutes", "lc": COMPETENCY}, got
 
+# Objectives are unpacked from the competency (DO 016), not copied: a line the
+# guide doesn't contain is kept, one that matches a guide statement is snapped.
+obj_out = grounding.snap_to_guide({"obj2": "Identify three qualities of ICT entrepreneurs\nDiscuss the emerging trends and issues"},
+                                  [F(field_key="obj2", label="Learning Objectives")], GUIDE)["obj2"]
+assert obj_out.split("\n") == ["Identify three qualities of ICT entrepreneurs", COMPETENCY], obj_out
+
+# Completeness, checked after every batch: every weekly day filled, and at
+# least three objectives (four lines when the field also holds the competency).
+from services import ai_service as _ai  # noqa: E402
+wk = F(field_key="flow", label="Flow", field_type="weekly", parts_list=["Mon", "Tue"], ai_hint=None)
+assert not _ai._field_complete(wk, ["Did things.", ""])
+assert _ai._field_complete(wk, ["Did things.", "Did more."])
+objf = F(field_key="lo", label="Learning Objectives", field_type="textarea", ai_hint=None)
+assert not _ai._field_complete(objf, "At the end of the lesson, the learners are expected to:\n1. Identify\n2. Explain")
+assert _ai._field_complete(objf, "At the end of the lesson, the learners are expected to:\n1. Identify\n2. Explain\n3. Value")
+combo = F(field_key="lco", label="Learning Competencies / Objectives", field_type="textarea", ai_hint=None)
+assert not _ai._field_complete(combo, "Discuss X.\n1. a\n2. b")
+assert _ai._field_complete(combo, "Discuss X.\n1. a\n2. b\n3. c")
+integ = F(field_key="i", label="Opportunities for Integration and Contextualization", field_type="text", ai_hint=None)
+assert _ai._incomplete({"i": "N/A"}, [integ]) == [], "integration may honestly be N/A"
+
 # The curriculum guide: its numbered competency is copied without the number,
 # and its run-on content standard comes out as its own statement.
 os.environ.setdefault("DATABASE_URL", "sqlite://")

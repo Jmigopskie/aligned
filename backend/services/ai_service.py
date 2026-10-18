@@ -375,6 +375,16 @@ def _field_directive(field):
             " Fill this only from the lesson details given above. If they don't state it, "
             "return an empty string: never invent a school, date, time, room or section."
         )
+    if _is_objective_field(field):
+        combined = re.search(r"competenc", field.label or "", re.I)
+        return (
+            (" First line: the learning competency copied word for word from the guide. Then"
+             if combined else "")
+            + f" at least {_MIN_OBJECTIVES} learning objectives (this overrides any smaller number), "
+            "one per line, each unpacked from the competency (knowledge, skill and attitude), "
+            "starting with a measurable verb and achievable in the session. Keep the stem "
+            "'At the end of the lesson, the learners are expected to:' if the format uses one."
+        )
     if grounding.is_verbatim_field(field):
         return (
             " Copy the matching statement(s) from the course guide / budget of work above "
@@ -681,25 +691,68 @@ def _must_answer(fields):
             and not re.search(r"integration|contextuali", f"{f.field_key} {f.label}", re.I)]
 
 
+# A learning objective field must carry at least this many objectives
+# (the teacher's rule, matching DO 016's knowledge / skill / attitude split).
+_MIN_OBJECTIVES = 3
+_OBJECTIVE_STEM = re.compile(r"(?i)^\s*at the end of the")
+
+
+def _is_objective_field(field):
+    return bool(re.search(r"objective", f"{field.field_key or ''} {field.label or ''}", re.I))
+
+
+def _cell_complete(field, value):
+    """One cell (or a whole non-weekly field) really answered."""
+    if not ai_limits.is_answered(value):
+        return False
+    if _is_objective_field(field):
+        lines = [l for l in str(value).split("\n") if l.strip() and not _OBJECTIVE_STEM.match(l)]
+        # A combined "Competencies / Objectives" field also holds the competency line.
+        need = _MIN_OBJECTIVES + (1 if re.search(r"competenc", field.label or "", re.I) else 0)
+        return len(lines) >= need
+    return True
+
+
+def _field_complete(field, value):
+    """Whether a field came back usable: answered, every day of a weekly field
+    filled (an answer for Monday alone used to count as done), and objective
+    fields holding at least _MIN_OBJECTIVES objectives."""
+    if field.field_type == "weekly":
+        names = getattr(field, "parts_list", None) or []
+        parts = value if isinstance(value, list) else [value]
+        if names and len(parts) < len(names):
+            return False
+        return all(_cell_complete(field, p) for p in parts)
+    return _cell_complete(field, value)
+
+
+def _incomplete(values: dict, fields) -> list:
+    """The field_keys of `fields` that still need work, in field order."""
+    return [f.field_key for f in _must_answer(fields) if not _field_complete(f, (values or {}).get(f.field_key))]
+
+
 def _fill_gaps(lesson: str, fields, all_values: dict, label: str, guide_text="", citation="",
                context=None) -> dict:
-    """One more attempt at the fields that came back blank or as a placeholder.
+    """One more attempt at the fields that came back blank, as a placeholder,
+    with days missing, or with too few objectives.
 
-    A model asked for twelve fields at once will occasionally skip one or answer
-    it with "N/A". Re-asking for just those, naming them, recovers most of them
-    on the second try. Only one extra pass: if a field is still empty after
-    being asked on its own, the caller reports it as unanswered rather than
-    looping and spending a teacher's time.
+    A model asked for several fields at once will occasionally skip one, leave a
+    day empty or answer it with "N/A". Re-asking for just those, naming what is
+    wrong, recovers most of them. The callers run this after every batch (so a
+    gap is fixed before the next batch builds on it) and once more at the end.
     """
-    gaps = ai_limits.missing_keys(all_values, _must_answer(fields))
+    gaps = _incomplete(all_values, fields)
     if not gaps:
         return {}
 
     gap_fields = [f for f in fields if f.field_key in set(gaps)]
     task = f"""
-These fields of the lesson plan came back empty or unanswered. Answer each one
-now with real, specific content grounded in the lesson details above. Return
-strict JSON with field_key as keys and nothing else:
+These fields of the lesson plan came back incomplete: empty, a placeholder, a
+weekly field with a day missing, or an objectives field with fewer than
+{_MIN_OBJECTIVES} objectives. Answer each one again, in full, with real, specific
+content grounded in the lesson details above and consistent with the fields
+already written. Give every day of a weekly field. Return strict JSON with
+field_key as keys and nothing else:
 {_schema_block(gap_fields)}
 """
     try:
@@ -711,9 +764,33 @@ strict JSON with field_key as keys and nothing else:
         _log.warning("[%s] gap-fill pass failed; reporting the blanks instead", label, exc_info=True)
         return {}
 
-    # Only real answers are taken: a second empty reply must not overwrite
-    # anything, nor make the field look answered.
-    return {k: v for k, v in recovered.items() if ai_limits.is_answered(v)}
+    # Only an improvement is taken: a second reply that is still empty must not
+    # overwrite anything, nor make the field look answered.
+    by_key = {f.field_key: f for f in gap_fields}
+    return {k: v for k, v in recovered.items()
+            if k in by_key and (_field_complete(by_key[k], v) or not ai_limits.is_answered(all_values.get(k)))
+            and ai_limits.is_answered(v)}
+
+
+# How many times a batch's incomplete fields are asked for again before the
+# next batch starts.
+_BATCH_RETRIES = 2
+
+
+def _complete_batch(lesson, chunk, values, label, guide_text, citation, context):
+    """Ask again for whatever in this batch is incomplete, up to _BATCH_RETRIES
+    times, so the next batch (which reads these as "already written") builds
+    on complete fields. Returns the merged values."""
+    values = dict(values)
+    for attempt in range(_BATCH_RETRIES):
+        if not _incomplete(values, chunk):
+            break
+        recovered = _fill_gaps(lesson, chunk, values, f"{label} (check {attempt + 1})",
+                               guide_text, citation, context)
+        if not recovered:
+            continue
+        values.update(recovered)
+    return values
 
 
 def select_fields(fields, include_keys):
@@ -744,8 +821,7 @@ Fill ONLY the following fields and return strict JSON with field_key as keys:
 """
     values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency"), targets,
                    course_guide_text, cite, context)
-    values.update(_fill_gaps(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context))
-    return values
+    return _complete_batch(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
 
 
 _STREAM_CHUNK_SIZE = 4
@@ -791,13 +867,20 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
             _call(_SYSTEM_INSTRUCTION, [lesson, task], f"Building Proficiency {i}/{len(chunks)}"),
             chunk, course_guide_text, cite, context,
         )
+        # Check this batch before moving on: anything blank, a weekly field
+        # with a day missing, or objectives short of the minimum is asked for
+        # again now, while it is still the next batch's context.
+        if _incomplete(values, chunk):
+            yield {"type": "filling_gaps", "count": len(_incomplete(values, chunk))}
+            values = _complete_batch(lesson, chunk, values, f"Building Proficiency {i}/{len(chunks)}",
+                                     course_guide_text, cite, context)
         all_values.update(values)
         yield {"type": "section_done", "section": name, "index": i, "total": len(chunks), "values": values}
 
     # Anything still blank or answered with a placeholder gets one more,
     # targeted attempt before this reports back. Without it the page announced
     # a finished plan over fields the model had quietly skipped.
-    gaps = ai_limits.missing_keys(all_values, _must_answer(fields))
+    gaps = _incomplete(all_values, fields)
     if gaps:
         yield {"type": "filling_gaps", "count": len(gaps)}
         recovered = _fill_gaps(lesson, fields, all_values, "Building Proficiency", course_guide_text, cite,
@@ -812,7 +895,7 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
     # nothing about fields outside include_keys, so the page must combine this
     # with its own check of any fields the teacher chose to write themselves
     # before it can claim the plan is finished.
-    missing = ai_limits.missing_keys(all_values, _must_answer(fields))
+    missing = _incomplete(all_values, fields)
     yield {
         "type": "complete",
         "values": all_values,

@@ -29,7 +29,7 @@ class Field:
 
 # The user's real ILAW format, in document order: (key, label, expected role).
 ILAW = [
-    ("name_of_lesson", "Name of Lesson", "self"),
+    ("name_of_lesson", "Name of Lesson", "easy"),
     ("learning_area_s", "Learning Area/s", "easy"),
     ("designed_by_teacher_s", "Designed by Teacher/s", "easy"),
     ("designed_for_which_grade_level_section", "Designed for which Grade Level & Section", "easy"),
@@ -73,21 +73,23 @@ def check_real_format():
     heavy = [l for k, l, _ in ILAW if field_roles.role_for(Field(k, l)) == "heavy"]
     easy = [l for k, l, _ in ILAW if field_roles.role_for(Field(k, l)) == "easy"]
     assert len(heavy) == 9, heavy
-    assert len(easy) == 6, easy
+    assert len(easy) == 7, easy  # Name of Lesson is now AI-filled from the topic
     assert heavy[0] == "Learning Competency", heavy
     assert heavy[-1] == "Reflections", heavy
     print("  real format OK")
 
 
 def check_self_fields():
-    """The lesson's title and session number are the student's own to write:
-    not filled in automatically, offered to the AI only if they tick them."""
-    for key, label in [("lesson_title", "Lesson Title"), ("session_no", "Session No."),
-                       ("name_of_lesson", "Name of Lesson"), ("no_of_sessions", "No. of Sessions"),
+    """The session number is the student's own to write (only their schedule
+    knows it): not filled in automatically, offered to the AI only if they tick
+    it. The lesson title follows from the topic, so the AI fills it."""
+    for key, label in [("session_no", "Session No."), ("no_of_sessions", "No. of Sessions"),
                        ("session_number", "Session Number")]:
         assert field_roles.role_for(Field(key, label)) == "self", label
-    # An explicit override still wins over it.
-    assert field_roles.role_for(Field("lesson_title", "Lesson Title", role="easy")) == "easy"
+    for key, label in [("lesson_title", "Lesson Title"), ("name_of_lesson", "Name of Lesson")]:
+        assert field_roles.role_for(Field(key, label)) != "self", label
+    # An explicit override still wins over the keywords.
+    assert field_roles.role_for(Field("session_no", "Session No.", role="easy")) == "easy"
     print("  self fields OK")
 
 
