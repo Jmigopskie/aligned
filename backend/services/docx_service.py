@@ -2098,7 +2098,32 @@ def _export_generic(plan, fmt) -> str:
 
     return _save(doc, plan)
 
+# Paper sizes the generator's picker offers, as (width, height) portrait.
+# Folio is the 8.5 x 13 in "long bond" Philippine schools print on.
+PAPER_SIZES = {
+    "letter": (Inches(8.5), Inches(11)),
+    "legal": (Inches(8.5), Inches(14)),
+    "folio": (Inches(8.5), Inches(13)),
+    "a4": (Emu(7560310), Emu(10692130)),  # 210 x 297 mm
+}
+
+
+def apply_paper_size(doc, key):
+    """Resize every section to the chosen paper, keeping each section's
+    orientation and margins. An unknown or empty key leaves the format's own
+    size alone, which is what every plan saved before the picker gets."""
+    size = PAPER_SIZES.get((key or "").lower())
+    if not size:
+        return
+    for section in doc.sections:
+        width, height = size
+        if section.page_width and section.page_height and section.page_width > section.page_height:
+            width, height = height, width
+        section.page_width, section.page_height = width, height
+
+
 def _save(doc, plan) -> str:
+    apply_paper_size(doc, plan.get_setup_context().get("pageSize"))
     os.makedirs(Config.GENERATED_FOLDER, exist_ok=True)
     filename = f"lesson_plan_{plan.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.docx"
     path = os.path.join(Config.GENERATED_FOLDER, filename)

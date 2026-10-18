@@ -281,6 +281,16 @@
                   <button type="button" id="submit-btn" class="btn btn-secondary" hidden>Submit to class</button>
                   <button type="button" id="preview-btn" class="btn btn-secondary">Preview</button>
                   <button type="button" id="save-btn" class="btn btn-secondary">Save lesson plan</button>
+                  <label class="text-sm" for="page-size-select" style="display:flex; align-items:center; gap:6px;">
+                    Paper
+                    <select id="page-size-select" style="width:auto;">
+                      <option value="">Format's own</option>
+                      <option value="letter">Letter (8.5 × 11 in)</option>
+                      <option value="legal">Legal (8.5 × 14 in)</option>
+                      <option value="folio">Folio (8.5 × 13 in)</option>
+                      <option value="a4">A4 (210 × 297 mm)</option>
+                    </select>
+                  </label>
                   <a id="export-btn" class="btn btn-primary" style="pointer-events:none; opacity:0.5;">Export as Word</a>
                 </div>
               </div>
@@ -358,9 +368,42 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-10-06c"></script>
+  <div class="modal-overlay" id="leave-overlay" hidden>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="leave-title" style="max-width:480px;">
+      <div class="modal-header">
+        <h2 id="leave-title">Leave without saving?</h2>
+        <button type="button" class="modal-close" id="leave-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Your latest changes to this lesson plan haven't been saved to your account yet. If you leave now, they may be lost, and they won't show up if you open the plan on another device.</p>
+      </div>
+      <div class="gen-review-footer" style="flex-wrap:wrap;">
+        <button type="button" class="btn btn-danger" id="leave-discard">Leave anyway</button>
+        <button type="button" class="btn btn-secondary" id="leave-stay">Stay</button>
+        <button type="button" class="btn btn-primary" id="leave-save">Save and leave</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="conflict-overlay" hidden>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="conflict-title" style="max-width:520px;">
+      <div class="modal-header">
+        <h2 id="conflict-title">This plan changed somewhere else</h2>
+      </div>
+      <div class="modal-body">
+        <p>This lesson plan was saved from another device or tab after this page opened it. Saving here would overwrite that work, so nothing has been saved yet.</p>
+        <p id="conflict-when" class="text-sm"></p>
+      </div>
+      <div class="gen-review-footer" style="flex-wrap:wrap;">
+        <button type="button" class="btn btn-secondary" id="conflict-copy">Keep mine as a separate copy</button>
+        <button type="button" class="btn btn-primary" id="conflict-load">Load the latest version</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js?v=2026-10-18a"></script>
   <script src="js/icons.js?v=2026-10-06c"></script>
   <script src="js/doc-toolbar.js?v=2026-10-06c"></script>
-  <script src="js/generator.js?v=2026-10-06c"></script>
+  <script src="js/generator.js?v=2026-10-18a"></script>
 </body>
 </html>

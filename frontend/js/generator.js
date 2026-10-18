@@ -8,7 +8,16 @@ let fieldValues = {};
 // stays plain text.
 let fieldRichValues = {};
 let planId = null;
+// The plan's server revision this page last loaded or saved. Every PATCH sends
+// it, and the server refuses the save if another device has written since.
+let planRevision = null;
 let dirty = false;
+// Bumped on every edit, so a save can tell whether something changed while
+// its request was in flight (a boolean can't: it is already true then).
+let editSeq = 0;
+// True while what is on screen is exactly the server's copy at planRevision,
+// which is the only time it's safe to swap in a newer copy silently.
+let syncedWithServer = false;
 
 // True for the duration of a Building Proficiency generation stream. Guards
 // the mode-switch buttons: section_done handlers keep assigning into
@@ -120,6 +129,7 @@ const previewBtn = document.getElementById("preview-btn");
 const saveBtn = document.getElementById("save-btn");
 const exportBtn = document.getElementById("export-btn");
 const visibilityCheckbox = document.getElementById("visibility-checkbox");
+const pageSizeSelect = document.getElementById("page-size-select");
 const submitSectionSelect = document.getElementById("submit-section-select");
 const submitBtn = document.getElementById("submit-btn");
 const previewOverlay = document.getElementById("preview-overlay");
@@ -1970,6 +1980,8 @@ function maybeRenderResults() {
 
 function markDirty() {
   dirty = true;
+  editSeq++;
+  syncedWithServer = false;
   saveStatus.textContent = "Unsaved changes. Save to export the latest version.";
   exportBtn.style.pointerEvents = "none";
   exportBtn.style.opacity = "0.5";
@@ -2009,6 +2021,9 @@ function setupContext() {
       section: sectionInput.value,
     },
     courseGuide: selectedCourseGuide,
+    // Rides along here rather than in its own column: export reads it from
+    // the saved plan, so every device exports on the same paper.
+    pageSize: pageSizeSelect.value,
   };
 }
 
@@ -2024,6 +2039,7 @@ function applySetupContext(ctx) {
   if (setup.collegeYear) collegeYearSelect.value = setup.collegeYear;
   if (setup.k12Grade) k12GradeSelect.value = setup.k12Grade;
   if (setup.section) sectionInput.value = setup.section;
+  if (ctx && ctx.pageSize) pageSizeSelect.value = ctx.pageSize;
   updateLevelFields();
   if (ctx && ctx.courseGuide) selectCourseGuide(ctx.courseGuide);
 }
@@ -2065,16 +2081,35 @@ function worthSaving() {
   return hasAnyValue() || !!subjectInput.value.trim() || !!topicInput.value.trim();
 }
 
-async function persistPlan() {
+// Saves run one at a time. The autosave and the Save button used to be able to
+// overlap, which now matters twice over: two PATCHes carrying the same
+// base_revision would make the page conflict with itself, and two POSTs before
+// the first returned an id would create the plan twice. The payload is built
+// when a save's turn comes, so it always carries the latest revision.
+let saveQueue = Promise.resolve();
+
+function persistPlan() {
+  const run = saveQueue.then(persistPlanNow);
+  saveQueue = run.catch(() => {});
+  return run;
+}
+
+async function persistPlanNow() {
   if (!fmt) return null;
   const payload = planPayload();
+  let data;
   if (planId) {
-    const data = await Api.updateLessonPlan(planId, payload);
-    return data.lesson_plan;
+    data = await Api.updateLessonPlan(planId, { ...payload, base_revision: planRevision });
+  } else {
+    data = await Api.saveLessonPlan(payload);
+    planId = data.lesson_plan.id;
   }
-  const data = await Api.saveLessonPlan(payload);
-  planId = data.lesson_plan.id;
+  planRevision = data.lesson_plan.revision;
   return data.lesson_plan;
+}
+
+function isStaleSave(err) {
+  return err && err.status === 409 && err.data && err.data.code === "stale";
 }
 
 function scheduleServerSave() {
@@ -2084,24 +2119,33 @@ function scheduleServerSave() {
 }
 
 async function runServerSave() {
-  if (serverSaveLocked || serverSaveInFlight || !fmt || !worthSaving()) return;
+  if (serverSaveLocked || !fmt || !worthSaving()) return;
+  // Already saving: try again once it lands rather than dropping this edit,
+  // which is what returning here used to do.
+  if (serverSaveInFlight) {
+    scheduleServerSave();
+    return;
+  }
 
   serverSaveInFlight = true;
-  const wasDirty = dirty;
+  const seq = editSeq;
   try {
     await persistPlan();
     // Only claim saved if nothing changed while the request was in flight —
     // otherwise the newer edit is still unsaved and saying otherwise would
     // lie about it.
-    if (dirty === wasDirty) {
+    if (editSeq === seq) {
       dirty = false;
+      syncedWithServer = true;
       saveStatus.textContent = `Draft saved ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`;
       enableExport();
     }
   } catch (err) {
+    if (isStaleSave(err)) {
+      showConflict(err.data.lesson_plan);
     // 409 means the plan was submitted or graded elsewhere, so it will never
     // accept another edit — stop autosaving and say so once.
-    if (/submitted/i.test(err.message || "")) {
+    } else if (/submitted/i.test(err.message || "")) {
       serverSaveLocked = true;
       saveStatus.textContent = "This plan has been submitted and can no longer be edited.";
       showToast("This plan has been submitted, so your latest changes weren't saved.", true);
@@ -2124,9 +2168,150 @@ function enableExport() {
   exportBtn.style.opacity = "1";
 }
 
-// Nothing is sent on pagehide: the debounce window is short and the
-// localStorage draft below already survives navigation, so an unload-time
-// request would add a failure path without covering anything new.
+// ---- Same plan on two devices ----------------------------------------------
+// A stale save is refused by the server (see update_lesson_plan), and this is
+// where the page catches up: switching back to a tab silently loads a newer
+// copy when this one has nothing unsaved, and an unsaved edit that lost the
+// race asks rather than overwriting either side.
+
+const conflictOverlay = document.getElementById("conflict-overlay");
+let conflictPlan = null;
+
+function reopenFromServer(id) {
+  // Nothing on this device is worth keeping by now (caller's decision), and a
+  // leftover draft would be restored over the newer copy on the next visit.
+  clearDraft();
+  dirty = false;
+  leavingConfirmed = true;
+  window.location.replace(`generator.html?plan_id=${encodeURIComponent(id)}`);
+}
+
+function showConflict(newer) {
+  serverSaveLocked = true;
+  clearTimeout(serverSaveTimer);
+  conflictPlan = newer;
+  saveStatus.textContent = "Not saved: this plan was changed on another device.";
+  const when = newer && newer.updated_at ? new Date(newer.updated_at) : null;
+  document.getElementById("conflict-when").textContent = when
+    ? `The other copy was saved ${when.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}.`
+    : "";
+  openDialog(conflictOverlay);
+}
+
+document.getElementById("conflict-load").addEventListener("click", () => {
+  reopenFromServer(conflictPlan ? conflictPlan.id : planId);
+});
+
+document.getElementById("conflict-copy").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  setButtonLoading(btn, true, "Saving");
+  // Detach from the row the other device owns, then save this device's work
+  // as a new plan. Both versions survive; the teacher keeps whichever.
+  planId = null;
+  planRevision = null;
+  try {
+    const plan = await persistPlan();
+    serverSaveLocked = false;
+    dirty = false;
+    syncedWithServer = true;
+    clearDraft();
+    // A reload should reopen this copy, not the plan it split from.
+    history.replaceState(null, "", `generator.html?plan_id=${plan.id}`);
+    closeDialog(conflictOverlay);
+    saveStatus.textContent = "Saved as a separate copy.";
+    enableExport();
+    showToast("Saved your version as a separate plan. The other version is still in your list.");
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    setButtonLoading(btn, false);
+  }
+});
+
+// The usual laptop-to-phone-and-back case: when this tab comes back into view,
+// check whether the plan moved on elsewhere. If nothing here is unsaved, load
+// the newer copy now, before the next keystroke would conflict with it.
+async function checkForNewerCopy() {
+  if (!planId || serverSaveLocked || !syncedWithServer || serverSaveInFlight) return;
+  try {
+    const { lesson_plan: plan } = await Api.getLessonPlan(planId);
+    if (syncedWithServer && plan.revision > planRevision) reopenFromServer(plan.id);
+  } catch (err) {
+    /* offline or signed out — the next save will find out */
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    checkForNewerCopy();
+  } else if (dirty && !serverSaveLocked) {
+    // Leaving for another app or device: don't wait out the debounce, or the
+    // last few seconds of typing aren't there when the plan is opened next.
+    clearTimeout(serverSaveTimer);
+    runServerSave();
+  }
+});
+
+// ---- Unsaved-changes warning -------------------------------------------------
+// The localStorage draft survives a navigation on this device, but not a
+// switch to another one, so leaving with changes the server doesn't have yet
+// asks first. App links get the page's own dialog; closing or reloading the
+// tab can only get the browser's.
+
+const leaveOverlay = document.getElementById("leave-overlay");
+let leaveHref = null;
+let leavingConfirmed = false;
+
+function hasUnsavedWork() {
+  return dirty && worthSaving() && !leavingConfirmed;
+}
+
+function leaveTo(href) {
+  leavingConfirmed = true;
+  closeDialog(leaveOverlay);
+  showPageTransition();
+  window.location.href = href;
+}
+
+// Capture phase, so this runs before api.js's page-transition handler, which
+// skips any click already default-prevented.
+document.addEventListener("click", (e) => {
+  if (!hasUnsavedWork() || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const link = e.target.closest("a[href]");
+  if (!link || link.target === "_blank" || link === exportBtn) return;
+  const href = link.getAttribute("href");
+  if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+  e.preventDefault();
+  leaveHref = link.href;
+  openDialog(leaveOverlay);
+}, true);
+
+window.addEventListener("beforeunload", (e) => {
+  if (!hasUnsavedWork()) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+
+wireDialog(leaveOverlay);
+document.getElementById("leave-close").addEventListener("click", () => closeDialog(leaveOverlay));
+document.getElementById("leave-stay").addEventListener("click", () => closeDialog(leaveOverlay));
+document.getElementById("leave-discard").addEventListener("click", () => leaveTo(leaveHref));
+document.getElementById("leave-save").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  clearTimeout(serverSaveTimer);
+  setButtonLoading(btn, true, "Saving");
+  try {
+    await persistPlan();
+    dirty = false;
+    leaveTo(leaveHref);
+  } catch (err) {
+    closeDialog(leaveOverlay);
+    if (isStaleSave(err)) showConflict(err.data.lesson_plan);
+    else showToast(err.message, true);
+  } finally {
+    setButtonLoading(btn, false);
+  }
+});
 
 // ---- Draft autosave -------------------------------------------------------
 // This is a multi-page app: clicking a sidebar link, or opening the plan in
@@ -2163,6 +2348,7 @@ function saveDraft() {
       localStorage.setItem(draftKey(), JSON.stringify({
         at: Date.now(),
         planId,
+        planRevision,
         mode,
         stepIndex,
         fieldValues,
@@ -2236,6 +2422,7 @@ function applyOpenedPlan(plan) {
   restoringDraft = true;
   try {
     planId = plan.id;
+    planRevision = plan.revision ?? null;
     fieldValues = plan.field_values || {};
     fieldRichValues = plan.rich_field_values || {};
     // The active mode's values are in field_values; the other mode's ride in
@@ -2265,6 +2452,7 @@ function applyOpenedPlan(plan) {
       // Detached from the row so editing on can't overwrite the original;
       // Save then writes a new plan of the reader's own.
       planId = null;
+      planRevision = null;
       saveStatus.textContent = "You're viewing someone else's plan. Save to keep your own copy.";
     } else if (plan.status === "submitted" || plan.status === "reviewed") {
       // A plan already submitted or graded can't take further edits, so the
@@ -2274,6 +2462,8 @@ function applyOpenedPlan(plan) {
         plan.status === "reviewed"
           ? "This plan has been reviewed, so it can no longer be edited."
           : "This plan has been submitted, so it can no longer be edited.";
+    } else {
+      syncedWithServer = true;
     }
 
     paintRestoredValues();
@@ -2313,6 +2503,9 @@ function restoreDraft() {
     // Both modes' work comes back, not just the one that happened to be active.
     if (draft.modeSlots) modeSlots = draft.modeSlots;
     planId = draft.planId || null;
+    // A draft from before revisions has none, and its first save goes through
+    // unchecked, as every save did then.
+    planRevision = draft.planRevision ?? null;
     stepIndex = draft.stepIndex || 0;
 
 
@@ -3087,6 +3280,10 @@ visibilityCheckbox.addEventListener("change", async () => {
   }
 });
 
+// Export reads the paper size from the saved plan, so a change is an edit like
+// any other: it autosaves, and Export waits for that save.
+pageSizeSelect.addEventListener("change", markDirty);
+
 saveBtn.addEventListener("click", async () => {
   // A pending autosave would otherwise race this one and re-send the same
   // payload a moment later.
@@ -3095,6 +3292,7 @@ saveBtn.addEventListener("click", async () => {
   try {
     await persistPlan();
     dirty = false;
+    syncedWithServer = true;
     // The plan is on the server now and listed under "List of Lesson Plan",
     // so the local draft has done its job. Editing on from here marks the
     // page dirty again and starts a fresh draft.
@@ -3105,7 +3303,8 @@ saveBtn.addEventListener("click", async () => {
     setOwlState("celebrate", "Saved! Export it as Word whenever you're ready.");
     revealSubmitControlsIfStudent();
   } catch (err) {
-    showError(err.message);
+    if (isStaleSave(err)) showConflict(err.data.lesson_plan);
+    else showError(err.message);
   } finally {
     setButtonLoading(saveBtn, false);
   }

@@ -98,6 +98,8 @@ def _migrate_lesson_plan_columns():
         "setup_context": "TEXT",
         # The teacher's edits to the document body; see LessonPlan.doc_edits.
         "doc_edits": "TEXT",
+        # Save counter for the stale-device check; see LessonPlan.revision.
+        "revision": "INTEGER NOT NULL DEFAULT 0",
     }
 
     for col_name, col_type in new_columns.items():

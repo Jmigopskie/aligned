@@ -17,9 +17,12 @@ function docImageUrl(id) {
 }
 
 class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, data = null) {
     super(message);
     this.status = status;
+    // The parsed error body, for callers that need more than the message
+    // (a stale-save 409 carries the newer plan).
+    this.data = data;
   }
 }
 
@@ -57,7 +60,7 @@ async function apiFetch(path, options = {}) {
   if (!response.ok) {
     const message =
       (data && data.message) || `Request failed (${response.status}).`;
-    throw new ApiError(message, response.status);
+    throw new ApiError(message, response.status, data);
   }
 
   return data;

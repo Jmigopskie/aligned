@@ -205,6 +205,35 @@ def update_lesson_plan(plan_id):
 
     data = request.get_json(silent=True) or {}
 
+    # The same account open on two devices: each autosave carries the whole
+    # plan, so whichever device saved last used to win, and a laptop tab left
+    # open with an older copy wiped what had just been written on a phone. The
+    # client now sends the revision it last saw; the conditional UPDATE claims
+    # the next one atomically (two workers can't both pass), and a stale device
+    # gets the current plan back instead of overwriting it. A request without
+    # base_revision (a page loaded before this shipped) keeps the old behaviour.
+    base = data.get("base_revision")
+    if base is not None:
+        try:
+            base = int(base)
+        except (TypeError, ValueError):
+            return jsonify({"status": "error", "message": "Invalid base_revision."}), 400
+        claimed = (
+            LessonPlan.query.filter_by(id=plan.id, revision=base)
+            .update({"revision": base + 1}, synchronize_session=False)
+        )
+        if not claimed:
+            db.session.rollback()
+            return jsonify({
+                "status": "error",
+                "code": "stale",
+                "message": "This plan was changed on another device or tab since this page loaded it.",
+                "lesson_plan": LessonPlan.query.get(plan_id).to_dict(),
+            }), 409
+        plan.revision = base + 1
+    else:
+        plan.revision = (plan.revision or 0) + 1
+
     # Only the fields actually present are touched, so an autosave carrying
     # just the field values can't blank out the title alongside them.
     if "title" in data:
