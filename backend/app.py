@@ -161,6 +161,32 @@ def _migrate_format_columns():
     _add_unique_index("lesson_plan_formats", "uq_lesson_plan_formats_builtin_key", "builtin_key")
 
 
+def _backfill_guide_doc_types():
+    """Give a type to uploads from before the Budget of Work / Curriculum
+    Guide pickers, when the document says plainly what it is. Untyped rows
+    show in both pickers, so a Budget of Work uploaded back then would
+    otherwise keep turning up under Curriculum Guide too. Anything that doesn't
+    name itself stays untyped rather than being guessed into one picker."""
+    import re
+
+    from models.course_guide import CourseGuide
+
+    changed = False
+    for guide in CourseGuide.query.filter(CourseGuide.doc_type.is_(None)).all():
+        head = re.sub(r"\s+", " ", (guide.extracted_text or "")[:4000]).lower()
+        title = (guide.title or "").lower()
+        if "budget of work" in head or "budget of work" in title:
+            guide.doc_type = "budget_of_work"
+        elif ("curriculum guide" in head or "basic education curriculum" in head
+              or re.search(r"(?:^|[-_ ])cg(?:[-_ .]|$)", title)):
+            guide.doc_type = "curriculum_guide"
+        else:
+            continue
+        changed = True
+    if changed:
+        db.session.commit()
+
+
 def _widen_course_guide_text():
     """course_guides.extracted_text as MEDIUMTEXT on MySQL.
 
@@ -338,6 +364,7 @@ def create_app():
         _migrate_section_columns()
         # Before seeding, which writes the full built-in guide texts.
         _widen_course_guide_text()
+        _backfill_guide_doc_types()
         _ensure_default_admin(app)
 
         from services.builtins import seed_builtins

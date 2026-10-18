@@ -299,6 +299,19 @@ def check_guides(app, admin, student):
         for b in ("4-6", "7-8", "9-10"):
             rows = c.get(f"/api/course-guides?grade_band={b}&doc_type=curriculum_guide").get_json()["course_guides"]
             assert any(g["title"].startswith("MATATAG EPP/TLE") for g in rows), (b, rows)
+        # Uploads from before the pickers get their type from what the
+        # document says it is; one that doesn't say stays untyped.
+        from app import _backfill_guide_doc_types
+        from models.course_guide import CourseGuide as CG
+        olds = [CG(uploader_id=admin.id, subject="ICT", title=t, file_path="x", extracted_text=x)
+                for t, x in (("[G7] TLE_ ICT.pdf", "Page 1 of 9 Three-Term   Budget\nOf Work For Learning"),
+                             ("Programming-Java-NC-III-CG.pdf", "K to 12 BASIC EDUCATION CURRICULUM"),
+                             ("notes.pdf", "Some lesson notes"))]
+        db.session.add_all(olds)
+        db.session.commit()
+        _backfill_guide_doc_types()
+        assert [g.doc_type for g in olds] == ["budget_of_work", "curriculum_guide", None], [g.doc_type for g in olds]
+
         # A type filter keeps the other kind out; an untyped upload (from
         # before the Budget of Work / Curriculum Guide split) shows in both.
         cg_rows = c.get("/api/course-guides?doc_type=curriculum_guide").get_json()["course_guides"]
