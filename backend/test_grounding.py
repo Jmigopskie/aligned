@@ -122,6 +122,14 @@ combined = "Discuss the emerging trends and issues\n1. list two trends\n2. expla
 got = grounding.snap_to_guide({"c": combined}, [F(field_key="c", label="Learning Competencies / Objectives")], GUIDE)["c"]
 assert got.split("\n") == [COMPETENCY, "1. list two trends", "2. explain one issue", "3. value safe use"], got
 
+# Objectives leave the server un-numbered under a plain lead-in, so the page
+# bullets them (ILAW's own hint asks for numbers; the teacher wants bullets).
+from services import ai_service as _ais  # noqa: E402
+lo = F(field_key="lo", label="Learning Objectives", field_type="weekly", ai_hint="numbered", parts_list=["Mon"])
+got = _ais._unnumber_objectives({"lo": ["At the end of the lesson, the learners are expected to:\n1. identify a\n2) explain b\n3. value c"]}, [lo])
+assert got["lo"] == ["At the end of the lesson, the learners are expected to:\nidentify a\nexplain b\nvalue c"], got
+assert _ais._unnumber_objectives({"x": "1. step"}, [F(field_key="x", label="Procedure", field_type="list", ai_hint=None)])["x"] == "1. step"
+
 # A numbered list's lead-in line is not numbered as item 1.
 from services import ai_limits as _lim  # noqa: E402
 num = _lim.clean_value("At the end of the lesson, the learners are expected to:\n1. identify\n2. explain\n3. value",

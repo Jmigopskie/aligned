@@ -1411,7 +1411,9 @@ function formatGeneratedValue(raw) {
     return items.join("\n");
   }
 
-  return items.map((item) => `• ${stripExistingBullet(item)}`).join("\n");
+  // A lead-in line ("At the end of the lesson, the learners are expected to:")
+  // introduces the list, so it stays a plain line above the bullets.
+  return items.map((item) => (/:\s*$/.test(item) ? stripExistingBullet(item) : `• ${stripExistingBullet(item)}`)).join("\n");
 }
 
 // Runs formatGeneratedValue over a whole field_key -> value map returned by

@@ -104,10 +104,16 @@ _SYSTEM_INSTRUCTION = (
     "(the one exception: integration and contextualization may be 'N/A' when there is "
     "genuinely no meaningful link). If a field is hard to ground in the topic or guide, "
     "still answer it with the most specific content the topic supports.\n\n"
-    "Formatting: plain text only, except that a step-by-step procedure may number "
-    "its steps ('1. ', '2. ') and a list may put one item per line. Never use "
-    "markdown syntax (no **bold**, no ## headings, no - bullets); the app applies "
-    "its own formatting."
+    "Formatting: plain text only. Any field (or day of a weekly field) that holds "
+    "several parts or items puts EACH ON ITS OWN LINE, so the app can show it as a "
+    "bulleted list instead of one dense paragraph: the pre-lesson's routine and review "
+    "steps, each part of the flow, materials and resources, assessment questions or "
+    "tasks, extended-learning tasks, reflection questions, values, objectives. A line may "
+    "start with its own short label ('Prayer:', 'Guided Practice (10 min):'). Only a "
+    "single idea (a standard, a competency, learner context, a generalization) stays one "
+    "sentence or short paragraph. Do not number items or add bullet characters yourself "
+    "(the app adds bullets), except that a step-by-step procedure may number its steps "
+    "('1. ', '2. '). Never use markdown syntax (no **bold**, no ## headings)."
 )
 
 _ANCHOR_SYSTEM_INSTRUCTION = (
@@ -380,10 +386,17 @@ def _field_directive(field):
         return (
             (" First line: the learning competency copied word for word from the guide. Then"
              if combined else "")
-            + f" at least {_MIN_OBJECTIVES} learning objectives (this overrides any smaller number), "
-            "one per line, each unpacked from the competency (knowledge, skill and attitude), "
-            "starting with a measurable verb and achievable in the session. Keep the stem "
-            "'At the end of the lesson, the learners are expected to:' if the format uses one."
+            + " the line 'At the end of the lesson, the learners are expected to:' (not counted, not "
+            f"numbered), then at least {_MIN_OBJECTIVES} learning objectives, one per line with no "
+            "numbers or bullet characters (the app bullets them; this overrides any 'numbered' "
+            "wording above). Each is unpacked from the competency, achievable in the session, and "
+            "starts with a measurable Bloom's taxonomy action verb in lowercase, never 'understand', "
+            "'know', 'learn' or 'appreciate the importance of'. Cover the domains the lesson really "
+            "has: cognitive (e.g. identify, describe, explain, compare, classify, analyze, evaluate, "
+            "create), affective (e.g. value, show willingness to, demonstrate respect for, cooperate "
+            "in, practice), and psychomotor (e.g. perform, construct, operate, assemble, demonstrate "
+            "the procedure for) ONLY when the lesson has a real hands-on skill; never force a "
+            "psychomotor objective. Order them from lower to higher thinking."
         )
     if grounding.is_verbatim_field(field):
         return (
@@ -681,7 +694,29 @@ def _trim(values, fields, guide_text="", citation="", context=None):
         )
         kept = grounding.snap_to_guide(kept, exact, guide_text)
         out.update(grounding.keep_working_links(kept, exact, citation))
-    return grounding.keep_given_logistics(out, fields, context)
+    return _unnumber_objectives(grounding.keep_given_logistics(out, fields, context), fields)
+
+
+_LIST_NUMBER = re.compile(r"^\s*\(?\d{1,2}[.)]\s+")
+
+
+def _unnumber_objectives(values: dict, fields) -> dict:
+    """Objectives are a bulleted list under an unnumbered lead-in ('At the end
+    of the lesson, the learners are expected to:'), so any numbering the model
+    added anyway (ILAW's own field hint says 'numbered') comes off here and the
+    page bullets the lines. A numbered list would also keep the page from
+    bulleting them, since it treats numbers as an ordered procedure."""
+    out = dict(values)
+    for f in fields:
+        if f.field_key not in out or not _is_objective_field(f):
+            continue
+
+        def clean(text):
+            return "\n".join(_LIST_NUMBER.sub("", line) for line in str(text or "").split("\n"))
+
+        value = out[f.field_key]
+        out[f.field_key] = [clean(v) for v in value] if isinstance(value, list) else clean(value)
+    return out
 
 
 def _must_answer(fields):
