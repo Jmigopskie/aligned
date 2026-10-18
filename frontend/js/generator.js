@@ -3168,22 +3168,28 @@ function renderUnmatchedFieldList(keys) {
   return `<div class="preview-section-title">Not part of the printed template</div>${items}`;
 }
 
-// Copies the already-generated fieldValues into the document canvas's
-// editable slots. Only fields the backend actually matched to a real anchor
-// in the reference file have a slot to fill — everything else is simply not
-// touched, so nothing invented ever appears in the canvas.
+// Copies the plan's current content into the preview's document slots, the
+// same way the live document paints them (styled HTML and pictures when a
+// field has them, plain text otherwise). Runs as soon as the preview opens:
+// it used to wait for a "Fill in generated content" click, so a finished plan
+// previewed as an empty form. Only fields matched to a real spot in the
+// reference file have a slot, so nothing invented appears in the canvas.
 function fillDocCanvas() {
   const canvas = previewBody.querySelector(".lp-doc");
   if (!canvas) return;
-  let filled = 0;
   canvas.querySelectorAll("[data-field-key]").forEach((el) => {
+    const rich = richForSlot(el);
     const text = valueForSlot(el);
-    if (!text.trim()) return;
-    el.textContent = text;
+    if (rich) {
+      el.innerHTML = rich;
+      hydrateDocImages(el);
+    } else if (text.trim()) {
+      el.textContent = text;
+    } else {
+      return;
+    }
     el.classList.add("lp-filled");
-    filled += 1;
   });
-  showToast(filled ? `Filled ${filled} field${filled === 1 ? "" : "s"} from your generated content.` : "Nothing generated yet to fill in.");
 }
 
 // Lets a teacher tweak wording directly in the document canvas, syncing any
@@ -3219,7 +3225,6 @@ function renderPreviewModal(templateData, docAvailable) {
           Field list view
         </button>
       </div>
-      ${previewViewMode === "doc" ? `<button type="button" class="btn btn-secondary btn-sm" id="preview-fill-btn">Fill in generated content</button>` : ""}
     </div>`;
 
   const warning =
@@ -3229,7 +3234,7 @@ function renderPreviewModal(templateData, docAvailable) {
 
   let content;
   if (previewViewMode === "doc") {
-    content = `<div class="doc-hint">This mirrors your uploaded reference file. Tap "Fill in generated content", or click into any highlighted spot to edit it directly.</div>`;
+    content = `<div class="doc-hint">Your plan in its reference document. Click into any highlighted spot to edit it directly.</div>`;
     content += `<div class="lp-doc-wrap">${templateData.html}</div>`;
     content += renderUnmatchedFieldList(templateData.unmatched_fields);
   } else {
@@ -3248,9 +3253,8 @@ function renderPreviewModal(templateData, docAvailable) {
   });
 
   if (previewViewMode === "doc") {
+    fillDocCanvas();
     wireDocCanvasEditing();
-    const fillBtn = document.getElementById("preview-fill-btn");
-    if (fillBtn) fillBtn.addEventListener("click", fillDocCanvas);
   }
 }
 

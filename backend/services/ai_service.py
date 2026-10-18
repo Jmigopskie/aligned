@@ -420,9 +420,11 @@ def _field_directive(field):
         )
     if "material" in haystack or "resource" in haystack:
         return (
-            " Each item must be a general category only (e.g. 'Laptop', 'Whiteboard', "
-            "'Printed handouts') — no brand names, software names, or specific model "
-            "numbers, and no parenthetical examples."
+            " Three to five items, one per line: the materials the flow actually uses, each a "
+            "general category (e.g. 'Laptop', 'Whiteboard', 'Printed case study handouts'), no "
+            "brand names, software names or model numbers. For learning resources, end with one "
+            "line 'Home-based alternative: ...' for learners who cannot attend face to face "
+            "(DO 016 s.2026)."
         )
     if any(kw in haystack for kw in ("energizer", "motivation", "warm up", "warm-up", "icebreaker", "routine")):
         return (
@@ -811,6 +813,83 @@ field_key as keys and nothing else:
 # next batch starts.
 _BATCH_RETRIES = 2
 
+# The parts of one class session whose minutes must add up to at most
+# _SESSION_MINUTES, matched by label: the pre-lesson, the flow/procedure, and
+# the formative assessment when it is timed on its own.
+_TIMED_PARTS = re.compile(r"pre-?lesson|\bflow\b|procedure|lesson proper|formative", re.I)
+_PRE_LESSON = re.compile(r"pre-?lesson", re.I)
+_MINUTES = re.compile(r"(\d{1,2})\s*(?:-|–|to)?\s*(?:\d{1,2}\s*)?min(?:ute)?s?\b", re.I)
+
+
+def _timing_problems(values: dict, fields) -> list:
+    """(day index, total minutes, pre-lesson timed?) for every session that runs
+    past _SESSION_MINUTES or whose pre-lesson gives no minutes (so its time is
+    unaccounted for). The model was told the cap and still timed the flow
+    alone to 45 with the routine on top, so the plan is checked, not trusted."""
+    timed = [f for f in fields if _TIMED_PARTS.search(f.label or "")]
+    if not timed or not any(_PRE_LESSON.search(f.label or "") for f in timed):
+        return []
+
+    def cells(f):
+        v = values.get(f.field_key)
+        return v if isinstance(v, list) else [v]
+
+    days = max(len(cells(f)) for f in timed)
+    problems = []
+    for d in range(days):
+        total, pre_timed = 0, False
+        for f in timed:
+            parts = cells(f)
+            text = str(parts[d] if d < len(parts) else "") or ""
+            mins = sum(int(m) for m in _MINUTES.findall(text))
+            total += mins
+            if _PRE_LESSON.search(f.label or "") and mins:
+                pre_timed = True
+        if total > _SESSION_MINUTES or not pre_timed:
+            problems.append((d, total, pre_timed))
+    return problems
+
+
+def _fix_timing(lesson, fields, values, label, guide_text, citation, context):
+    """Re-time the sessions that break the cap: the pre-lesson and the flow are
+    asked for again with the exact totals, up to _BATCH_RETRIES times, and a
+    reply is kept only when it actually brings every day within the cap."""
+    for attempt in range(_BATCH_RETRIES):
+        problems = _timing_problems(values, fields)
+        if not problems:
+            return values
+        targets = [f for f in fields if _TIMED_PARTS.search(f.label or "")
+                   and not re.search(r"formative", f.label or "", re.I)]
+        if not targets:
+            return values
+        detail = "; ".join(
+            f"day {d + 1} adds up to {total} minutes{'' if pre else ' and its pre-lesson has no minutes'}"
+            for d, total, pre in problems
+        )
+        task = f"""
+Already written fields (keep them consistent):
+{json.dumps(values)}
+
+The session timing is wrong: {detail}. Every session must total AT MOST
+{_SESSION_MINUTES} minutes INCLUDING the pre-lesson (about 5 minutes) and any
+timed assessment. Rewrite these fields for every day so each part shows its
+minutes and each day adds up to {_SESSION_MINUTES} minutes or less; keep the
+same activities, shortened if needed, one part per line. Return strict JSON with
+field_key as keys:
+{_schema_block(targets)}
+"""
+        try:
+            fixed = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], f"{label} (timing {attempt + 1})"),
+                          targets, guide_text, citation, context)
+        except Exception:
+            _log.warning("[%s] timing pass failed; keeping the plan as written", label, exc_info=True)
+            return values
+        candidate = dict(values)
+        candidate.update({k: v for k, v in fixed.items() if ai_limits.is_answered(v)})
+        if len(_timing_problems(candidate, fields)) < len(problems) and not _incomplete(candidate, targets):
+            values = candidate
+    return values
+
 
 def _complete_batch(lesson, chunk, values, label, guide_text, citation, context):
     """Ask again for whatever in this batch is incomplete, up to _BATCH_RETRIES
@@ -856,7 +935,8 @@ Fill ONLY the following fields and return strict JSON with field_key as keys:
 """
     values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency"), targets,
                    course_guide_text, cite, context)
-    return _complete_batch(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
+    values = _complete_batch(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
+    return _fix_timing(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
 
 
 _STREAM_CHUNK_SIZE = 4
@@ -924,6 +1004,17 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
             all_values.update(recovered)
             yield {"type": "section_done", "section": "Filled-in gaps",
                    "index": len(chunks), "total": len(chunks), "values": recovered}
+
+    # The whole session, pre-lesson included, must fit the cap. Only checkable
+    # once every timed part is written, so it runs after the batches.
+    if _timing_problems(all_values, fields):
+        yield {"type": "filling_gaps", "count": len(_timing_problems(all_values, fields))}
+        retimed = _fix_timing(lesson, fields, all_values, "Building Proficiency", course_guide_text, cite, context)
+        changed = {k: v for k, v in retimed.items() if all_values.get(k) != v}
+        if changed:
+            all_values.update(changed)
+            yield {"type": "section_done", "section": "Session timing",
+                   "index": len(chunks), "total": len(chunks), "values": changed}
 
     # `missing` answers "did everything I was asked to write come back": the
     # requested field keys with no real content even after the retry. It says

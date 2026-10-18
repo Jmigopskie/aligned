@@ -130,6 +130,18 @@ got = _ais._unnumber_objectives({"lo": ["At the end of the lesson, the learners 
 assert got["lo"] == ["At the end of the lesson, the learners are expected to:\nidentify a\nexplain b\nvalue c"], got
 assert _ais._unnumber_objectives({"x": "1. step"}, [F(field_key="x", label="Procedure", field_type="list", ai_hint=None)])["x"] == "1. step"
 
+# Session timing: pre-lesson + flow (+ timed assessment) must fit 45 minutes,
+# and an untimed pre-lesson counts as a problem (its time is unaccounted for).
+pre = F(field_key="pre", label="Pre-Lesson", field_type="weekly", parts_list=["Mon", "Tue"], ai_hint=None)
+flo = F(field_key="flow", label="Flow", field_type="weekly", parts_list=["Mon", "Tue"], ai_hint=None)
+plan_t = {"pre": ["Prayer and review (5 min)", "Prayer and review"],
+          "flow": ["Intro (5 min)\nPractice (30 min)\nGeneralization (5 min)", "Intro (10 min)\nPractice (35 min)"]}
+assert _ais._timing_problems(plan_t, [pre, flo]) == [(1, 45, False)], _ais._timing_problems(plan_t, [pre, flo])
+plan_t["pre"][1] = "Prayer (5 min)"
+assert _ais._timing_problems(plan_t, [pre, flo]) == [(1, 50, True)]
+plan_t["flow"][1] = "Intro (5 min)\nPractice (30 min)\nGeneralization (5 min)"
+assert _ais._timing_problems(plan_t, [pre, flo]) == []
+
 # A numbered list's lead-in line is not numbered as item 1.
 from services import ai_limits as _lim  # noqa: E402
 num = _lim.clean_value("At the end of the lesson, the learners are expected to:\n1. identify\n2. explain\n3. value",
