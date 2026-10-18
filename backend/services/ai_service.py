@@ -282,6 +282,11 @@ def _field_directive(field):
     model detail where a general category is what's wanted."""
     haystack = f"{field.field_key or ''} {field.label or ''}".lower()
 
+    if grounding.is_logistics_field(field):
+        return (
+            " Fill this only from the lesson details given above. If they don't state it, "
+            "return an empty string: never invent a school, date, time, room or section."
+        )
     if grounding.is_verbatim_field(field):
         return (
             " Copy the matching statement(s) from the course guide / budget of work above "
@@ -517,7 +522,7 @@ def _is_exact(field):
     return grounding.is_verbatim_field(field) or grounding.is_reference_field(field)
 
 
-def _trim(values, fields, guide_text="", citation=""):
+def _trim(values, fields, guide_text="", citation="", context=None):
     """Every value the model returns goes through here before it leaves this
     module, so the length ceilings hold regardless of which call produced it.
 
@@ -540,10 +545,17 @@ def _trim(values, fields, guide_text="", citation=""):
         )
         kept = grounding.snap_to_guide(kept, exact, guide_text)
         out.update(grounding.keep_working_links(kept, exact, citation))
-    return out
+    return grounding.keep_given_logistics(out, fields, context)
 
 
-def _fill_gaps(lesson: str, fields, all_values: dict, label: str, guide_text="", citation="") -> dict:
+def _must_answer(fields):
+    """The fields a reply is held to: logistics a teacher didn't give are left
+    blank on purpose, so they are neither re-asked nor reported missing."""
+    return [f for f in fields if not grounding.is_logistics_field(f)]
+
+
+def _fill_gaps(lesson: str, fields, all_values: dict, label: str, guide_text="", citation="",
+               context=None) -> dict:
     """One more attempt at the fields that came back blank or as a placeholder.
 
     A model asked for twelve fields at once will occasionally skip one or answer
@@ -552,7 +564,7 @@ def _fill_gaps(lesson: str, fields, all_values: dict, label: str, guide_text="",
     being asked on its own, the caller reports it as unanswered rather than
     looping and spending a teacher's time.
     """
-    gaps = ai_limits.missing_keys(all_values, fields)
+    gaps = ai_limits.missing_keys(all_values, _must_answer(fields))
     if not gaps:
         return {}
 
@@ -565,7 +577,7 @@ strict JSON with field_key as keys and nothing else:
 """
     try:
         recovered = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], f"{label} (filling gaps)"), gap_fields,
-                          guide_text, citation)
+                          guide_text, citation, context)
     except Exception:
         # The gap pass is best-effort: a failure here must not lose the fields
         # that were generated successfully.
@@ -603,8 +615,8 @@ Fill ONLY the following fields and return strict JSON with field_key as keys:
 {_schema_block(targets)}
 """
     values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency"), targets,
-                   course_guide_text, cite)
-    values.update(_fill_gaps(lesson, targets, values, "Building Proficiency", course_guide_text, cite))
+                   course_guide_text, cite, context)
+    values.update(_fill_gaps(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context))
     return values
 
 
@@ -648,7 +660,7 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
 """
         values = _trim(
             _call(_SYSTEM_INSTRUCTION, [lesson, task], f"Building Proficiency {i}/{len(chunks)}"),
-            chunk, course_guide_text, cite,
+            chunk, course_guide_text, cite, context,
         )
         all_values.update(values)
         yield {"type": "section_done", "section": name, "index": i, "total": len(chunks), "values": values}
@@ -656,10 +668,11 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
     # Anything still blank or answered with a placeholder gets one more,
     # targeted attempt before this reports back. Without it the page announced
     # a finished plan over fields the model had quietly skipped.
-    gaps = ai_limits.missing_keys(all_values, fields)
+    gaps = ai_limits.missing_keys(all_values, _must_answer(fields))
     if gaps:
         yield {"type": "filling_gaps", "count": len(gaps)}
-        recovered = _fill_gaps(lesson, fields, all_values, "Building Proficiency", course_guide_text, cite)
+        recovered = _fill_gaps(lesson, fields, all_values, "Building Proficiency", course_guide_text, cite,
+                               context)
         if recovered:
             all_values.update(recovered)
             yield {"type": "section_done", "section": "Filled-in gaps",
@@ -670,7 +683,7 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
     # nothing about fields outside include_keys, so the page must combine this
     # with its own check of any fields the teacher chose to write themselves
     # before it can claim the plan is finished.
-    missing = ai_limits.missing_keys(all_values, fields)
+    missing = ai_limits.missing_keys(all_values, _must_answer(fields))
     yield {
         "type": "complete",
         "values": all_values,

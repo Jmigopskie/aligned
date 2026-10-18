@@ -40,6 +40,40 @@ def is_reference_field(field) -> bool:
     return bool(_REFERENCE_FIELD.search(_haystack(field)))
 
 
+# Facts about the class session that no guide contains: which school, which day,
+# what time, which room or section. A model asked to fill them made them up
+# ("Philippine National High School", "October 15, 2026"), so they are only
+# filled from the setup the teacher gave and otherwise left for the teacher.
+# "Time allotment" is the lesson's length, not its clock time, so it isn't one.
+_LOGISTICS_FIELD = re.compile(r"\b(?:school|date|time|room|section)\b(?!\s*(?:allot|frame))", re.I)
+
+
+def is_logistics_field(field) -> bool:
+    return bool(_LOGISTICS_FIELD.search(field.label or ""))
+
+
+def keep_given_logistics(values: dict, fields, context: dict) -> dict:
+    """Logistics fields keep a value only when it is something the teacher
+    entered in setup (a section name, say); anything else was invented and is
+    blanked for the teacher to fill in."""
+    # Word by word, so "Grade 7 - Campos" stands when the grade and the
+    # section were each given, even though setup never wrote them together.
+    given = set(re.findall(r"[a-z0-9]+", " ".join(str(v) for v in (context or {}).values() if v).lower()))
+    out = dict(values)
+
+    def entered(text):
+        words = re.findall(r"[a-z0-9]+", str(text or "").lower())
+        return bool(words) and set(words) <= given
+
+    for f in fields:
+        if f.field_key in out and is_logistics_field(f):
+            value = out[f.field_key]
+            parts = value if isinstance(value, list) else [value]
+            kept = [p if entered(p) else "" for p in parts]
+            out[f.field_key] = kept if isinstance(value, list) else kept[0]
+    return out
+
+
 # ---------------------------------------------------------------------------
 # The guide's statements
 # ---------------------------------------------------------------------------

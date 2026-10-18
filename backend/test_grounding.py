@@ -95,6 +95,21 @@ kept = grounding.keep_working_links({"refs": "Networking basics https://good.exa
 assert kept["refs"] == cite, "a working link that isn't an APA reference is still dropped"
 assert grounding.keep_working_links({"refs": ["https://dead.example.org"]}, [refs], cite)["refs"] == [cite]
 
+# Session logistics: only what the teacher entered survives; an invented
+# school, date or time is blanked. "Time Allotment" is lesson length, not one.
+school = F(field_key="school", label="School")
+date = F(field_key="date", label="Date")
+grade_section = F(field_key="gs", label="Grade and Section")
+allot = F(field_key="ta", label="Time Allotment")
+assert grounding.is_logistics_field(school) and grounding.is_logistics_field(date)
+assert not grounding.is_logistics_field(allot) and not grounding.is_logistics_field(competency)
+ctx = {"teacher_name": "John Mark V. Aguirre", "grade_level": "Grade 7", "section": "Campos", "topic": "ICT"}
+got = grounding.keep_given_logistics(
+    {"school": "Philippine National High School", "date": "October 15, 2026",
+     "gs": "Grade 7 - Campos", "ta": "60 minutes", "lc": COMPETENCY},
+    [school, date, grade_section, allot, competency], ctx)
+assert got == {"school": "", "date": "", "gs": "Grade 7 - Campos", "ta": "60 minutes", "lc": COMPETENCY}, got
+
 # The curriculum guide: its numbered competency is copied without the number,
 # and its run-on content standard comes out as its own statement.
 os.environ.setdefault("DATABASE_URL", "sqlite://")
