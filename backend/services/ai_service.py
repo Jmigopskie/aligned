@@ -51,8 +51,30 @@ _SESSION_MINUTES = 45
 
 _SYSTEM_INSTRUCTION = (
     "You are helping a K-12 ICT/TLE teacher in the Philippines write a lesson plan. "
-    "Follow DepEd K-12 tone and terminology. Return complete, specific, classroom-ready "
-    "content a teacher can use as written.\n\n"
+    "Follow DepEd K-12 tone and terminology. Return specific, classroom-ready content a "
+    "teacher can use as written.\n\n"
+    "Follow DepEd Order No. 016, s. 2026 (Guidelines on Lesson Planning and Learning Design, "
+    "the ILAW framework):\n"
+    "- Keep it simple: brief notes, no excessive detail. Another teacher must still be able "
+    "to run the lesson without extra explanation.\n"
+    "- Coherence: the intentions are evident in every section. Each learning objective is "
+    "unpacked from the curriculum competency, is taught in the flow, is checked by the "
+    "formative assessment, and is extended in ways forward. The resources listed are the "
+    "ones the flow actually uses. Nothing appears in one section that the others ignore.\n"
+    "- Intentions: learning objectives are the smaller knowledge, skills or tasks from the "
+    "competency that learners can show by the end of the session(s), achievable in the time.\n"
+    "- Learning experience: the pre-lesson is a brief routine or check-in that activates "
+    "prior knowledge (its minutes count toward the session). The flow applies the learning "
+    "design principles where they fit: make the objective clear to learners, guide or model "
+    "before learners try on their own, check understanding during the lesson, connect to a "
+    "past competency, use collaboration, let learners see why it matters, and include "
+    "learners of varied abilities. Learning resources include an alternative for home-based "
+    "learning in case face-to-face class is interrupted.\n"
+    "- Assessing learning: formative checks happen during the session, include a way for "
+    "learners to ask for help, and allow an accommodation (e.g. oral answer, visual aid, "
+    "pair support).\n"
+    "- Ways forward: an extended learning opportunity beyond class time; reflections are the "
+    "teacher's own after teaching.\n\n"
     "Grounding rules (follow strictly):\n"
     "- Every field must be grounded in the specific topic, subject, and any course guide "
     "text given below — never generic filler that could apply to any lesson.\n"
@@ -63,25 +85,25 @@ _SYSTEM_INSTRUCTION = (
     "- Never reuse the same stock activity across different lessons or sections; if a "
     "course guide or references are provided, pull concrete details (terms, examples, "
     "page/unit names) from them rather than inventing generic ones.\n\n"
-    "Length: use the room you need to make each field complete and specific (steps, "
-    "timings, materials, concrete examples, what learners do and produce), but no padding "
-    "and no repetition of other fields:\n"
-    f"- A list field: up to {_MAX_LIST_ITEMS} items, one per line, each one complete "
-    f"sentence or phrase of up to about {_MAX_ITEM_WORDS} words. Always finish the "
-    "sentence; never stop mid-thought.\n"
-    f"- A prose field: up to {_MAX_PROSE_SENTENCES} complete sentences.\n"
+    "Length (concise, per DO 016): say what the teacher and learners do, no explanations of "
+    "why, no repetition of other fields:\n"
+    "- Most fields: one or two sentences, or three to five short items, one per line.\n"
+    "- A flow, procedure or lesson-proper field: one short line per part (its heading, its "
+    "minutes, what happens), about 60 to 90 words for a session in total.\n"
+    "- Always finish the sentence; never stop mid-thought.\n"
     f"- Time: each day is ONE class session of at most {_SESSION_MINUTES} minutes, a hard cap. "
-    "Everything planned for a session (routine, review, motivation, discussion, practice, "
-    f"assessment) must fit inside those {_SESSION_MINUTES} minutes together, never more; give "
-    "the minutes for each part so the teacher can see it adds up.\n"
+    "Everything planned for a session (pre-lesson routine and review, motivation, discussion, "
+    f"practice, assessment) must fit inside those {_SESSION_MINUTES} minutes together, never "
+    "more; give the minutes for each part, including the pre-lesson, so it visibly adds up.\n"
     "- Never restate the field's own label, never open with filler such as 'In this "
     "lesson' or 'The teacher will', and never explain your reasoning or comment on "
     "the plan. Write the content only: no preamble, no closing sentence, no "
     "meta-text.\n\n"
     "Answer every field you are asked for with real content. Never return an empty "
-    "string, a placeholder such as 'N/A' or 'To be determined', or a restatement "
-    "of the label. If a field is hard to ground in the topic or guide, still answer "
-    "it with the most specific content the topic supports.\n\n"
+    "string, a placeholder such as 'To be determined', or a restatement of the label "
+    "(the one exception: integration and contextualization may be 'N/A' when there is "
+    "genuinely no meaningful link). If a field is hard to ground in the topic or guide, "
+    "still answer it with the most specific content the topic supports.\n\n"
     "Formatting: plain text only, except that a step-by-step procedure may number "
     "its steps ('1. ', '2. ') and a list may put one item per line. Never use "
     "markdown syntax (no **bold**, no ## headings, no - bullets); the app applies "
@@ -314,7 +336,35 @@ def _field_directive(field):
     model detail where a general category is what's wanted."""
     haystack = f"{field.field_key or ''} {field.label or ''}".lower()
 
-    if re.search(r"\b(?:semester|quarter|term)\b", field.label or "", re.I):
+    # DO 016 s.2026: learner context is the teacher's own observation and
+    # reflections are written after teaching. A model can't observe either, so
+    # it drafts something the teacher confirms instead of inventing outcomes.
+    if "learner context" in haystack:
+        return (
+            " The AI cannot observe this class: write one or two sentences of anticipated "
+            "context for this grade and topic (likely strengths, interests, possible "
+            "barriers), starting with 'Anticipated:' so the teacher confirms or edits it."
+        )
+    if "reflection" in haystack:
+        return (
+            " Reflections are written by the teacher after the session: give two or three "
+            "short questions to answer then (e.g. which objective needs reteaching, who needs "
+            "remediation or enrichment), not invented results."
+        )
+    if "declaration of ai" in haystack or "ai use" in haystack:
+        return (
+            " One honest sentence: the plan was drafted with AlignED's AI from the selected "
+            "Budget of Work / Curriculum Guide and reviewed and edited by the teacher "
+            "(DO 003 s.2026)."
+        )
+    if "integration" in haystack or "contextuali" in haystack:
+        return (
+            " One concrete link to another learning area or to the learners' local context "
+            "that the flow actually uses; write N/A if there is genuinely none."
+        )
+    # Only when the format doesn't say how to write it (ILAW asks for the term
+    # number alone, which must win over this).
+    if not field.ai_hint and re.search(r"\b(?:semester|quarter|term)\b", field.label or "", re.I):
         return (
             " Use the guide's own heading for the section the lesson's competency sits in, "
             "worded as the guide words it (e.g. 'First Term' if the guide says Term, never "
@@ -627,7 +677,8 @@ def _trim(values, fields, guide_text="", citation="", context=None):
 def _must_answer(fields):
     """The fields a reply is held to: logistics a teacher didn't give are left
     blank on purpose, so they are neither re-asked nor reported missing."""
-    return [f for f in fields if not grounding.is_logistics_field(f)]
+    return [f for f in fields if not grounding.is_logistics_field(f)
+            and not re.search(r"integration|contextuali", f"{f.field_key} {f.label}", re.I)]
 
 
 def _fill_gaps(lesson: str, fields, all_values: dict, label: str, guide_text="", citation="",
