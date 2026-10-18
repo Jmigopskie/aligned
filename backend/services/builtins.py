@@ -148,19 +148,26 @@ def _seed_guides(folder, owner_id):
             guide = CourseGuide(builtin_key=key, uploader_id=owner_id)
             db.session.add(guide)
 
-        # Only a new or changed file gets its text read. The text ships beside
-        # the PDF as <name>.txt, extracted once when the guide was added:
-        # extracting a 184-page PDF inside every gunicorn worker's startup
-        # could outlast the worker timeout. An empty or failed extraction is
-        # kept as it is rather than retried on every boot.
-        if guide.file_hash != file_hash:
-            cached = os.path.splitext(path)[0] + ".txt"
+        # The text ships beside the PDF as <name>.txt, extracted once when the
+        # guide was added: extracting a 184-page PDF inside every gunicorn
+        # worker's startup could outlast the worker timeout. The .txt is cheap
+        # to read, so it is applied whenever it differs from what is stored,
+        # which is how a re-extracted text (the 20,000-character cut fixed)
+        # reaches a database whose PDFs haven't changed. Without a .txt, only a
+        # new or changed PDF is extracted, and a failure isn't retried per boot.
+        cached = os.path.splitext(path)[0] + ".txt"
+        if os.path.isfile(cached):
             try:
-                if os.path.isfile(cached):
-                    with open(cached, encoding="utf-8") as fh:
-                        guide.extracted_text = fh.read()
-                else:
-                    guide.extracted_text = text_extract.extract_text(path)
+                with open(cached, encoding="utf-8") as fh:
+                    shipped = fh.read()
+                if guide.extracted_text != shipped:
+                    guide.extracted_text = shipped
+            except Exception:
+                _log.exception("Couldn't read the shipped text for built-in guide %s", key)
+            guide.file_hash = file_hash
+        elif guide.file_hash != file_hash:
+            try:
+                guide.extracted_text = text_extract.extract_text(path)
             except Exception:
                 _log.exception("Text extraction failed for built-in guide %s", key)
                 guide.extracted_text = ""

@@ -9,7 +9,7 @@ from models.lesson_plan import LessonPlan
 from models.course_guide import CourseGuide
 from models.section import Section, SectionMembership
 from routes.auth_routes import login_required, current_user
-from services import ai_service, docx_service
+from services import ai_service, docx_service, grounding
 from services.notify import notify
 
 generate_bp = Blueprint("generate", __name__)
@@ -53,6 +53,13 @@ def _build_context(data, guide):
         context["course_guide_title"] = guide.title
     return context
 
+def _guide_citation(guide):
+    """APA reference for the chosen guide; "" for an uploaded one with no
+    public link, since only references that open are kept."""
+    if not guide:
+        return ""
+    return grounding.guide_citation(guide.title, guide.source_url, guide.extracted_text or "")
+
 def _include_keys(data, fmt):
     """The field_keys this request wants generated, or None for all of them.
 
@@ -83,7 +90,7 @@ def generate_full():
 
     field_values = ai_service.generate_full(
         context, fmt.fields, course_guide_text=course_guide_text,
-        include_keys=_include_keys(data, fmt),
+        include_keys=_include_keys(data, fmt), course_guide_citation=_guide_citation(guide),
     )
     return jsonify({"status": "ok", "field_values": field_values})
 
@@ -103,11 +110,13 @@ def generate_full_stream():
     # Read here, not inside _stream(): the generator runs after the request
     # context is gone, so `request`/`data` can't be touched from inside it.
     include_keys = _include_keys(data, fmt)
+    citation = _guide_citation(guide)
 
     def _stream():
         try:
             for event in ai_service.generate_full_streaming(
                 context, fields, course_guide_text=course_guide_text, include_keys=include_keys,
+                course_guide_citation=citation,
             ):
                 yield json.dumps(event) + "\n"
         except Exception as exc:
@@ -149,7 +158,8 @@ def owl_chat():
     course_guide_text = guide.extracted_text if guide else ""
     prior_values = data.get("prior_values") or {}
 
-    answer = ai_service.owl_chat(context, field, prior_values, course_guide_text, history, message)
+    answer = ai_service.owl_chat(context, field, prior_values, course_guide_text, history, message,
+                                 course_guide_citation=_guide_citation(guide))
     return jsonify({"status": "ok", **answer})
 
 @generate_bp.get("/lesson-plans")

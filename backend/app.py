@@ -161,6 +161,33 @@ def _migrate_format_columns():
     _add_unique_index("lesson_plan_formats", "uq_lesson_plan_formats_builtin_key", "builtin_key")
 
 
+def _widen_course_guide_text():
+    """course_guides.extracted_text as MEDIUMTEXT on MySQL.
+
+    Plain TEXT stops at 64 KB there, and the full MATATAG curriculum guide is
+    ~210,000 characters: text used to be cut at 20,000 characters, which is
+    why most of a long guide never reached the AI. SQLite has no such limit.
+    Re-running the MODIFY is harmless, so a worker that loses the race to
+    another one doing the same ALTER just moves on.
+    """
+    if db.engine.dialect.name != "mysql":
+        return
+    from sqlalchemy import text
+    from sqlalchemy.exc import DatabaseError
+
+    try:
+        with db.engine.begin() as conn:
+            kind = conn.execute(text(
+                "SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() "
+                "AND TABLE_NAME = 'course_guides' AND COLUMN_NAME = 'extracted_text'"
+            )).scalar()
+            if kind and kind.lower() == "text":
+                conn.execute(text("ALTER TABLE course_guides MODIFY extracted_text MEDIUMTEXT"))
+    except DatabaseError as exc:
+        if "concurrent ddl" not in str(exc).lower():
+            raise
+
+
 def _migrate_course_guide_builtin_columns():
     """Columns describing an official DepEd guide seeded from backend/builtin."""
     for column, ddl_type in (
@@ -309,6 +336,8 @@ def create_app():
         _migrate_format_field_columns()
         _migrate_announcement_columns()
         _migrate_section_columns()
+        # Before seeding, which writes the full built-in guide texts.
+        _widen_course_guide_text()
         _ensure_default_admin(app)
 
         from services.builtins import seed_builtins

@@ -21,7 +21,7 @@ import time
 import requests
 
 from config import Config
-from services import ai_limits
+from services import ai_limits, grounding
 
 _log = logging.getLogger(__name__)
 
@@ -128,14 +128,112 @@ _STOPWORDS = set(
 )
 
 
-def guide_excerpt(text: str, context: dict, budget: int = GUIDE_BUDGET) -> str:
-    """The parts of a course guide most relevant to this lesson, within budget.
+def _focus_terms(*values):
+    words = re.findall(r"[a-z0-9][a-z0-9+#.-]{2,}", " ".join(str(v or "") for v in values).lower())
+    # A stem so "conversion" also finds "convert" and "systems" "system". Six
+    # letters, matched only at the start of a word: five let "underwater" hit
+    # "understanding".
+    return {w[:6] for w in words if w not in _STOPWORDS}
 
-    A guide that fits is used whole. A longer one keeps its opening (scope and
-    overview) and then the passages that mention the lesson's topic and
-    subject most, in their original order, so the AI sees the section being
-    taught even when it sits deep in the guide."""
+
+# Where a section's standards start. Competencies sit under these, so a topic
+# found in a competency is read together with the standards above it. The
+# Budget of Work writes them in Title Case, the curriculum guide in CAPITALS.
+_STANDARDS_HEADING = re.compile(
+    r"Performance Standards?|Content Standards?|Learning Competenc(?:y|ies)|(?:First|Second|Third|Fourth) "
+    r"(?:Term|Quarter)|Quarter (?:\d|[IVX]+)|GRADE \d+", re.I)
+_LOOK_BACK = 6000
+_LOOK_AHEAD = 2500
+_MAX_HITS = 3
+
+
+def _topic_sections(text: str, terms: set, budget: int) -> str:
+    """The guide searched for the topic: the passages that mention it most,
+    each widened back to the standards heading it sits under and a little past
+    it, merged and kept in document order. "" when the topic isn't in the guide."""
+    low = text.lower()
+    patterns = {t: re.compile(r"\b" + re.escape(t)) for t in terms}
+    # A passage that holds one stray word of the topic isn't the topic: a short
+    # topic needs every word, a longer one most of them.
+    needed = len(terms) if len(terms) <= 2 else -(-len(terms) * 3 // 5)
+    hits = []
+    for start in range(0, len(text), _BLOCK_CHARS // 2):
+        block = low[start:start + _BLOCK_CHARS]
+        counts = {t: len(p.findall(block)) for t, p in patterns.items()}
+        present = [t for t, n in counts.items() if n]
+        if len(present) >= needed:
+            # Covering more of the topic's words beats repeating one of them,
+            # and a passage inside a standards/competencies table beats the
+            # guide's overview pages, which mention every topic in passing.
+            score = len(present) ** 2 * 10 + sum(counts.values())
+            if _STANDARDS_HEADING.search(text, max(0, start - 1500), start + _BLOCK_CHARS):
+                score *= 2
+            hits.append((score, start))
+    if not hits:
+        return ""
+    hits.sort(reverse=True)
+
+    windows = []
+    for score, start in hits:
+        # Further passages only when they are nearly as good a match as the
+        # best one, so a passing mention doesn't pull in an unrelated section.
+        if len(windows) == _MAX_HITS or score < hits[0][0] / 2:
+            break
+        if any(a <= start < b for a, b in windows):
+            continue
+        heads = [m.start() for m in _STANDARDS_HEADING.finditer(text, max(0, start - _LOOK_BACK), start)]
+        begin = max(0, start - 1500)
+        if heads:
+            # Walk back through the run of headings nearest the hit (Term,
+            # Performance Standard, Content Standard sit close together), not
+            # to the first heading in range, which may be a section earlier.
+            # The curriculum guide repeats its headers on every page and puts
+            # PERFORMANCE STANDARD at the END of a table, so the walk stops at
+            # one of those: it belongs to the previous table, not this one.
+            begin = heads[-1]
+            for h in reversed(heads[:-1]):
+                if begin - h > 600 or text.startswith("PERFORMANCE", h):
+                    break
+                begin = h
+        windows.append((begin, min(len(text), start + _BLOCK_CHARS + _LOOK_AHEAD)))
+
+    out, used = [], 0
+    for a, b in sorted(windows):
+        if out and a <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], b))
+        else:
+            out.append((a, b))
+    parts = []
+    for a, b in out:
+        piece = text[a:b]
+        if used + len(piece) > budget:
+            piece = piece[: max(0, budget - used)]
+        if piece:
+            parts.append(piece)
+            used += len(piece)
+    return "\n[...]\n".join(parts)
+
+
+def guide_excerpt(text: str, context: dict, budget: int = GUIDE_BUDGET) -> str:
+    """The parts of a course guide that cover this lesson, within budget.
+
+    The guide is searched for the lesson's topic and only the sections that
+    teach it are sent (with the standards they sit under), rather than reading
+    the document from its first page. When the topic can't be found, the old
+    fallback applies: the whole guide if it fits, otherwise its opening plus the
+    passages that mention the topic and subject most."""
     text = (text or "").strip()
+    # PDF extraction of the DepEd Budget of Work files puts every word on its
+    # own line, which wastes most of the budget on line breaks and leaves the
+    # line-based blocks below meaningless.
+    lines = [l for l in text.split("\n") if l.strip()]
+    if lines and sum(len(l) for l in lines) / len(lines) < 20:
+        text = grounding.tidy_guide(text)
+    topic_terms = _focus_terms(context.get("topic"))
+    if topic_terms:
+        found = _topic_sections(text, topic_terms, budget)
+        if found:
+            return found
     if len(text) <= budget:
         return text
     focus = " ".join(str(context.get(k) or "") for k in ("topic", "subject", "grade_level", "program"))
@@ -184,6 +282,20 @@ def _field_directive(field):
     model detail where a general category is what's wanted."""
     haystack = f"{field.field_key or ''} {field.label or ''}".lower()
 
+    if grounding.is_verbatim_field(field):
+        return (
+            " Copy the matching statement(s) from the course guide / budget of work above "
+            "WORD FOR WORD: exact wording, no paraphrasing, shortening, merging or added "
+            "words, one statement per line. The length limits do not apply to this field. "
+            "Lines not found in the guide are removed."
+        )
+    if grounding.is_reference_field(field):
+        return (
+            " Only real, publicly accessible sources, each in APA 7th format ending with its "
+            "full working URL: Author. (Year). Title. Publisher. https://... Put the course "
+            "guide citation given above first. Never invent a URL; every link is checked and "
+            "lines whose link doesn't open are removed."
+        )
     if "value" in haystack:
         return (
             " Each item must be a single word only (e.g. 'Patience', 'Accuracy') — "
@@ -229,7 +341,7 @@ def _context_block(context: dict):
     return ", ".join(f"{k}: {v}" for k, v in context.items() if v)
 
 
-def _lesson_block(context: dict, guide_text: str) -> str:
+def _lesson_block(context: dict, guide_text: str, citation: str = "") -> str:
     """The part of every generation and chat request that stays the same for a
     lesson, sent first so it can be served from the provider's prompt cache."""
     block = f"Lesson details: {_context_block(context)}\n"
@@ -238,11 +350,14 @@ def _lesson_block(context: dict, guide_text: str) -> str:
 Base the content on this course guide (follow its scope, sequence, and terminology closely).
 Every field that references material, examples, or activities must be traceable back to
 something in this guide — do not introduce topics, terms, or activities that aren't
-supported by it:
+supported by it. Content standards, performance standards, learning competencies and
+objectives are copied from it word for word, never reworded:
 ---
 {guide_text}
 ---
 """
+    if citation:
+        block += f"\nAPA citation of this course guide (use it first in References):\n{citation}\n"
     return block
 
 
@@ -395,19 +510,37 @@ Return strict JSON: {{"fields": [...]}} where each item is:
 # Writing a lesson plan (Building Proficiency)
 # ---------------------------------------------------------------------------
 
-def _trim(values, fields):
+def _is_exact(field):
+    return grounding.is_verbatim_field(field) or grounding.is_reference_field(field)
+
+
+def _trim(values, fields, guide_text="", citation=""):
     """Every value the model returns goes through here before it leaves this
-    module, so the length ceilings hold regardless of which call produced it."""
-    return ai_limits.enforce_limits(
-        values, fields,
+    module, so the length ceilings hold regardless of which call produced it.
+
+    Curriculum statements and APA references are exempt from the word ceilings
+    (a DepEd competency is often longer than 15 words, and clipping it is
+    exactly the rewording that must not happen); instead they are snapped to
+    the guide's own wording and held to links that open."""
+    plain = [f for f in fields if not _is_exact(f)]
+    exact = [f for f in fields if _is_exact(f)]
+    out = ai_limits.enforce_limits(
+        values, plain,
         max_items=_MAX_LIST_ITEMS,
         max_item_words=_MAX_ITEM_WORDS,
         max_sentences=_MAX_PROSE_SENTENCES,
         max_prose_words=_MAX_PROSE_WORDS,
     )
+    if exact:
+        kept = ai_limits.enforce_limits(
+            values, exact, max_items=10, max_item_words=120, max_sentences=12, max_prose_words=400,
+        )
+        kept = grounding.snap_to_guide(kept, exact, guide_text)
+        out.update(grounding.keep_working_links(kept, exact, citation))
+    return out
 
 
-def _fill_gaps(lesson: str, fields, all_values: dict, label: str) -> dict:
+def _fill_gaps(lesson: str, fields, all_values: dict, label: str, guide_text="", citation="") -> dict:
     """One more attempt at the fields that came back blank or as a placeholder.
 
     A model asked for twelve fields at once will occasionally skip one or answer
@@ -428,7 +561,8 @@ strict JSON with field_key as keys and nothing else:
 {_schema_block(gap_fields)}
 """
     try:
-        recovered = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], f"{label} (filling gaps)"), gap_fields)
+        recovered = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], f"{label} (filling gaps)"), gap_fields,
+                          guide_text, citation)
     except Exception:
         # The gap pass is best-effort: a failure here must not lose the fields
         # that were generated successfully.
@@ -454,17 +588,20 @@ def select_fields(fields, include_keys):
     return [f for f in fields if f.field_key in wanted]
 
 
-def generate_full(context: dict, fields, course_guide_text: str = "", include_keys=None) -> dict:
+def generate_full(context: dict, fields, course_guide_text: str = "", include_keys=None,
+                  course_guide_citation: str = "") -> dict:
     targets = select_fields(fields, include_keys)
     if not targets:
         return {}
-    lesson = _lesson_block(context, guide_excerpt(course_guide_text, context))
+    cite = course_guide_citation
+    lesson = _lesson_block(context, guide_excerpt(course_guide_text, context), cite)
     task = f"""
 Fill ONLY the following fields and return strict JSON with field_key as keys:
 {_schema_block(targets)}
 """
-    values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency"), targets)
-    values.update(_fill_gaps(lesson, targets, values, "Building Proficiency"))
+    values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency"), targets,
+                   course_guide_text, cite)
+    values.update(_fill_gaps(lesson, targets, values, "Building Proficiency", course_guide_text, cite))
     return values
 
 
@@ -475,7 +612,8 @@ def _chunk_label(chunk):
     return chunk[0].label if len(chunk) == 1 else f"{chunk[0].label} – {chunk[-1].label}"
 
 
-def generate_full_streaming(context: dict, fields, course_guide_text: str = "", include_keys=None):
+def generate_full_streaming(context: dict, fields, course_guide_text: str = "", include_keys=None,
+                            course_guide_citation: str = ""):
     """Fields have no meaningful grouping anymore (section_group isn't
     collected — see the format builder), so this batches them in fixed-size
     groups by document order instead: enough fields per AI call to stay fast
@@ -490,7 +628,8 @@ def generate_full_streaming(context: dict, fields, course_guide_text: str = "", 
         return
     chunks = [fields[i:i + _STREAM_CHUNK_SIZE] for i in range(0, len(fields), _STREAM_CHUNK_SIZE)]
     # Built once per plan: every chunk shares this exact prefix.
-    lesson = _lesson_block(context, guide_excerpt(course_guide_text, context))
+    cite = course_guide_citation
+    lesson = _lesson_block(context, guide_excerpt(course_guide_text, context), cite)
 
     all_values = {}
     for i, chunk in enumerate(chunks, start=1):
@@ -506,7 +645,7 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
 """
         values = _trim(
             _call(_SYSTEM_INSTRUCTION, [lesson, task], f"Building Proficiency {i}/{len(chunks)}"),
-            chunk,
+            chunk, course_guide_text, cite,
         )
         all_values.update(values)
         yield {"type": "section_done", "section": name, "index": i, "total": len(chunks), "values": values}
@@ -517,7 +656,7 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
     gaps = ai_limits.missing_keys(all_values, fields)
     if gaps:
         yield {"type": "filling_gaps", "count": len(gaps)}
-        recovered = _fill_gaps(lesson, fields, all_values, "Building Proficiency")
+        recovered = _fill_gaps(lesson, fields, all_values, "Building Proficiency", course_guide_text, cite)
         if recovered:
             all_values.update(recovered)
             yield {"type": "section_done", "section": "Filled-in gaps",
@@ -545,10 +684,10 @@ _MAX_CHOICES = 4
 
 
 def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
-             history: list, message: str) -> dict:
+             history: list, message: str, course_guide_citation: str = "") -> dict:
     """One turn of the Guided mode chat about `field`. Returns
     {"reply": str, "choices": [{"type": "use"|"ask", "label": str, "text": str}]}."""
-    lesson = _lesson_block(context, guide_excerpt(course_guide_text, context))
+    lesson = _lesson_block(context, guide_excerpt(course_guide_text, context), course_guide_citation)
     written = {k: v for k, v in (prior_values or {}).items() if v and k != field.field_key}
     current = (prior_values or {}).get(field.field_key) or ""
     names = getattr(field, "parts_list", None) or []
@@ -573,7 +712,26 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
 {f"Conversation so far:{chr(10)}{turns}{chr(10)}" if turns else ""}Teacher: {message}
 """
     data = _call(_OWL_SYSTEM_INSTRUCTION, [lesson, task], "Owl chat")
-    return _clean_owl_reply(data)
+    return _ground_choices(_clean_owl_reply(data), field, course_guide_text, course_guide_citation)
+
+
+def _ground_choices(answer, field, guide_text, citation):
+    """The owl's insertable choices held to the same rules as generation: a
+    curriculum field only gets the guide's own statements, a references field
+    only links that open. A choice with nothing left after that is dropped."""
+    if not _is_exact(field):
+        return answer
+    choices = []
+    key = field.field_key
+    for c in answer["choices"]:
+        if c["type"] == "use":
+            text = grounding.snap_to_guide({key: c["text"]}, [field], guide_text)[key]
+            text = grounding.keep_working_links({key: text}, [field], citation)[key]
+            if not text.strip():
+                continue
+            c = {**c, "text": text}
+        choices.append(c)
+    return {**answer, "choices": choices}
 
 
 def _clean_owl_reply(data) -> dict:

@@ -7,7 +7,10 @@ try:
 except ImportError:
     PdfReader = None
 
-MAX_CHARS = 20000
+# Was 20,000, which kept about a tenth of the 184-page MATATAG curriculum guide
+# and so most of its standards and competencies never reached the AI. Now just
+# a guard against a pathological file; the column is MEDIUMTEXT on MySQL.
+MAX_CHARS = 1_000_000
 
 def extract_text(file_path: str) -> str:
     ext = os.path.splitext(file_path)[1].lower()
