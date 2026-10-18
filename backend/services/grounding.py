@@ -230,7 +230,27 @@ def link_works(url: str) -> bool:
     return False
 
 
+# APA 7 for a web source: Author. (Year[, Month Day]). Title. Site. URL
+# The author may be a person ("Cruz, J. A.") or an organization; "n.d." when
+# undated. Only one URL, at the end, with no full stop after it.
+_APA = re.compile(
+    r"^[^()]{2,}?\.?\s\((?:(?:19|20)\d{2}[a-z]?(?:,\s[A-Z][a-z]+(?:\s\d{1,2})?)?|n\.d\.)\)\.\s"
+    r"[^\s].{2,}?\.\s(?:[^\s].*?\.\s)?https?://\S+$"
+)
+_APA6_LEFTOVER = re.compile(r"\s*(?:Retrieved from|Available (?:at|from):?)\s+(?=https?://)", re.I)
+
+
+def to_apa(line: str) -> str:
+    """The line as an APA 7 reference, or "" when it isn't one. Fixes only
+    the mechanical slips (APA 6's "Retrieved from", a full stop after the URL,
+    stray spaces); anything missing an author, year or title is not guessed at."""
+    line = _APA6_LEFTOVER.sub(" ", re.sub(r"\s+", " ", line or "").strip())
+    line = re.sub(r"(https?://\S+?)[.,;]+$", r"\1", line)
+    return line if _APA.match(line) else ""
+
+
 def _check_lines(lines, citation):
+    lines = [to_apa(line) for line in lines]
     urls = {u.rstrip(".,;") for line in lines for u in _URL.findall(line)}
     with ThreadPoolExecutor(max_workers=8) as pool:
         ok = dict(zip(urls, pool.map(link_works, urls)))
@@ -247,9 +267,10 @@ def _check_lines(lines, citation):
 
 
 def keep_working_links(values: dict, fields, citation: str = "") -> dict:
-    """Reference fields reduced to lines whose links open, led by the course
-    guide's own citation. A line without a link is dropped: it can't be
-    checked, and a reference that can't be followed is what this replaces."""
+    """Reference fields reduced to APA 7 lines whose links open, led by the
+    course guide's own citation. A line without a link is dropped: it can't be
+    checked, and a reference that can't be followed is what this replaces. So
+    is a line that isn't in APA form (no author, year or title)."""
     out = dict(values)
     for f in fields:
         if f.field_key not in out or not is_reference_field(f):

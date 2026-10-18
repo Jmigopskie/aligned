@@ -928,8 +928,12 @@ const OwlGuide = {
       // sits on top of whatever is beneath him — often the page's primary
       // button, since he rests in the bottom-right corner. If this turned out
       // to be a click rather than a drag, pass it on to whatever the pointer
-      // was really over, so he never silently eats one.
-      if (!dragged) this._passClickThrough(e);
+      // was really over, so he never silently eats one. Docked in Guided
+      // mode he is the chat's open/close control instead, so the click is his.
+      if (!dragged) {
+        if (this._docked && this._dockedClick) this._dockedClick();
+        else this._passClickThrough(e);
+      }
       try {
         if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
       } catch (err) {
@@ -950,6 +954,11 @@ const OwlGuide = {
       };
       if (e.key === "Escape") {
         this.hide();
+        return;
+      }
+      if (this._docked && this._dockedClick && (e.key === "Enter" || e.key === " ")) {
+        e.preventDefault();
+        this._dockedClick();
         return;
       }
       if (!moves[e.key]) return;
@@ -1086,27 +1095,44 @@ const OwlGuide = {
     this._leaveTimer = null;
   },
 
-  // Guided mode: the owl stays on screen next to the chat (which has its own
-  // Open and Hide button) instead of leaving after five seconds. He is still
-  // only a companion: dragging moves him and the chat follows, but clicking
-  // him does nothing to the chat.
-  dock() {
+  // Guided mode: the owl stays on screen next to the chat instead of leaving
+  // after five seconds, and he is how the chat opens: minimized, the chat is
+  // gone and only he is left, and clicking him (or Enter/Space when he has
+  // focus) calls onClick. Dragging still just moves him; the chat follows.
+  dock(onClick) {
     const el = this._el || this._build();
     this._cancelLeave();
     el.classList.remove("is-leaving");
     el.hidden = false;
+    this._dockedClick = onClick || null;
     if (this._docked) return;
     this._docked = true;
     el.classList.add("is-docked");
+    el.setAttribute("role", "button");
+    el.setAttribute("aria-label", "Chat with Alan");
     this._bubble().hidden = true;
     this._pause();
     this._moveTo(this._pos.x, this._pos.y);
   },
 
+  // What the docked owl announces: whether the chat he opens is open, and
+  // whether a reply is waiting in it.
+  setChatState({ open, unread }) {
+    const el = this._el;
+    if (!el || !this._docked) return;
+    el.setAttribute("aria-expanded", String(!!open));
+    el.classList.toggle("has-unread", !!unread);
+    el.setAttribute("aria-label", unread ? "Chat with Alan, new reply" : "Chat with Alan");
+  },
+
   undock() {
     if (!this._docked) return;
     this._docked = false;
-    this._el.classList.remove("is-docked");
+    this._dockedClick = null;
+    this._el.classList.remove("is-docked", "has-unread");
+    this._el.setAttribute("role", "group");
+    this._el.setAttribute("aria-label", "Guide");
+    this._el.removeAttribute("aria-expanded");
     this._bubble().hidden = false;
     this.hide();
   },

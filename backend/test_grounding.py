@@ -82,6 +82,17 @@ assert kept["refs"].split("\n") == [
     cite, "Cisco. (2020). Networking basics. Cisco Networking Academy. https://good.example.org/networking",
 ], kept["refs"]
 assert kept["proc"] == "x"
+
+# APA 7 only: mechanical slips are fixed, a line missing author/year/title goes.
+assert grounding.to_apa("Smith, J. (2020). Networking basics. Retrieved from https://good.example.org/net.") == \
+    "Smith, J. (2020). Networking basics. https://good.example.org/net"
+assert grounding.to_apa("Department of Education. (n.d.). K to 12 curriculum guide. https://good.example.org/k12")
+assert grounding.to_apa("Cruz, J. A. (2023, March 5). Emerging trends in ICT. Rappler. https://good.example.org/x")
+for not_apa in ("Networking basics https://good.example.org/net", "https://good.example.org/net",
+                "Some Textbook (2019). Learning ICT."):
+    assert grounding.to_apa(not_apa) == "", not_apa
+kept = grounding.keep_working_links({"refs": "Networking basics https://good.example.org/net"}, [refs], cite)
+assert kept["refs"] == cite, "a working link that isn't an APA reference is still dropped"
 assert grounding.keep_working_links({"refs": ["https://dead.example.org"]}, [refs], cite)["refs"] == [cite]
 
 # The curriculum guide: its numbered competency is copied without the number,

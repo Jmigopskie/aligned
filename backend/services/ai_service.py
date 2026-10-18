@@ -291,10 +291,11 @@ def _field_directive(field):
         )
     if grounding.is_reference_field(field):
         return (
-            " Only real, publicly accessible sources, each in APA 7th format ending with its "
-            "full working URL: Author. (Year). Title. Publisher. https://... Put the course "
-            "guide citation given above first. Never invent a URL; every link is checked and "
-            "lines whose link doesn't open are removed."
+            " The sources this plan's content is drawn from: real, publicly accessible pages, "
+            "one per line, each in APA 7th format exactly: Author. (Year). Title. Site Name. "
+            "https://full-url (use n.d. when undated; no full stop after the URL). Put the "
+            "course guide citation given above first. Never invent a URL or a source; every "
+            "line is checked and any that isn't APA or whose link doesn't open is removed."
         )
     if "value" in haystack:
         return (
@@ -347,10 +348,12 @@ def _lesson_block(context: dict, guide_text: str, citation: str = "") -> str:
     block = f"Lesson details: {_context_block(context)}\n"
     if guide_text:
         block += f"""
-Base the content on this course guide (follow its scope, sequence, and terminology closely).
-Every field that references material, examples, or activities must be traceable back to
-something in this guide — do not introduce topics, terms, or activities that aren't
-supported by it. Content standards, performance standards, learning competencies and
+This is the section of the course guide that covers the lesson's topic. EVERY field must be
+grounded in it or in a source listed under References: the lesson content, examples,
+activities, questions, assessment and materials all come from this section's competencies,
+suggested activities and performance tasks (or from a listed reference), using its terms.
+Do not add facts, topics, activities or examples that neither the guide nor a listed
+reference supports. Content standards, performance standards, learning competencies and
 objectives are copied from it word for word, never reworded:
 ---
 {guide_text}

@@ -4026,23 +4026,9 @@ body.auth-page::after {
   overflow: hidden;
 }
 
-/* Collapsed: just the header bar, with its Open button, sitting beside the
-   owl. A compact width, since it only has to carry its title. */
+/* Minimized: the chat is gone entirely and only Alan is left on screen.
+   Clicking him brings it back (see OwlGuide.dock). */
 .owl-chat.is-collapsed {
-  height: auto;
-  width: min(300px, var(--chat-room, calc(100vw - 32px)));
-}
-
-.owl-chat.is-collapsed .owl-chat-head {
-  padding: 8px 10px 8px 8px;
-}
-
-.owl-chat.is-collapsed .owl-chat-avatar {
-  width: 32px;
-  height: 32px;
-}
-
-.owl-chat.is-collapsed #owl-chat-history-btn {
   display: none;
 }
 
@@ -4072,18 +4058,6 @@ body.auth-page::after {
   position: relative;
 }
 
-.owl-chat-toggle.has-unread::after {
-  content: "";
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 2px solid var(--primary);
-}
-
 body.owl-chat-shown .dash-main {
   padding-bottom: 140px;
 }
@@ -4101,6 +4075,31 @@ body.owl-chat-shown .dash-main {
 
 .owl-guide.is-docked .owl-guide-img {
   width: 96px;
+  cursor: pointer;
+}
+
+/* Docked, Alan is the chat's open/close control, so he takes focus like one. */
+.owl-guide.is-docked:focus-visible {
+  outline: none;
+}
+
+.owl-guide.is-docked:focus-visible .owl-guide-figure {
+  outline: 3px solid var(--primary);
+  outline-offset: 4px;
+  border-radius: 50%;
+}
+
+/* A reply that arrived while the chat was minimized. */
+.owl-guide.has-unread .owl-guide-figure::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #FFFFFF;
 }
 
 @media (max-width: 640px) {
@@ -4152,10 +4151,6 @@ body.owl-chat-shown .dash-main {
 
 .owl-chat.is-resizing {
   user-select: none;
-}
-
-.owl-chat.is-collapsed .owl-chat-resizer {
-  display: none;
 }
 
 .owl-chat-head {
@@ -4211,14 +4206,6 @@ body.owl-chat-shown .dash-main {
   flex-shrink: 0;
 }
 
-/* Open is the collapsed bar's one action, so it reads as a button. */
-.owl-chat.is-collapsed .owl-chat-toggle {
-  background: #FFFFFF;
-  color: var(--primary);
-  border-color: #FFFFFF;
-  padding: 4px 16px;
-}
-
 .owl-chat-toggle:hover { background: rgba(255, 255, 255, 0.14); }
 
 .owl-chat-body {
@@ -4228,8 +4215,6 @@ body.owl-chat-shown .dash-main {
   flex: 1;
 }
 
-.owl-chat.is-collapsed .owl-chat-body { display: none; }
-.owl-chat.is-collapsed .owl-chat-head { cursor: pointer; }
 
 .owl-chat-log {
   flex: 1;
@@ -6044,6 +6029,9 @@ body.owl-chat-shown .dash-main {
 .owl-guide.is-peeking .owl-guide-figure { transform: translate(12%, 34%) scale(0.5); transform-origin: bottom right; }
 .owl-guide.is-peeking .owl-guide-figure,
 .owl-guide.is-peeking .owl-guide-figure * { pointer-events: none; }
+/* Docked in Guided mode he is how the chat opens, so even shrunk into his
+   corner beside the action row he stays clickable. */
+.owl-guide.is-docked.is-peeking .owl-guide-img { pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) {
   .owl-guide .owl-guide-figure, .owl-guide .owl-guide-bubble { transition: none; }
 }

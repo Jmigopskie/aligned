@@ -474,7 +474,7 @@ function updateChatRoom() {
 }
 
 // Collapsed means the panel is gone and only the owl is left, as the button
-// that brings it back. Guided mode always starts that way; the teacher's
+// that brings it back (clicking him toggles the chat; see OwlGuide.dock). Guided mode always starts that way; the teacher's
 // choice after that lasts for the tab (sessionStorage), so a reload or a
 // trip to the Setup tab keeps it but tomorrow starts minimized again.
 const CHAT_OPEN_KEY = "owlChatOpen";
@@ -487,21 +487,20 @@ function chatWasOpen() {
   }
 }
 
-// Collapsed, the chat shrinks to its header bar with an Open button; open, the
-// same button reads Hide. A reply that arrives while collapsed puts a dot on
-// that button.
+// Minimized, nothing of the chat is left on screen but Alan, so a reply that
+// arrives meanwhile puts its dot on him.
+let chatUnread = false;
+
 function setChatUnread(unread) {
-  owlChatToggle.classList.toggle("has-unread", !!unread);
-  // The button's own text names it; only a waiting reply needs saying.
-  if (unread) owlChatToggle.setAttribute("aria-label", "Open, new reply");
-  else owlChatToggle.removeAttribute("aria-label");
+  chatUnread = !!unread;
+  OwlGuide.setChatState({ open: !owlChat.classList.contains("is-collapsed"), unread: chatUnread });
 }
 
 function setOwlChatCollapsed(collapsed, { remember = true } = {}) {
   owlChat.classList.toggle("is-collapsed", collapsed);
   owlChatToggle.setAttribute("aria-expanded", String(!collapsed));
   owlChatToggle.textContent = collapsed ? "Open" : "Hide";
-  if (!collapsed) setChatUnread(false);
+  setChatUnread(collapsed && chatUnread);
   if (remember) {
     try {
       sessionStorage.setItem(CHAT_OPEN_KEY, collapsed ? "0" : "1");
@@ -723,7 +722,7 @@ function showOwlChat(visible) {
   if (visible) {
     // The owl stays through Guided mode beside the chat, rather than stepping
     // aside for a panel that then covered his corner.
-    OwlGuide.dock();
+    OwlGuide.dock(toggleOwlChat);
     if (opening) setOwlChatCollapsed(!chatWasOpen(), { remember: false });
     showChatHistory(false);
     introduceFieldInChat();
@@ -740,10 +739,6 @@ owlChatForm.addEventListener("submit", (e) => {
 owlChatToggle.addEventListener("click", (e) => {
   e.stopPropagation();
   toggleOwlChat();
-});
-// The collapsed bar is one big target: a click anywhere on it opens the chat.
-owlChat.querySelector(".owl-chat-head").addEventListener("click", (e) => {
-  if (owlChat.classList.contains("is-collapsed") && !e.target.closest("button")) setOwlChatCollapsed(false);
 });
 
 function setOwlState(state, message) {
