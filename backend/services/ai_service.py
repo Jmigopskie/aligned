@@ -34,18 +34,21 @@ if PROVIDER == "gemini" and not Config.GEMINI_API_KEY:
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 _gemini_client = None
 
-# Ceilings on what one field may contain. Stated in the prompt AND enforced on
-# the reply in _enforce_limits(), because asking a model for brevity is a
-# request, not a guarantee: the trim is what actually holds the line when it
-# writes four sentences anyway.
-_MAX_LIST_ITEMS = 5
-_MAX_ITEM_WORDS = 15
-_MAX_PROSE_SENTENCES = 3
-_MAX_PROSE_WORDS = 60
+# Ceilings on what one field may contain, stated in the prompt and enforced on
+# the reply. They are set to give a capable model room for complete,
+# classroom-ready content (timings, steps, concrete examples): the old 15-word
+# items and 3-sentence fields made a model like Mistral Large get chopped
+# mid-sentence. They are a guard against runaway answers now, not a style rule,
+# and the trim in ai_limits cuts at a sentence or clause when it has to cut.
+_MAX_LIST_ITEMS = 8
+_MAX_ITEM_WORDS = 40
+_MAX_PROSE_SENTENCES = 6
+_MAX_PROSE_WORDS = 140
 
 _SYSTEM_INSTRUCTION = (
     "You are helping a K-12 ICT/TLE teacher in the Philippines write a lesson plan. "
-    "Follow DepEd K-12 tone and terminology. Return concise, classroom-ready content.\n\n"
+    "Follow DepEd K-12 tone and terminology. Return complete, specific, classroom-ready "
+    "content a teacher can use as written.\n\n"
     "Grounding rules (follow strictly):\n"
     "- Every field must be grounded in the specific topic, subject, and any course guide "
     "text given below — never generic filler that could apply to any lesson.\n"
@@ -56,11 +59,13 @@ _SYSTEM_INSTRUCTION = (
     "- Never reuse the same stock activity across different lessons or sections; if a "
     "course guide or references are provided, pull concrete details (terms, examples, "
     "page/unit names) from them rather than inventing generic ones.\n\n"
-    "Length rules (follow strictly. A teacher is copying this into a form, not "
-    "reading an essay):\n"
-    f"- A list field: at most {_MAX_LIST_ITEMS} items, one per line, each a single "
-    f"line of at most {_MAX_ITEM_WORDS} words. No item may be a paragraph.\n"
-    f"- A prose field: at most {_MAX_PROSE_SENTENCES} sentences.\n"
+    "Length: use the room you need to make each field complete and specific (steps, "
+    "timings, materials, concrete examples, what learners do and produce), but no padding "
+    "and no repetition of other fields:\n"
+    f"- A list field: up to {_MAX_LIST_ITEMS} items, one per line, each one complete "
+    f"sentence or phrase of up to about {_MAX_ITEM_WORDS} words. Always finish the "
+    "sentence; never stop mid-thought.\n"
+    f"- A prose field: up to {_MAX_PROSE_SENTENCES} complete sentences.\n"
     "- Never restate the field's own label, never open with filler such as 'In this "
     "lesson' or 'The teacher will', and never explain your reasoning or comment on "
     "the plan. Write the content only: no preamble, no closing sentence, no "
@@ -102,7 +107,7 @@ _OWL_SYSTEM_INSTRUCTION = (
     "- A \"use\" choice is finished content for the current field that the teacher can "
     "insert as is: classroom-ready, in DepEd K-12 terminology, grounded in the lesson's "
     "topic, subject and course guide. Fit the field: one line for a short text field; for "
-    "a list, one item per line and at most 5 items. Its label names the option in at most "
+    f"a list, one item per line and at most {_MAX_LIST_ITEMS} complete items. Its label names the option in at most "
     "6 words.\n"
     "- An \"ask\" choice is a follow-up question the teacher may want to ask next, at most "
     "8 words; its label and text are that question.\n"
