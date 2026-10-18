@@ -108,8 +108,12 @@ _SYSTEM_INSTRUCTION = (
     "several parts or items puts EACH ON ITS OWN LINE, so the app can show it as a "
     "bulleted list instead of one dense paragraph: the pre-lesson's routine and review "
     "steps, each part of the flow, materials and resources, assessment questions or "
-    "tasks, extended-learning tasks, reflection questions, values, objectives. A line may "
-    "start with its own short label ('Prayer:', 'Guided Practice (10 min):'). Only a "
+    "tasks, extended-learning tasks, reflection questions, values, objectives. ONE thing "
+    "per line: never join separate steps, items, materials or routines in one line with "
+    "commas, semicolons or 'and' (write 'Prayer', 'Greetings', 'Attendance check' as three "
+    "lines, not 'Prayer, greetings, and attendance check'). Commas belong only inside a "
+    "real sentence. A line may start with its own short label ('Review:', 'Guided "
+    "Practice (10 min):'). Only a "
     "single idea (a standard, a competency, learner context, a generalization) stays one "
     "sentence or short paragraph. Do not number items or add bullet characters yourself "
     "(the app adds bullets), except that a step-by-step procedure may number its steps "
@@ -342,6 +346,13 @@ def _field_directive(field):
     model detail where a general category is what's wanted."""
     haystack = f"{field.field_key or ''} {field.label or ''}".lower()
 
+    if "pre-lesson" in haystack or "pre lesson" in haystack:
+        return (
+            " One short line per step, each its own bullet, never several steps in one line: "
+            "e.g. 'Prayer (1 min)', 'Greetings (1 min)', 'Attendance check (1 min)', 'Wellness "
+            "check (1 min): ...', 'Review (3 min): ...' with the question or task. About 5 "
+            "minutes in total, counted toward the session."
+        )
     # DO 016 s.2026: learner context is the teacher's own observation and
     # reflections are written after teaching. A model can't observe either, so
     # it drafts something the teacher confirms instead of inventing outcomes.
