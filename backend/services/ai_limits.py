@@ -165,7 +165,16 @@ def clean_value(value, field_type: str = "text", *, max_items: int, max_item_wor
         # stripped to bare lines the page would then bullet. Anything else stays
         # unmarked and the page applies its own bullets.
         if numbered:
-            return "\n".join(f"{i}. {item}" for i, item in enumerate(items, start=1))
+            # A lead-in line ("At the end of the lesson, the learners are
+            # expected to:") introduces the list; it is not item 1.
+            out, n = [], 0
+            for item in items:
+                if item.rstrip().endswith(":"):
+                    out.append(item)
+                else:
+                    n += 1
+                    out.append(f"{n}. {item}")
+            return "\n".join(out)
         return "\n".join(items)
 
     # Prose: cap the sentence count first, then the overall word count, so a

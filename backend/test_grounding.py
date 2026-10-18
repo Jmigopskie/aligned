@@ -113,11 +113,21 @@ got = grounding.keep_given_logistics(
     [school, date, grade_section, allot, competency], ctx)
 assert got == {"school": "", "date": "", "gs": "Grade 7 - Campos", "ta": "60 minutes", "lc": COMPETENCY}, got
 
-# Objectives are unpacked from the competency (DO 016), not copied: a line the
-# guide doesn't contain is kept, one that matches a guide statement is snapped.
-obj_out = grounding.snap_to_guide({"obj2": "Identify three qualities of ICT entrepreneurs\nDiscuss the emerging trends and issues"},
-                                  [F(field_key="obj2", label="Learning Objectives")], GUIDE)["obj2"]
-assert obj_out.split("\n") == ["Identify three qualities of ICT entrepreneurs", COMPETENCY], obj_out
+# Objectives are unpacked from the competency (DO 016), never snapped: matching
+# them once swapped an objective for a look-alike Budget of Work activity line.
+objs = "At the end of the lesson, the learners are expected to:\n1. identify traits of successful ICT entrepreneurs\n2. explain one trait"
+assert grounding.snap_to_guide({"o": objs}, [F(field_key="o", label="Learning Objectives")], GUIDE)["o"] == objs
+# In a combined field only the competency line is held to the guide's wording.
+combined = "Discuss the emerging trends and issues\n1. list two trends\n2. explain one issue\n3. value safe use"
+got = grounding.snap_to_guide({"c": combined}, [F(field_key="c", label="Learning Competencies / Objectives")], GUIDE)["c"]
+assert got.split("\n") == [COMPETENCY, "1. list two trends", "2. explain one issue", "3. value safe use"], got
+
+# A numbered list's lead-in line is not numbered as item 1.
+from services import ai_limits as _lim  # noqa: E402
+num = _lim.clean_value("At the end of the lesson, the learners are expected to:\n1. identify\n2. explain\n3. value",
+                       "list", max_items=8, max_item_words=40, max_sentences=6, max_prose_words=140)
+assert num.split("\n") == ["At the end of the lesson, the learners are expected to:", "1. identify", "2. explain",
+                           "3. value"], num
 
 # Completeness, checked after every batch: every weekly day filled, and at
 # least three objectives (four lines when the field also holds the competency).

@@ -190,6 +190,19 @@ def snap_text(value: str, guide_text: str, strict: bool = True) -> str:
     return "\n".join(out)
 
 
+def _snap_competency_line(value, guide_text: str) -> str:
+    """The first content line (the competency) in the guide's exact wording;
+    the objectives after it untouched."""
+    lines = str(value or "").split("\n")
+    for i, line in enumerate(lines):
+        if line.strip() and not _OBJECTIVE_STEM.match(line.strip()):
+            snapped = snap_text(line, guide_text)
+            if snapped:
+                lines[i] = snapped
+            break
+    return "\n".join(lines)
+
+
 def snap_to_guide(values: dict, fields, guide_text: str) -> dict:
     """Every curriculum field in `values` replaced with verbatim guide text.
     Without a guide there is nothing to copy from, so values pass through."""
@@ -200,13 +213,19 @@ def snap_to_guide(values: dict, fields, guide_text: str) -> dict:
         if f.field_key not in out or not is_verbatim_field(f):
             continue
         value = out[f.field_key]
-        # Objectives (alone or combined with the competency) are unpacked by
-        # the teacher, so only lines that match a guide statement are snapped.
-        strict = not re.search(r"objective", _haystack(f), re.I)
-        if isinstance(value, list):
-            out[f.field_key] = [snap_text(v, guide_text, strict) for v in value]
+        # Objectives are unpacked from the competency (DO 016), so they are
+        # never snapped: matching them to the guide once replaced a measurable
+        # objective with a look-alike activity line from the Budget of Work. In
+        # a combined "Competencies / Objectives" field only the first line, the
+        # competency itself, is held to the guide's wording.
+        if re.search(r"objective", _haystack(f), re.I):
+            snap = _snap_competency_line if re.search(r"competenc", _haystack(f), re.I) else (lambda v, g: v)
         else:
-            out[f.field_key] = snap_text(value, guide_text, strict)
+            snap = snap_text
+        if isinstance(value, list):
+            out[f.field_key] = [snap(v, guide_text) for v in value]
+        else:
+            out[f.field_key] = snap(value, guide_text)
     return out
 
 
