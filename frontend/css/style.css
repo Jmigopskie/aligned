@@ -1621,26 +1621,58 @@ body.auth-page::after {
   margin: 0;
 }
 
+/* The two document pickers, one after the other, each with its own name. */
+.guide-pickers {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.guide-picker-title {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.guide-picker-hint {
+  margin: 0 0 12px;
+}
+
+/* A long result list scrolls inside its picker instead of pushing the next
+   picker down the page. */
 .cg-results {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 292px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 
 .cg-results:not(:empty) {
   margin-top: 14px;
 }
 
+/* Each result is a real button: full width, left-aligned, in the page's own
+   type rather than the browser's button font. */
 .cg-result-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
+  flex-shrink: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
   cursor: pointer;
   background: var(--surface);
+  font: inherit;
+  color: inherit;
+  text-align: left;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
@@ -1648,20 +1680,57 @@ body.auth-page::after {
   border-color: var(--primary);
 }
 
+.cg-result-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* The document in use: tinted, outlined in the brand green, and labelled
+   with a check, so it reads as chosen at a glance in a list of near-identical
+   titles. */
 .cg-result-card.selected {
   border-color: var(--primary);
-  background: var(--bg);
+  background: var(--primary-tint);
+  box-shadow: inset 0 0 0 1px var(--primary);
 }
 
 .cg-result-card .cg-title {
+  display: block;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-heading);
 }
 
 .cg-result-card .cg-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
   font-size: 12px;
   color: var(--text-body);
+}
+
+.cg-result-card .cg-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: var(--text-body);
+}
+
+.cg-result-card.selected .cg-pick {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.cg-result-card .cg-pick svg {
+  width: 15px;
+  height: 15px;
+}
+
+.cg-selected {
+  margin-top: 12px;
 }
 
 .cg-selected-chip {
@@ -4003,52 +4072,61 @@ body.auth-page::after {
   --owl-chat-w: 460px;
 }
 
-/* Placed beside the docked owl by placeChat() in generator.js, which sets
-   --chat-right / --chat-bottom from where he actually is. The owl stacks
-   above it (56 vs 55) so the two can never swap, and both float above the
-   sticky top bar (50) but under modals and toasts (100). */
+/* The document and the open chat share one row: the chat is a column beside
+   the plan, never a panel over it. The document side takes what is left and
+   its Fit zoom follows (doc-toolbar.js watches the panel's size). */
+/* Wraps rather than squeezing: when the panel can't hold both, the chat
+   drops under the plan. Decided by the panel's own width (a container query
+   below), not the window's, since the sidebar takes a share of the window. */
+.doc-chat-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 20px;
+  container-type: inline-size;
+}
+
+.doc-chat-main {
+  flex: 1 1 480px;
+  min-width: 0;
+}
+
+/* Sticky, so it stays beside whatever part of the plan is on screen, and
+   never taller than the space under the sticky top bar, which would
+   otherwise cover the chat's header and its Hide button. */
 .owl-chat {
-  position: fixed;
-  right: var(--chat-right, 24px);
-  bottom: var(--chat-bottom, 20px);
-  z-index: 55;
+  position: sticky;
+  top: calc(var(--topbar-h) + 16px);
+  flex: 0 0 var(--owl-chat-w);
   display: flex;
   flex-direction: column;
-  width: min(var(--owl-chat-w), var(--chat-room, calc(100vw - 32px)));
-  /* Never taller than the space under the sticky top bar, which would
-     otherwise cover the chat's header and its Hide button. */
-  max-height: min(760px, calc(100vh - var(--chat-bottom, 20px) - var(--topbar-h) - 24px));
-  height: min(760px, calc(100vh - var(--chat-bottom, 20px) - var(--topbar-h) - 24px));
+  width: var(--owl-chat-w);
+  height: min(760px, calc(100vh - var(--topbar-h) - 32px));
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
-  box-shadow: 0 18px 44px rgba(22, 35, 30, 0.18), 0 2px 6px rgba(22, 35, 30, 0.08);
+  box-shadow: 0 2px 6px rgba(22, 35, 30, 0.06);
   overflow: hidden;
+}
+
+/* Too narrow for the plan (480px at least) and the chat side by side: the
+   chat opens under the plan, full width. */
+@container (max-width: 900px) {
+  .owl-chat {
+    position: static;
+    flex: 1 1 100%;
+    width: 100%;
+    height: min(70vh, 640px);
+  }
+
+  .owl-chat-resizer {
+    display: none;
+  }
 }
 
 /* Minimized: the chat is gone entirely and only Alan is left on screen.
    Clicking him brings it back (see OwlGuide.dock). */
 .owl-chat.is-collapsed {
-  display: none;
-}
-
-/* No room beside the owl: a full-width sheet above him (or below, when he
-   sits in the top half of the screen). */
-.owl-chat.is-sheet {
-  left: 16px;
-  right: 16px;
-  width: auto;
-  height: auto;
-  max-height: min(70vh, calc(100vh - var(--chat-bottom, 20px) - var(--topbar-h) - 16px));
-}
-
-.owl-chat.is-sheet.is-below {
-  top: var(--chat-top, 80px);
-  bottom: auto;
-  max-height: min(70vh, calc(100vh - var(--chat-top, 80px) - 16px));
-}
-
-.owl-chat.is-sheet .owl-chat-resizer {
   display: none;
 }
 
@@ -4449,11 +4527,6 @@ body.owl-chat-shown .dash-main {
 
 @media (prefers-reduced-motion: reduce) {
   .owl-dots i { animation: none; opacity: 0.6; }
-}
-
-/* Room for the open chat and the docked owl beside it (96px + the gap). */
-@media (min-width: 1180px) {
-  body.owl-chat-open .dash-main { padding-right: calc(var(--owl-chat-w) + 30px + 108px); }
 }
 
 /* ---------------------------------------------------------------------------

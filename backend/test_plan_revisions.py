@@ -95,9 +95,13 @@ def main():
         client.patch(f"/api/lesson-plans/{plan_id}", json={"setup_context": {"pageSize": "a4"}})
         res = client.get(f"/api/lesson-plans/{plan_id}/export")
         assert res.status_code == 200, res.status_code
-        exported = Document(LessonPlan.query.get(plan_id).docx_path)
-        assert abs(exported.sections[0].page_width.mm - 210) < 0.1, exported.sections[0].page_width.mm
         res.close()
+        path = LessonPlan.query.get(plan_id).docx_path
+        try:
+            exported = Document(path)
+            assert abs(exported.sections[0].page_width.mm - 210) < 0.1, exported.sections[0].page_width.mm
+        finally:
+            os.remove(path)  # export writes into the real generated folder
 
     print("plan revisions + paper size OK")
 

@@ -136,11 +136,13 @@ const Api = {
     return apiFetch(`/api/course-guides?${query}`);
   },
   courseGuideFileUrl: (guideId) => `${API_URL}/api/course-guides/${guideId}/file`,
-  uploadCourseGuide: (file, subject, title) => {
+  // docType: "budget_of_work" or "curriculum_guide", the picker it came from.
+  uploadCourseGuide: (file, subject, title, docType) => {
     const form = new FormData();
     form.append("file", file);
     form.append("subject", subject || "");
     form.append("title", title || file.name);
+    if (docType) form.append("doc_type", docType);
     return apiFetch("/api/course-guides", { method: "POST", body: form });
   },
 

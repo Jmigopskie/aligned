@@ -8,6 +8,15 @@
         "value": "space grotesk",
         "createdAt": "2026-09-25T14:38:45.298Z",
         "reason": "user brief: the task prompt says to keep the Space Grotesk headings"
+      },
+      {
+        "rule": "pulsing-dot",
+        "value": "*",
+        "files": [
+          "frontend/generator.html"
+        ],
+        "createdAt": "2026-10-18T10:28:46.092Z",
+        "reason": "Claude triage: the only pulsing dot here is .owl-dots, Alan's typing indicator shown while a chat reply is actually pending (live state)"
       }
     ]
   }

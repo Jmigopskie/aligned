@@ -92,8 +92,14 @@ function inactiveModeHasWork() {
   return Object.values(values).some((v) => (Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim())));
 }
 
-let selectedCourseGuide = null;
-let cgTab = "search";
+// The two curriculum documents a plan is based on, picked separately: the
+// Budget of Work (week-by-week competencies) and the Curriculum Guide (the
+// standards above them). Either may be empty, not both.
+const selectedGuides = { budget_of_work: null, curriculum_guide: null };
+
+function hasGuide() {
+  return !!(selectedGuides.budget_of_work || selectedGuides.curriculum_guide);
+}
 let currentUser = null;
 
 // The format's real reference document, rendered with an empty editable slot
@@ -147,16 +153,6 @@ const collegeYearSelect = document.getElementById("ctx-college-year");
 const k12GradeWrap = document.getElementById("ctx-k12-grade-wrap");
 const k12GradeSelect = document.getElementById("ctx-k12-grade");
 const sectionInput = document.getElementById("ctx-section");
-const cgTabsEl = document.getElementById("cg-tabs");
-const cgTabSearch = document.getElementById("cg-tab-search");
-const cgTabUpload = document.getElementById("cg-tab-upload");
-const cgSearchBtn = document.getElementById("cg-search-btn");
-const cgSearchBtnLabel = document.getElementById("cg-search-btn-label");
-const cgResultsEl = document.getElementById("cg-results");
-const cgNoTopic = document.getElementById("cg-no-topic");
-const cgDropzone = document.getElementById("cg-dropzone");
-const cgFileInput = document.getElementById("cg-file-input");
-const cgSelectedEl = document.getElementById("cg-selected");
 const gateLock = document.getElementById("gate-lock");
 // The locked Generate tab's way out: the tab button does the real switching.
 document.getElementById("gate-setup-btn").addEventListener("click", () => {
@@ -467,25 +463,15 @@ function pickOwlChoice(choice, btn) {
 function updateChatRoom() {
   // On wide screens the page makes room for the open chat, so it never
   // covers the document the teacher is writing in.
-  document.body.classList.toggle("owl-chat-open", !owlChat.hidden && !owlChat.classList.contains("is-collapsed"));
   // Even collapsed, the bar and the owl float over the bottom of the page,
   // so the page gets room to scroll its last buttons clear of them.
   document.body.classList.toggle("owl-chat-shown", !owlChat.hidden);
 }
 
 // Collapsed means the panel is gone and only the owl is left, as the button
-// that brings it back (clicking him toggles the chat; see OwlGuide.dock). Guided mode always starts that way; the teacher's
-// choice after that lasts for the tab (sessionStorage), so a reload or a
-// trip to the Setup tab keeps it but tomorrow starts minimized again.
-const CHAT_OPEN_KEY = "owlChatOpen";
-
-function chatWasOpen() {
-  try {
-    return sessionStorage.getItem(CHAT_OPEN_KEY) === "1";
-  } catch (err) {
-    return false;
-  }
-}
+// that brings it back (clicking him toggles the chat; see OwlGuide.dock).
+// Guided mode always starts that way, every time: the chat only ever appears
+// because the teacher clicked him, never because it was open last time.
 
 // Minimized, nothing of the chat is left on screen but Alan, so a reply that
 // arrives meanwhile puts its dot on him.
@@ -496,68 +482,32 @@ function setChatUnread(unread) {
   OwlGuide.setChatState({ open: !owlChat.classList.contains("is-collapsed"), unread: chatUnread });
 }
 
-function setOwlChatCollapsed(collapsed, { remember = true } = {}) {
+function setOwlChatCollapsed(collapsed) {
   owlChat.classList.toggle("is-collapsed", collapsed);
   owlChatToggle.setAttribute("aria-expanded", String(!collapsed));
   owlChatToggle.textContent = collapsed ? "Open" : "Hide";
   setChatUnread(collapsed && chatUnread);
-  if (remember) {
-    try {
-      sessionStorage.setItem(CHAT_OPEN_KEY, collapsed ? "0" : "1");
-    } catch (err) {
-      /* not fatal: the choice just isn't remembered */
-    }
-  }
   updateChatRoom();
-  placeChat();
-  if (!collapsed) scrollChatToEnd();
-}
-
-// ---- Chat placement: beside the owl, never over him ----
-// Desktop: the panel's right edge sits a gap to the owl's left, bottoms
-// aligned. When there isn't room there (a phone, or the owl dragged to the
-// left edge) the open panel becomes a full-width sheet above the owl, or
-// below him when he sits in the top half of the screen. The collapsed bar is
-// narrow enough to stay beside him even on a phone.
-const OWL_GAP = 12;
-const EDGE = 16;
-const CHAT_BAR_MIN = 200;
-
-function placeChat() {
-  if (owlChat.hidden) return;
-  const owl = OwlGuide.rect();
-  if (!owl) return;
-  const s = owlChat.style;
-  const collapsed = owlChat.classList.contains("is-collapsed");
-  const room = owl.left - OWL_GAP - EDGE;
-  const sheet = collapsed ? room < CHAT_BAR_MIN : room < CHAT_W_MIN || window.innerWidth <= 640;
-  owlChat.classList.toggle("is-sheet", sheet);
-  owlChat.classList.remove("is-below");
-  if (!sheet) {
-    s.setProperty("--chat-right", `${window.innerWidth - owl.left + OWL_GAP}px`);
-    s.setProperty("--chat-bottom", `${Math.max(8, window.innerHeight - owl.bottom)}px`);
-    s.setProperty("--chat-room", `${room}px`);
-  } else if (owl.top > window.innerHeight / 2) {
-    s.setProperty("--chat-bottom", `${window.innerHeight - owl.top + OWL_GAP}px`);
-  } else {
-    owlChat.classList.add("is-below");
-    s.setProperty("--chat-top", `${owl.bottom + OWL_GAP}px`);
+  if (!collapsed) {
+    scrollChatToEnd();
+    // Stacked under the plan on a narrow screen, it may open out of view.
+    owlChat.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 }
 
-OwlGuide.onMove(placeChat);
 
 // ---- Chat panel width ----
 const CHAT_W_KEY = "owlChatWidth";
 const CHAT_W_MIN = 340;
 const chatResizer = document.getElementById("owl-chat-resizer");
 
-// As wide as the space left of the owl allows, since the panel must not
-// grow over him.
+// The document beside it keeps at least DOC_MIN_W, so the chat can't squeeze
+// the plan into a sliver.
+const DOC_MIN_W = 480;
+
 function chatMaxWidth() {
-  const owl = OwlGuide.rect();
-  const room = owl ? owl.left - OWL_GAP - EDGE : window.innerWidth - 120;
-  return Math.max(CHAT_W_MIN, Math.min(820, room));
+  const row = owlChat.parentElement.getBoundingClientRect().width || window.innerWidth;
+  return Math.max(CHAT_W_MIN, Math.min(820, row - DOC_MIN_W - 20));
 }
 
 function setChatWidth(px, persist = true) {
@@ -723,7 +673,7 @@ function showOwlChat(visible) {
     // The owl stays through Guided mode beside the chat, rather than stepping
     // aside for a panel that then covered his corner.
     OwlGuide.dock(toggleOwlChat);
-    if (opening) setOwlChatCollapsed(!chatWasOpen(), { remember: false });
+    if (opening) setOwlChatCollapsed(true);
     showChatHistory(false);
     introduceFieldInChat();
   } else {
@@ -805,7 +755,7 @@ function syncOwlVisibility() {
 function updateGate() {
   const teacherOk = teacherNameInput.value.trim().length > 0;
   const subjectOk = subjectInput.value.trim().length > 0;
-  const guideOk = !!selectedCourseGuide;
+  const guideOk = hasGuide();
   const ready = teacherOk && subjectOk && guideOk;
 
   gateLock.hidden = ready;
@@ -824,8 +774,15 @@ function updateGate() {
 }
 
 teacherNameInput.addEventListener("input", updateGate);
+// The pickers' search buttons name the subject they will search for.
+function syncGuideSearchLabels() {
+  document.querySelectorAll(".cg-search-btn-label").forEach((el) => {
+    el.textContent = `Search for "${subjectInput.value.trim() || "this subject"}"`;
+  });
+}
+
 subjectInput.addEventListener("change", () => {
-  cgSearchBtnLabel.textContent = `Search for "${subjectInput.value.trim() || "this subject"}"`;
+  syncGuideSearchLabels();
   updateGate();
 });
 
@@ -859,19 +816,10 @@ genTabsEl.querySelectorAll("button").forEach((btn) => {
 
 setupContinueBtn.addEventListener("click", () => {
   if (!updateGate()) {
-    showError("Fill in the cooperating teacher, subject, and course guide first.");
+    showError("Fill in the cooperating teacher and subject, and choose a Budget of Work or Curriculum Guide first.");
     return;
   }
   goToTab("generate");
-});
-
-cgTabsEl.querySelectorAll("button").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    cgTab = btn.dataset.tab;
-    cgTabsEl.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
-    cgTabSearch.hidden = cgTab !== "search";
-    cgTabUpload.hidden = cgTab !== "upload";
-  });
 });
 
 // The course guide library groups grades the way DepEd's documents do.
@@ -885,121 +833,189 @@ function gradeBandFor() {
   return "";
 }
 
-function renderCourseGuideResults(guides) {
-  cgResultsEl.innerHTML = "";
-  guides.forEach((g) => {
-    const card = document.createElement("div");
-    card.className = "cg-result-card";
-    const meta = g.is_builtin
-      ? `${g.doc_type === "curriculum_guide" ? "Curriculum Guide" : "Budget of Work"} &middot; ${escapeHtml(g.curriculum || "DepEd")}`
-      : `${escapeHtml(g.subject)} &middot; uploaded by ${escapeHtml(g.uploaded_by || "a teacher")}`;
-    card.innerHTML = `
-      <div>
-        <div class="cg-title">${escapeHtml(g.title)}</div>
-        <div class="cg-meta">${g.is_builtin ? `<span class="badge badge-official">${Icons.shieldCheck}Official DepEd</span> ` : ""}${meta}</div>
-      </div>
-      <span class="text-sm">Select</span>
-    `;
-    card.addEventListener("click", () => {
-      selectCourseGuide(g);
-    });
-    cgResultsEl.appendChild(card);
-  });
-}
+const GUIDE_KIND_LABEL = { budget_of_work: "Budget of Work", curriculum_guide: "Curriculum Guide" };
 
-function selectCourseGuide(guide) {
-  selectedCourseGuide = guide;
-  cgSelectedEl.hidden = false;
-  cgSelectedEl.innerHTML = `
-    <span class="cg-selected-chip">
-      ${Icons.checkSquare}
-      <span>Using "${escapeHtml(guide.title)}" (${escapeHtml(guide.subject)})</span>
-      <button type="button" id="cg-clear-btn" class="btn btn-ghost btn-sm" style="padding:2px 6px;">Change</button>
-    </span>
-  `;
-  document.getElementById("cg-clear-btn").addEventListener("click", () => {
-    selectedCourseGuide = null;
-    cgSelectedEl.hidden = true;
+// One picker per document kind, built from the same markup in generator.html.
+// Each searches only its own kind (plus untyped uploads from before the split),
+// shows what is chosen by highlighting its card and a summary under the list,
+// and files an upload as its own kind.
+const guidePickers = {};
+
+function makeGuidePicker(root) {
+  const kind = root.dataset.guideKind;
+  const label = GUIDE_KIND_LABEL[kind];
+  const tabs = [...root.querySelectorAll(".cg-tabs button")];
+  const panes = [...root.querySelectorAll(".cg-tab-content")];
+  const searchBtn = root.querySelector(".cg-search-btn");
+  const resultsEl = root.querySelector(".cg-results");
+  const noneEl = root.querySelector(".cg-none");
+  const dropzone = root.querySelector(".cg-dropzone");
+  const fileInput = root.querySelector(".cg-file-input");
+  const selectedEl = root.querySelector(".cg-selected");
+
+  tabs.forEach((btn) => btn.addEventListener("click", () => {
+    tabs.forEach((b) => b.classList.toggle("active", b === btn));
+    panes.forEach((p) => { p.hidden = p.dataset.pane !== btn.dataset.tab; });
+  }));
+
+  // The chosen card is marked in the list itself, not only in the summary
+  // below it, so a teacher scanning the results sees at once which one is in use.
+  function markResults() {
+    const chosen = selectedGuides[kind];
+    resultsEl.querySelectorAll(".cg-result-card").forEach((card) => {
+      const on = !!chosen && Number(card.dataset.guideId) === chosen.id;
+      card.classList.toggle("selected", on);
+      card.setAttribute("aria-pressed", String(on));
+      card.querySelector(".cg-pick").innerHTML = on ? `${Icons.check}Selected` : "Select";
+    });
+  }
+
+  function renderSelected() {
+    const g = selectedGuides[kind];
+    root.classList.toggle("has-selection", !!g);
+    selectedEl.hidden = !g;
+    if (!g) {
+      selectedEl.innerHTML = "";
+    } else {
+      selectedEl.innerHTML = `
+        <span class="cg-selected-chip">
+          ${Icons.checkSquare}
+          <span>Using <strong>${escapeHtml(g.title)}</strong></span>
+          <button type="button" class="btn btn-ghost btn-sm cg-clear-btn">Remove</button>
+        </span>`;
+      selectedEl.querySelector(".cg-clear-btn").addEventListener("click", () => select(null));
+    }
+    markResults();
+  }
+
+  function select(guide) {
+    selectedGuides[kind] = guide;
+    renderSelected();
+    if (noneEl) noneEl.hidden = true;
     updateGate();
     saveDraft();
-  });
-  cgNoTopic.hidden = true;
-  updateGate();
-  saveDraft();
-}
-
-cgSearchBtn.addEventListener("click", async () => {
-  const subject = subjectInput.value.trim();
-  if (!subject) {
-    showError("Select a subject first, then search the course guide library.");
-    return;
   }
-  errorBox.hidden = true;
-  cgNoTopic.hidden = true;
 
-  setButtonLoading(cgSearchBtn, true, "Searching");
-  try {
-    // The grade only ranks results, it never hides any: a guide for the next
-    // band up can still be the right reference.
-    const data = await Api.searchCourseGuides({ subject, prefer_grade_band: gradeBandFor() });
-    const guides = data.course_guides || [];
-    if (!guides.length) {
-      cgResultsEl.innerHTML = "";
-      cgNoTopic.hidden = false;
+  function renderResults(guides) {
+    resultsEl.innerHTML = "";
+    guides.forEach((g) => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "cg-result-card";
+      card.dataset.guideId = g.id;
+      card.setAttribute("role", "listitem");
+      const meta = g.is_builtin
+        ? `${escapeHtml(g.curriculum || "DepEd")}${g.grades ? ` &middot; Grade ${escapeHtml(g.grades)}` : ""}`
+        : `${escapeHtml(g.subject)} &middot; uploaded by ${escapeHtml(g.uploaded_by || "a teacher")}`;
+      card.innerHTML = `
+        <span>
+          <span class="cg-title">${escapeHtml(g.title)}</span>
+          <span class="cg-meta">${g.is_builtin ? `<span class="badge badge-official">${Icons.shieldCheck}Official DepEd</span> ` : ""}${meta}</span>
+        </span>
+        <span class="cg-pick text-sm">Select</span>`;
+      card.addEventListener("click", () => select(g));
+      resultsEl.appendChild(card);
+    });
+    markResults();
+  }
+
+  searchBtn.addEventListener("click", async () => {
+    const subject = subjectInput.value.trim();
+    if (!subject) {
+      showError(`Select a subject first, then search for a ${label}.`);
       return;
     }
-    renderCourseGuideResults(guides);
-  } catch (err) {
-    showError(err.message);
-  } finally {
-    setButtonLoading(cgSearchBtn, false);
+    errorBox.hidden = true;
+    noneEl.hidden = true;
+    setButtonLoading(searchBtn, true, "Searching");
+    try {
+      // The grade only ranks results, it never hides any: a document for the
+      // next band up can still be the right reference.
+      const data = await Api.searchCourseGuides({ subject, doc_type: kind, prefer_grade_band: gradeBandFor() });
+      const guides = data.course_guides || [];
+      if (!guides.length) {
+        resultsEl.innerHTML = "";
+        noneEl.hidden = false;
+        return;
+      }
+      renderResults(guides);
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      setButtonLoading(searchBtn, false);
+    }
+  });
+
+  async function upload(file) {
+    if (!/\.(docx|dotx|pdf)$/i.test(file.name)) {
+      showError("Only .docx, .dotx, or .pdf files are allowed.");
+      return;
+    }
+    const subject = subjectInput.value.trim();
+    if (!subject) {
+      showError(`Select a subject first, so this ${label} can be filed correctly.`);
+      return;
+    }
+    errorBox.hidden = true;
+    dropzone.style.opacity = "0.5";
+    dropzone.style.pointerEvents = "none";
+    try {
+      const data = await Api.uploadCourseGuide(file, subject, file.name, kind);
+      const g = data.course_guide;
+      // The same file may already be in the library as the other kind (an
+      // official Curriculum Guide dropped on the Budget of Work picker, say);
+      // it goes where its own type says.
+      const target = guidePickers[g.doc_type] || guidePickers[kind];
+      target.select(g);
+      showToast(
+        data.duplicate
+          ? `This file is already in the shared library, so the existing ${GUIDE_KIND_LABEL[g.doc_type] || label} is used.`
+          : `${label} added to the shared library.`
+      );
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      dropzone.style.opacity = "1";
+      dropzone.style.pointerEvents = "auto";
+    }
   }
+
+  dropzone.addEventListener("click", () => fileInput.click());
+  dropzone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
+  dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropzone.classList.add("dragover");
+  });
+  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    if (e.dataTransfer.files.length) upload(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files.length) upload(fileInput.files[0]);
+  });
+
+  return { select };
+}
+
+document.querySelectorAll("[data-guide-kind]").forEach((root) => {
+  guidePickers[root.dataset.guideKind] = makeGuidePicker(root);
 });
 
-cgDropzone.addEventListener("click", () => cgFileInput.click());
-cgDropzone.addEventListener("dragover", (e) => {
-  e.preventDefault();
-  cgDropzone.classList.add("dragover");
-});
-cgDropzone.addEventListener("dragleave", () => cgDropzone.classList.remove("dragover"));
-cgDropzone.addEventListener("drop", (e) => {
-  e.preventDefault();
-  cgDropzone.classList.remove("dragover");
-  if (e.dataTransfer.files.length) handleCourseGuideUpload(e.dataTransfer.files[0]);
-});
-cgFileInput.addEventListener("change", () => {
-  if (cgFileInput.files.length) handleCourseGuideUpload(cgFileInput.files[0]);
-});
-
-async function handleCourseGuideUpload(file) {
-  const allowed = /\.(docx|dotx|pdf)$/i;
-  if (!allowed.test(file.name)) {
-    showError("Only .docx, .dotx, or .pdf files are allowed.");
-    return;
-  }
-  const subject = subjectInput.value.trim();
-  if (!subject) {
-    showError("Select a subject first, so this course guide can be filed correctly.");
-    return;
-  }
-
-  errorBox.hidden = true;
-  cgDropzone.style.opacity = "0.5";
-  cgDropzone.style.pointerEvents = "none";
-  try {
-    const data = await Api.uploadCourseGuide(file, subject, file.name);
-    selectCourseGuide(data.course_guide);
-    showToast(
-      data.duplicate
-        ? "This course guide is already in the shared library, so the existing copy is used."
-        : "Course guide added to the shared library."
-    );
-  } catch (err) {
-    showError(err.message);
-  } finally {
-    cgDropzone.style.opacity = "1";
-    cgDropzone.style.pointerEvents = "auto";
-  }
+// Puts a saved guide back in its own picker. A plan or draft saved before the
+// split kept one guide under courseGuide whatever its kind, so the kind comes
+// from the guide itself; an untyped upload lands in the Curriculum Guide slot,
+// which is what that single picker was called.
+function restoreGuide(guide, fallbackKind) {
+  if (!guide) return;
+  const picker = guidePickers[guide.doc_type] || guidePickers[fallbackKind];
+  picker.select(guide);
 }
 
 function buildSections(fields) {
@@ -2015,7 +2031,8 @@ function setupContext() {
       k12Grade: k12GradeSelect.value,
       section: sectionInput.value,
     },
-    courseGuide: selectedCourseGuide,
+    courseGuide: selectedGuides.curriculum_guide,
+    budgetOfWork: selectedGuides.budget_of_work,
     // Rides along here rather than in its own column: export reads it from
     // the saved plan, so every device exports on the same paper.
     pageSize: pageSizeSelect.value,
@@ -2028,6 +2045,9 @@ function applySetupContext(ctx) {
   const setup = (ctx && ctx.setup) || {};
   if (setup.teacher) teacherNameInput.value = setup.teacher;
   if (setup.subject) subjectInput.value = setup.subject;
+  // Set in code, so the change listener that renames the search buttons
+  // never fired; a restored plan still said "this subject".
+  syncGuideSearchLabels();
   if (setup.topic) topicInput.value = setup.topic;
   if (setup.levelType) levelTypeSelect.value = setup.levelType;
   if (setup.collegeProgram) collegeProgramInput.value = setup.collegeProgram;
@@ -2036,7 +2056,10 @@ function applySetupContext(ctx) {
   if (setup.section) sectionInput.value = setup.section;
   if (ctx && ctx.pageSize) pageSizeSelect.value = ctx.pageSize;
   updateLevelFields();
-  if (ctx && ctx.courseGuide) selectCourseGuide(ctx.courseGuide);
+  if (ctx) {
+    restoreGuide(ctx.courseGuide, "curriculum_guide");
+    restoreGuide(ctx.budgetOfWork, "budget_of_work");
+  }
 }
 
 function planPayload() {
@@ -2094,13 +2117,32 @@ async function persistPlanNow() {
   const payload = planPayload();
   let data;
   if (planId) {
-    data = await Api.updateLessonPlan(planId, { ...payload, base_revision: planRevision });
+    // Visibility is changed only through its own control (which saves it at
+    // once), so an autosave never carries it: a stale tab would otherwise
+    // quietly flip a plan back to private or public. And a revision this page
+    // doesn't know is sent as -1, never left out, because a save without one
+    // skips the check altogether.
+    const { is_public: _visibility, ...changes } = payload;
+    data = await Api.updateLessonPlan(planId, { ...changes, base_revision: planRevision ?? -1 });
   } else {
     data = await Api.saveLessonPlan(payload);
     planId = data.lesson_plan.id;
   }
   planRevision = data.lesson_plan.revision;
+  // The local draft carries the revision too; without rewriting it here it
+  // would still hold the one from before this save, and coming back to the
+  // page later would conflict with this very save.
+  saveDraft();
   return data.lesson_plan;
+}
+
+// Whether nothing was typed since edit number `seq`, i.e. the save that just
+// finished covers everything on screen. Only then is the page clean.
+function savedEverythingSince(seq) {
+  if (editSeq !== seq) return false;
+  dirty = false;
+  syncedWithServer = true;
+  return true;
 }
 
 function isStaleSave(err) {
@@ -2129,9 +2171,7 @@ async function runServerSave() {
     // Only claim saved if nothing changed while the request was in flight —
     // otherwise the newer edit is still unsaved and saying otherwise would
     // lie about it.
-    if (editSeq === seq) {
-      dirty = false;
-      syncedWithServer = true;
+    if (savedEverythingSince(seq)) {
       saveStatus.textContent = `Draft saved ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`;
       enableExport();
     }
@@ -2435,6 +2475,7 @@ function applyOpenedPlan(plan) {
     // back through "Before we start" on a plan they already filled in.
     applySetupContext(plan.setup_context);
     if (plan.subject) subjectInput.value = plan.subject;
+    syncGuideSearchLabels();
     if (plan.is_public) visibilityCheckbox.checked = true;
 
     // Only the author can write to a plan. getLessonPlan also serves public
@@ -2485,6 +2526,21 @@ function applyOpenedPlan(plan) {
   return true;
 }
 
+// A draft written before plans had revisions knows its plan but not which
+// version of it. If the server's copy is no newer than the draft, the draft is
+// the latest and takes the server's revision; if another device saved since,
+// the teacher chooses, exactly as with any other conflict.
+async function adoptRevisionForOldDraft(draftAt) {
+  try {
+    const { lesson_plan: plan } = await Api.getLessonPlan(planId);
+    if (planRevision != null) return;
+    if (!draftAt || new Date(plan.updated_at).getTime() <= draftAt) planRevision = plan.revision;
+    else showConflict(plan);
+  } catch (err) {
+    /* unreachable or gone: the next save reports it */
+  }
+}
+
 function restoreDraft() {
   const draft = readDraft();
   if (!draft) return false;
@@ -2501,6 +2557,7 @@ function restoreDraft() {
     // A draft from before revisions has none, and its first save goes through
     // unchecked, as every save did then.
     planRevision = draft.planRevision ?? null;
+    if (planId && planRevision == null) adoptRevisionForOldDraft(draft.at);
     stepIndex = draft.stepIndex || 0;
 
 
@@ -2524,7 +2581,7 @@ function restoreDraft() {
   }
 
   updateGate();
-  return hasAnyValue() || !!draft.courseGuide;
+  return hasAnyValue() || !!draft.courseGuide || !!draft.budgetOfWork;
 }
 
 // Makes the visible page (active mode button, controls, owl chat, step
@@ -2623,7 +2680,8 @@ function baseGenerationPayload() {
     format_id: fmt.id,
     teacher_name: teacherNameInput.value.trim(),
     subject: subjectInput.value.trim(),
-    course_guide_id: selectedCourseGuide ? selectedCourseGuide.id : null,
+    course_guide_id: selectedGuides.curriculum_guide ? selectedGuides.curriculum_guide.id : null,
+    budget_of_work_id: selectedGuides.budget_of_work ? selectedGuides.budget_of_work.id : null,
     context: getAdvancedContext(),
     include_keys: selectedGenerateKeys(),
   };
@@ -2659,7 +2717,7 @@ ownFieldsGenerateBtn.addEventListener("click", () => {
 async function runGeneration(includeKeys) {
   if (generating) return;
   if (!updateGate()) {
-    showError("Fill in the cooperating teacher, subject, and course guide first.");
+    showError("Fill in the cooperating teacher and subject, and choose a Budget of Work or Curriculum Guide first.");
     return;
   }
 
@@ -2728,7 +2786,7 @@ async function runGeneration(includeKeys) {
 
 generateFullBtn.addEventListener("click", () => {
   if (!updateGate()) {
-    showError("Fill in the cooperating teacher, subject, and course guide first.");
+    showError("Fill in the cooperating teacher and subject, and choose a Budget of Work or Curriculum Guide first.");
     return;
   }
   openReview();
@@ -3284,16 +3342,21 @@ saveBtn.addEventListener("click", async () => {
   // payload a moment later.
   clearTimeout(serverSaveTimer);
   setButtonLoading(saveBtn, true, "Saving");
+  const seq = editSeq;
   try {
     await persistPlan();
-    dirty = false;
-    syncedWithServer = true;
-    // The plan is on the server now and listed under "List of Lesson Plan",
-    // so the local draft has done its job. Editing on from here marks the
-    // page dirty again and starts a fresh draft.
-    clearDraft();
-    saveStatus.textContent = "Saved.";
-    enableExport();
+    if (savedEverythingSince(seq)) {
+      // The plan is on the server now and listed under "List of Lesson Plan",
+      // so the local draft has done its job. Editing on from here marks the
+      // page dirty again and starts a fresh draft.
+      clearDraft();
+      saveStatus.textContent = "Saved.";
+      enableExport();
+    } else {
+      // Typing carried on while it saved: that newer text is not on the
+      // server yet, so the page stays unsaved and the autosave picks it up.
+      scheduleServerSave();
+    }
     showToast("Lesson plan saved.");
     setOwlState("celebrate", "Saved! Export it as Word whenever you're ready.");
     revealSubmitControlsIfStudent();

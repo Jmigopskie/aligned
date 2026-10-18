@@ -21,7 +21,8 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from urllib.parse import urljoin, urlparse
 
-import requests
+import certifi
+import urllib3
 
 # Fields whose wording must come from the curriculum documents verbatim.
 _VERBATIM_FIELD = re.compile(r"content standard|performance standard|competenc|objective|melc", re.I)
@@ -221,47 +222,100 @@ _UA = {"User-Agent": "Mozilla/5.0 (AlignED reference check)"}
 _MAX_REDIRECTS = 5
 
 
-def _public_host(url) -> bool:
-    """Only public internet addresses are fetched. The URLs come from model
-    output, which a teacher's chat message or uploaded file can steer, so this
-    is what keeps the check from probing the server's own network."""
+def _public_ip(url):
+    """The public address to connect to for this URL, or None. Only public
+    internet addresses are fetched: the URLs come from model output, which a
+    teacher's chat message or uploaded file can steer, so this is what keeps
+    the check from probing the server's own network. Every address the name
+    resolves to must be public, not just the first."""
     parts = urlparse(url)
     if parts.scheme not in ("http", "https") or not parts.hostname:
-        return False
+        return None
     try:
-        infos = socket.getaddrinfo(parts.hostname, parts.port or (443 if parts.scheme == "https" else 80))
-    except OSError:
-        return False
-    return all(ipaddress.ip_address(info[4][0].split("%")[0]).is_global for info in infos)
+        infos = socket.getaddrinfo(parts.hostname, parts.port or (443 if parts.scheme == "https" else 80),
+                                   proto=socket.IPPROTO_TCP)
+    except (OSError, ValueError):
+        return None
+    addrs = [ipaddress.ip_address(info[4][0].split("%")[0]) for info in infos]
+    if not addrs or not all(a.is_global for a in addrs):
+        return None
+    return str(sorted(addrs, key=lambda a: a.version)[0])  # IPv4 first
 
 
-@lru_cache(maxsize=512)
+def _public_host(url) -> bool:
+    return _public_ip(url) is not None
+
+
+_REDIRECTS = (301, 302, 303, 307, 308)
+
+
+def _status(method, url):
+    """(status, Location) for one request, made to the very address
+    _public_ip approved. Connecting by that IP, with the real host name for
+    TLS and the Host header, is what defeats DNS rebinding: letting the HTTP
+    library look the name up again could get a different, internal answer."""
+    ip = _public_ip(url)
+    if not ip:
+        return None
+    parts = urlparse(url)
+    https = parts.scheme == "https"
+    port = parts.port or (443 if https else 80)
+    opts = {"timeout": urllib3.Timeout(connect=8, read=8), "retries": False}
+    if https:
+        pool = urllib3.HTTPSConnectionPool(ip, port, server_hostname=parts.hostname,
+                                           assert_hostname=parts.hostname, cert_reqs="CERT_REQUIRED",
+                                           ca_certs=certifi.where(), **opts)
+    else:
+        pool = urllib3.HTTPConnectionPool(ip, port, **opts)
+    path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
+    host = parts.hostname if parts.port is None else f"{parts.hostname}:{parts.port}"
+    try:
+        resp = pool.urlopen(method, path, headers={**_UA, "Host": host}, redirect=False,
+                            preload_content=False, retries=False)
+        result = (resp.status, resp.headers.get("location"))
+        resp.release_conn()
+        return result
+    finally:
+        pool.close()
+
+
+# Only links that opened are remembered: a failure may be a passing timeout,
+# and caching it would drop a working reference for the life of the worker.
+_WORKING = set()
+_WORKING_MAX = 2000
+
+
 def link_works(url: str) -> bool:
     """Whether the URL opens (status below 400), following redirects by hand
-    so every hop is held to _public_host. HEAD first; GET when a site refuses
+    so every hop is held to _public_ip. HEAD first; GET when a site refuses
     HEAD, as many do."""
+    if url in _WORKING:
+        return True
+    ok = False
     try:
-        for method in ("head", "get"):
+        for method in ("HEAD", "GET"):
             current = url
             for _ in range(_MAX_REDIRECTS + 1):
-                if not _public_host(current):
+                result = _status(method, current)
+                if result is None:
                     return False
-                resp = requests.request(method, current, headers=_UA, timeout=8,
-                                        allow_redirects=False, stream=True)
-                resp.close()
-                if resp.is_redirect and resp.headers.get("location"):
-                    current = urljoin(current, resp.headers["location"])
+                status, location = result
+                if status in _REDIRECTS and location:
+                    current = urljoin(current, location)
                     continue
                 break
             else:
                 return False  # redirect loop
-            if resp.status_code < 400:
-                return True
-            if resp.status_code not in (403, 405, 501):
-                return False
-    except requests.RequestException:
-        return False
-    return False
+            if status < 400:
+                ok = True
+                break
+            if status not in (403, 405, 501):
+                break
+    except (urllib3.exceptions.HTTPError, OSError, ValueError):
+        ok = False
+    if ok and len(_WORKING) < _WORKING_MAX:
+        _WORKING.add(url)
+    return ok
 
 
 # APA 7 for a web source: Author. (Year[, Month Day]). Title. Site. URL
@@ -311,7 +365,10 @@ def keep_working_links(values: dict, fields, citation: str = "") -> dict:
             continue
         value = out[f.field_key]
         if isinstance(value, list):
-            out[f.field_key] = ["\n".join(_check_lines(str(v or "").split("\n"), citation)) for v in value]
+            # A weekly field cites the guide once, on its first day, rather
+            # than repeating the same reference in every day's cell.
+            out[f.field_key] = ["\n".join(_check_lines(str(v or "").split("\n"), citation if i == 0 else ""))
+                                for i, v in enumerate(value)]
         else:
             out[f.field_key] = "\n".join(_check_lines(str(value or "").split("\n"), citation))
     return out

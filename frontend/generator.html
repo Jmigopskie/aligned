@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-10-18b" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-18c" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -158,39 +158,71 @@
               </div>
             </div>
 
+            <!-- Two documents, picked separately: the Budget of Work (the
+                 week-by-week competencies) and the Curriculum Guide (the
+                 standards behind them). At least one is needed; with both,
+                 the plan draws on both and cites both. -->
             <div class="setup-section">
               <div class="setup-section-head">
-                <h3>Curriculum/Course guide *</h3>
-                <p>Base the lesson on a guide from the shared library, or upload your own.</p>
+                <h3>Curriculum documents *</h3>
+                <p>Choose a Budget of Work, a Curriculum Guide, or both. The plan's standards and competencies are copied from what you pick.</p>
               </div>
-              <div class="course-guide-picker">
-                <div class="cg-tabs" id="cg-tabs">
-                  <button type="button" class="active" data-tab="search">Search the shared library</button>
-                  <button type="button" data-tab="upload">Upload my own</button>
+              <div class="guide-pickers">
+                <div class="course-guide-picker" data-guide-kind="budget_of_work">
+                  <h4 class="guide-picker-title">Budget of Work</h4>
+                  <p class="hint guide-picker-hint">Weekly learning competencies and suggested activities.</p>
+                  <div class="cg-tabs">
+                    <button type="button" class="active" data-tab="search">Search the shared library</button>
+                    <button type="button" data-tab="upload">Upload my own</button>
+                  </div>
+                  <div class="cg-tab-content" data-pane="search">
+                    <div class="cg-search-row">
+                      <button type="button" class="btn btn-secondary btn-sm cg-search-btn">
+                        <span class="cg-search-btn-label">Search for "this subject"</span>
+                      </button>
+                    </div>
+                    <div class="cg-results" role="list" aria-label="Budget of Work results"></div>
+                    <div class="alert alert-warning mt-16 cg-none" hidden>
+                      No Budget of Work found for this subject yet. Upload one, or try a different subject.
+                    </div>
+                  </div>
+                  <div class="cg-tab-content" data-pane="upload" hidden>
+                    <div class="dropzone cg-dropzone" role="button" tabindex="0">
+                      <div>Drag a Budget of Work here or <strong>browse</strong> (.docx, .dotx, .pdf)</div>
+                    </div>
+                    <input type="file" class="cg-file-input" accept=".docx,.dotx,.pdf" hidden />
+                    <p class="hint">Uploads join the shared library so other teachers can find them too.</p>
+                  </div>
+                  <div class="cg-selected" hidden></div>
                 </div>
 
-                <div id="cg-tab-search" class="cg-tab-content">
-                  <div class="cg-search-row">
-                    <button type="button" id="cg-search-btn" class="btn btn-secondary btn-sm">
-                      <span id="cg-search-btn-label">Search for "this subject"</span>
-                    </button>
-                    <p class="hint cg-search-hint">We'll look for a matching course guide already shared by other teachers.</p>
+                <div class="course-guide-picker" data-guide-kind="curriculum_guide">
+                  <h4 class="guide-picker-title">Curriculum Guide</h4>
+                  <p class="hint guide-picker-hint">Content and performance standards for the whole course.</p>
+                  <div class="cg-tabs">
+                    <button type="button" class="active" data-tab="search">Search the shared library</button>
+                    <button type="button" data-tab="upload">Upload my own</button>
                   </div>
-                  <div id="cg-results" class="cg-results"></div>
-                  <div id="cg-no-topic" class="alert alert-warning mt-16" hidden>
-                    No course guide found for this subject yet. Upload one, or try a different subject and search again.
+                  <div class="cg-tab-content" data-pane="search">
+                    <div class="cg-search-row">
+                      <button type="button" class="btn btn-secondary btn-sm cg-search-btn">
+                        <span class="cg-search-btn-label">Search for "this subject"</span>
+                      </button>
+                    </div>
+                    <div class="cg-results" role="list" aria-label="Curriculum Guide results"></div>
+                    <div class="alert alert-warning mt-16 cg-none" hidden>
+                      No Curriculum Guide found for this subject yet. Upload one, or try a different subject.
+                    </div>
                   </div>
+                  <div class="cg-tab-content" data-pane="upload" hidden>
+                    <div class="dropzone cg-dropzone" role="button" tabindex="0">
+                      <div>Drag a Curriculum Guide here or <strong>browse</strong> (.docx, .dotx, .pdf)</div>
+                    </div>
+                    <input type="file" class="cg-file-input" accept=".docx,.dotx,.pdf" hidden />
+                    <p class="hint">Uploads join the shared library so other teachers can find them too.</p>
+                  </div>
+                  <div class="cg-selected" hidden></div>
                 </div>
-
-                <div id="cg-tab-upload" class="cg-tab-content" hidden>
-                  <div id="cg-dropzone" class="dropzone">
-                    <div>Drag a course guide here or <strong>browse</strong> (.docx, .dotx, .pdf)</div>
-                  </div>
-                  <input type="file" id="cg-file-input" accept=".docx,.dotx,.pdf" hidden />
-                  <p class="hint">Uploaded guides join the shared library so other teachers can find them too.</p>
-                </div>
-
-                <div id="cg-selected" class="mt-16" hidden></div>
               </div>
             </div>
 
@@ -261,12 +293,54 @@
               <!-- Toolbar and canvas share one stage because the stage is what
                    goes fullscreen: fullscreening the canvas alone left the
                    toolbar outside the fullscreened subtree and so invisible. -->
-              <div id="live-doc-stage" class="doc-stage" hidden>
-                <div id="live-doc-toolbar" class="doc-toolbar"></div>
-                <div id="live-doc-wrap" class="lp-doc-wrap"></div>
-              </div>
+              <!-- The document and, in Guided mode, Alan's chat side by side:
+                   clicking Alan opens the chat as a column beside the plan
+                   rather than a panel floating over it. -->
+              <div class="doc-chat-row">
+                <div class="doc-chat-main">
+                  <div id="live-doc-stage" class="doc-stage" hidden>
+                    <div id="live-doc-toolbar" class="doc-toolbar"></div>
+                    <div id="live-doc-wrap" class="lp-doc-wrap"></div>
+                  </div>
 
-              <div id="results" class="mt-24"></div>
+                  <div id="results" class="mt-24"></div>
+                </div>
+              <section class="owl-chat is-collapsed" id="owl-chat" aria-label="Chat with Alan" hidden>
+                <div class="owl-chat-resizer" id="owl-chat-resizer" role="separator" aria-orientation="vertical"
+                     tabindex="0" aria-label="Resize the chat panel. Use the left and right arrow keys."></div>
+                <header class="owl-chat-head">
+                  <img class="owl-chat-avatar" src="img/owl/alan-idle.png" alt="" />
+                  <div class="owl-chat-title">
+                    <strong>Ask Alan</strong>
+                    <span id="owl-chat-field">Guided mode</span>
+                  </div>
+                  <button type="button" class="owl-chat-toggle" id="owl-chat-history-btn" aria-pressed="false">History</button>
+                  <button type="button" class="owl-chat-toggle" id="owl-chat-toggle" aria-expanded="false" aria-controls="owl-chat-body">Open</button>
+                </header>
+                <div class="owl-chat-body" id="owl-chat-body">
+                  <div class="owl-chat-log" id="owl-chat-log" role="log" aria-live="polite"></div>
+
+                  <!-- Saved conversations, one thread per field, kept per format so a
+                       teacher can read back what the owl said about a field they have
+                       already moved past. -->
+                  <div class="owl-chat-history" id="owl-chat-history" hidden>
+                    <div class="owl-chat-history-head">
+                      <button type="button" class="owl-chat-back" id="owl-chat-history-back" hidden><span data-icon="arrowLeft"></span>All conversations</button>
+                      <span id="owl-chat-history-title">Saved conversations</span>
+                    </div>
+                    <div class="owl-chat-history-list" id="owl-chat-history-list"></div>
+                  </div>
+
+                  <!-- data-owl-avoid: Alan steps aside (shrinks into his corner)
+                       rather than sitting on the message box and Send. -->
+                  <form class="owl-chat-form" id="owl-chat-form" autocomplete="off" data-owl-avoid>
+                    <label class="sr-only" for="owl-chat-input">Message Alan</label>
+                    <input type="text" id="owl-chat-input" maxlength="500" placeholder="Ask about this field&hellip;" />
+                    <button type="submit" class="btn btn-primary btn-sm" id="owl-chat-send">Send</button>
+                  </form>
+                </div>
+              </section>
+              </div>
 
               <div id="footer" class="generator-footer" hidden>
                 <div class="flex gap-8" style="align-items:center; flex-wrap:wrap;">
@@ -302,39 +376,6 @@
     </div>
   </div>
 
-  <section class="owl-chat is-collapsed" id="owl-chat" aria-label="Chat with Alan" hidden>
-    <div class="owl-chat-resizer" id="owl-chat-resizer" role="separator" aria-orientation="vertical"
-         tabindex="0" aria-label="Resize the chat panel. Use the left and right arrow keys."></div>
-    <header class="owl-chat-head">
-      <img class="owl-chat-avatar" src="img/owl/alan-idle.png" alt="" />
-      <div class="owl-chat-title">
-        <strong>Ask Alan</strong>
-        <span id="owl-chat-field">Guided mode</span>
-      </div>
-      <button type="button" class="owl-chat-toggle" id="owl-chat-history-btn" aria-pressed="false">History</button>
-      <button type="button" class="owl-chat-toggle" id="owl-chat-toggle" aria-expanded="false" aria-controls="owl-chat-body">Open</button>
-    </header>
-    <div class="owl-chat-body" id="owl-chat-body">
-      <div class="owl-chat-log" id="owl-chat-log" role="log" aria-live="polite"></div>
-
-      <!-- Saved conversations, one thread per field, kept per format so a
-           teacher can read back what the owl said about a field they have
-           already moved past. -->
-      <div class="owl-chat-history" id="owl-chat-history" hidden>
-        <div class="owl-chat-history-head">
-          <button type="button" class="owl-chat-back" id="owl-chat-history-back" hidden><span data-icon="arrowLeft"></span>All conversations</button>
-          <span id="owl-chat-history-title">Saved conversations</span>
-        </div>
-        <div class="owl-chat-history-list" id="owl-chat-history-list"></div>
-      </div>
-
-      <form class="owl-chat-form" id="owl-chat-form" autocomplete="off">
-        <label class="sr-only" for="owl-chat-input">Message Alan</label>
-        <input type="text" id="owl-chat-input" maxlength="500" placeholder="Ask about this field&hellip;" />
-        <button type="submit" class="btn btn-primary btn-sm" id="owl-chat-send">Send</button>
-      </form>
-    </div>
-  </section>
 
   <div class="modal-overlay" id="preview-overlay" hidden>
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="preview-title">
@@ -401,9 +442,9 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-10-18b"></script>
+  <script src="js/api.js?v=2026-10-18c"></script>
   <script src="js/icons.js?v=2026-10-06c"></script>
   <script src="js/doc-toolbar.js?v=2026-10-06c"></script>
-  <script src="js/generator.js?v=2026-10-18b"></script>
+  <script src="js/generator.js?v=2026-10-18c"></script>
 </body>
 </html>

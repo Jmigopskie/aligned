@@ -299,7 +299,13 @@ def check_guides(app, admin, student):
         for b in ("4-6", "7-8", "9-10"):
             rows = c.get(f"/api/course-guides?grade_band={b}&doc_type=curriculum_guide").get_json()["course_guides"]
             assert any(g["title"].startswith("MATATAG EPP/TLE") for g in rows), (b, rows)
-        assert all(g["doc_type"] == "curriculum_guide" for g in c.get("/api/course-guides?doc_type=curriculum_guide").get_json()["course_guides"])
+        # A type filter keeps the other kind out; an untyped upload (from
+        # before the Budget of Work / Curriculum Guide split) shows in both.
+        cg_rows = c.get("/api/course-guides?doc_type=curriculum_guide").get_json()["course_guides"]
+        assert cg_rows and all(g["doc_type"] in ("curriculum_guide", None) for g in cg_rows)
+        bow_rows = c.get("/api/course-guides?doc_type=budget_of_work").get_json()["course_guides"]
+        assert all(g["doc_type"] in ("budget_of_work", None) for g in bow_rows)
+        assert {g["id"] for g in cg_rows if g["doc_type"]}.isdisjoint({g["id"] for g in bow_rows})
 
         g7 = next(g for g in official if g.builtin_key == "bow-g7-ict")
         f = c.get(f"/api/course-guides/{g7.id}/file")

@@ -94,6 +94,9 @@ for not_apa in ("Networking basics https://good.example.org/net", "https://good.
 kept = grounding.keep_working_links({"refs": "Networking basics https://good.example.org/net"}, [refs], cite)
 assert kept["refs"] == cite, "a working link that isn't an APA reference is still dropped"
 assert grounding.keep_working_links({"refs": ["https://dead.example.org"]}, [refs], cite)["refs"] == [cite]
+# Weekly: the guide is cited once, on the first day, not repeated every day.
+weekly = grounding.keep_working_links({"refs": ["", "", ""]}, [refs], cite)["refs"]
+assert weekly == [cite, "", ""], weekly
 
 # Session logistics: only what the teacher entered survives; an invented
 # school, date or time is blanked. "Time Allotment" is lesson length, not one.
@@ -134,5 +137,19 @@ for statement in ("demonstrate an understanding of the food preservation and foo
 assert len(excerpt) < 9000, len(excerpt)
 bow = re.sub(r"\s+", " ", ai_service.guide_excerpt(GUIDE, {"topic": "Emerging trends and issues in ICT"}))
 assert COMPETENCY in bow and PERFORMANCE in bow and len(bow) < len(grounding.tidy_guide(GUIDE))
+
+# Budget of Work + Curriculum Guide picked together: each is searched for the
+# topic on its own share and labelled, and the verbatim check sees both.
+excerpt, full = ai_service._guide_inputs(
+    [("[G6] TLE: ICT, Three-Term Budget of Work", GUIDE), ("MATATAG EPP/TLE Curriculum Guide", CG)],
+    {"topic": "Food preservation"})
+assert "[From: [G6] TLE: ICT, Three-Term Budget of Work]" in excerpt and "[From: MATATAG EPP/TLE Curriculum Guide]" in excerpt
+assert len(excerpt) <= ai_service.GUIDE_BUDGET + 200, len(excerpt)
+assert "perform food preservation with precautions" in re.sub(r"\s+", " ", excerpt)
+assert grounding.snap_text("Discuss the emerging trends and issues in ICT", full) == COMPETENCY
+assert grounding.snap_text("perform food preservation with precautions", full) == "perform food preservation with precautions"
+# One guide as plain text still works the way it always did.
+assert ai_service._guide_inputs(GUIDE, {"topic": "Emerging trends"})[1] == GUIDE
+assert ai_service._guide_inputs([], {}) == ("", "")
 
 print("grounding OK")

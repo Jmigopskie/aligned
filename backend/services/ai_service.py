@@ -214,6 +214,25 @@ def _topic_sections(text: str, terms: set, budget: int) -> str:
     return "\n[...]\n".join(parts)
 
 
+def _guide_inputs(course_guide_text, context: dict):
+    """(excerpt for the prompt, full text for the verbatim check).
+
+    course_guide_text is one guide's text, or a list of (title, text) when the
+    teacher picked a Budget of Work and a Curriculum Guide. Each document is
+    searched for the topic on its own share of the budget and labelled, so one
+    long guide can't crowd the other out of the prompt; the verbatim check
+    runs against all of them."""
+    if isinstance(course_guide_text, (list, tuple)):
+        sources = [(t or "", x or "") for t, x in course_guide_text if (x or "").strip()]
+    else:
+        sources = [("", course_guide_text or "")] if (course_guide_text or "").strip() else []
+    if not sources:
+        return "", ""
+    share = GUIDE_BUDGET // len(sources)
+    parts = [(f"[From: {title}]\n" if title else "") + guide_excerpt(text, context, share) for title, text in sources]
+    return "\n\n".join(parts), "\n\n".join(text for _, text in sources)
+
+
 def guide_excerpt(text: str, context: dict, budget: int = GUIDE_BUDGET) -> str:
     """The parts of a course guide that cover this lesson, within budget.
 
@@ -282,6 +301,12 @@ def _field_directive(field):
     model detail where a general category is what's wanted."""
     haystack = f"{field.field_key or ''} {field.label or ''}".lower()
 
+    if re.search(r"\b(?:semester|quarter|term)\b", field.label or "", re.I):
+        return (
+            " Use the guide's own heading for the section the lesson's competency sits in, "
+            "worded as the guide words it (e.g. 'First Term' if the guide says Term, never "
+            "'First Quarter' instead)."
+        )
     if grounding.is_logistics_field(field):
         return (
             " Fill this only from the lesson details given above. If they don't state it, "
@@ -359,13 +384,16 @@ activities, questions, assessment and materials all come from this section's com
 suggested activities and performance tasks (or from a listed reference), using its terms.
 Do not add facts, topics, activities or examples that neither the guide nor a listed
 reference supports. Content standards, performance standards, learning competencies and
-objectives are copied from it word for word, never reworded:
+objectives are copied from it word for word, never reworded, and all from the SAME section
+(term/quarter and week) as the lesson's topic, so they belong together. Every other field
+builds on that one competency: the lesson, activities, generalization and evaluation teach
+and assess exactly what it names, and the topic, term and dates agree with it:
 ---
 {guide_text}
 ---
 """
     if citation:
-        block += f"\nAPA citation of this course guide (use it first in References):\n{citation}\n"
+        block += f"\nAPA citation of the curriculum documents above (list them first in References):\n{citation}\n"
     return block
 
 
@@ -609,7 +637,8 @@ def generate_full(context: dict, fields, course_guide_text: str = "", include_ke
     if not targets:
         return {}
     cite = course_guide_citation
-    lesson = _lesson_block(context, guide_excerpt(course_guide_text, context), cite)
+    excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
+    lesson = _lesson_block(context, excerpt, cite)
     task = f"""
 Fill ONLY the following fields and return strict JSON with field_key as keys:
 {_schema_block(targets)}
@@ -644,7 +673,8 @@ def generate_full_streaming(context: dict, fields, course_guide_text: str = "", 
     chunks = [fields[i:i + _STREAM_CHUNK_SIZE] for i in range(0, len(fields), _STREAM_CHUNK_SIZE)]
     # Built once per plan: every chunk shares this exact prefix.
     cite = course_guide_citation
-    lesson = _lesson_block(context, guide_excerpt(course_guide_text, context), cite)
+    excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
+    lesson = _lesson_block(context, excerpt, cite)
 
     all_values = {}
     for i, chunk in enumerate(chunks, start=1):
@@ -703,7 +733,8 @@ def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
              history: list, message: str, course_guide_citation: str = "") -> dict:
     """One turn of the Guided mode chat about `field`. Returns
     {"reply": str, "choices": [{"type": "use"|"ask", "label": str, "text": str}]}."""
-    lesson = _lesson_block(context, guide_excerpt(course_guide_text, context), course_guide_citation)
+    excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
+    lesson = _lesson_block(context, excerpt, course_guide_citation)
     written = {k: v for k, v in (prior_values or {}).items() if v and k != field.field_key}
     current = (prior_values or {}).get(field.field_key) or ""
     names = getattr(field, "parts_list", None) or []
