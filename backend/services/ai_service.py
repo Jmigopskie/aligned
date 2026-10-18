@@ -45,6 +45,10 @@ _MAX_ITEM_WORDS = 40
 _MAX_PROSE_SENTENCES = 6
 _MAX_PROSE_WORDS = 140
 
+# The length of one class session. Every day's plan, all parts together, must
+# fit inside it (the teacher's rule: content is capped at 45 minutes).
+_SESSION_MINUTES = 45
+
 _SYSTEM_INSTRUCTION = (
     "You are helping a K-12 ICT/TLE teacher in the Philippines write a lesson plan. "
     "Follow DepEd K-12 tone and terminology. Return complete, specific, classroom-ready "
@@ -66,6 +70,10 @@ _SYSTEM_INSTRUCTION = (
     f"sentence or phrase of up to about {_MAX_ITEM_WORDS} words. Always finish the "
     "sentence; never stop mid-thought.\n"
     f"- A prose field: up to {_MAX_PROSE_SENTENCES} complete sentences.\n"
+    f"- Time: each day is ONE class session of at most {_SESSION_MINUTES} minutes, a hard cap. "
+    "Everything planned for a session (routine, review, motivation, discussion, practice, "
+    f"assessment) must fit inside those {_SESSION_MINUTES} minutes together, never more; give "
+    "the minutes for each part so the teacher can see it adds up.\n"
     "- Never restate the field's own label, never open with filler such as 'In this "
     "lesson' or 'The teacher will', and never explain your reasoning or comment on "
     "the plan. Write the content only: no preamble, no closing sentence, no "
@@ -366,9 +374,44 @@ def _weekly_directive(field):
     )
 
 
+# What the standard DepEd lesson-plan parts are for, used only when a format
+# gives a field no hint of its own. Without them a model saw a bare label such
+# as "Analysis" and had to guess (one read it as questions for learners,
+# another as an analysis of the lesson plan itself). A format's own hint
+# always wins; these only fill the silence, the same for every model.
+_PART_MEANINGS = [
+    (r"\bmotivation\b", "A short, engaging opener (about 5 minutes) on today's topic "
+     "that gets learners curious; say what learners do."),
+    (r"\banalysis\b", "Two to four questions the teacher asks so learners process the activity they just did "
+     "and draw out the concept. Questions only, addressed to learners."),
+    (r"\babstraction\b|\blesson proper\b|\bdiscussion\b", "The core teaching of the concept, as ordered steps the "
+     "teacher follows, with the key facts or definitions learners must get."),
+    (r"\bapplication\b", "One task where learners use the new concept themselves (individually, in pairs or "
+     "groups), with what they produce."),
+    (r"\bgeneralization\b", "The key idea of the lesson in one to three sentences, as learners should be able to "
+     "state it."),
+    (r"\bevaluation\b|\bassessment\b", "A short check of the competency that fits the remaining time: three to "
+     "five items or one task, with the answer key or criteria."),
+    (r"\bassignment\b|\bagreement\b", "A brief task for home that extends today's lesson."),
+    (r"\breview\b", "A quick recap of the previous lesson (a few questions or a short activity) that leads into "
+     "today's topic."),
+]
+
+
+def _part_meaning(field):
+    if field.ai_hint:
+        return ""
+    label = (field.label or "").lower()
+    for pattern, meaning in _PART_MEANINGS:
+        if re.search(pattern, label):
+            return f" ({meaning})"
+    return ""
+
+
 def _schema_block(fields):
     return "\n".join(
-        f"- {f.field_key} ({f.field_type}): {f.ai_hint or f.label}{_field_directive(f)}{_weekly_directive(f)}"
+        f"- {f.field_key} ({f.field_type}): {f.ai_hint or f.label}{_part_meaning(f)}"
+        f"{_field_directive(f)}{_weekly_directive(f)}"
         for f in fields
     )
 
