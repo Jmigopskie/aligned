@@ -218,9 +218,60 @@ def _weekly_directive(field):
     )
 
 
-def _schema_block(fields):
+_RECAP_WORDS = ("review", "recap", "previous lesson", "reviewing previous", "checking of assignment",
+                "pre-lesson", "pre lesson")
+_ASSIGNMENT_WORDS = ("assignment", "agreement", "extended learning", "additional activities", "enrichment",
+                     "remediation")
+_TIMING_WORDS = ("procedure", "flow", "lesson proper", "learning experience", "activity")
+
+
+def _grounding_directive(field, context: dict) -> str:
+    """Ties the recap to the previous topic, the assignment to the next topic,
+    and the procedure's times to the discussion's length, using what Alan asked
+    during setup. Without it these fields were written blind."""
+    haystack = f"{field.field_key or ''} {field.label or ''}".lower().replace("_", " ")
+    weekly = field.field_type == "weekly"
+    topic = context.get("topic") or ""
+    out = ""
+
+    # Only when setup asked: a request without the key (an older draft) gets
+    # no line, rather than "first lesson" by default.
+    recap = any(w in haystack for w in _RECAP_WORDS)
+    if recap and "previous_topic" not in context:
+        pass
+    elif recap:
+        previous = context.get("previous_topic") or ""
+        if previous:
+            out += (f" The class's previous lesson was: {previous}. Base this recap on that lesson "
+                    f"and connect it to today's topic, {topic}.")
+            if weekly:
+                out += " Only day 1 recaps the previous lesson; each later day recaps the day before it."
+        else:
+            out += (" This is the first lesson on this topic; open with what learners already know from "
+                    "daily life or earlier grades instead of a recap of a previous lesson.")
+    # "Checking of Assignment" looks back at the last lesson, so a recap match wins.
+    elif "next_topic" in context and any(w in haystack for w in _ASSIGNMENT_WORDS):
+        upcoming = context.get("next_topic") or ""
+        if upcoming:
+            out += (f" The next lesson is: {upcoming}. Write the assignment so it prepares learners for "
+                    f"that next lesson while building on today's topic, {topic}.")
+            if weekly:
+                out += " Only the last day's assignment prepares for the next lesson; earlier days lead into the following day."
+        else:
+            out += " Base the assignment on today's topic."
+
+    minutes = context.get("duration_minutes")
+    if minutes and any(w in haystack for w in _TIMING_WORDS):
+        span = f"{minutes} minutes per session" if weekly else f"{minutes} minutes"
+        out += f" The whole discussion lasts {span}. Where the procedure gives times, they must add up to that."
+    return out
+
+
+def _schema_block(fields, context=None):
+    context = context or {}
     return "\n".join(
         f"- {f.field_key} ({f.field_type}): {f.ai_hint or f.label}{_field_directive(f)}{_weekly_directive(f)}"
+        f"{_grounding_directive(f, context) if context else ''}"
         for f in fields
     )
 
@@ -407,7 +458,7 @@ def _trim(values, fields):
     )
 
 
-def _fill_gaps(lesson: str, fields, all_values: dict, label: str) -> dict:
+def _fill_gaps(lesson: str, fields, all_values: dict, label: str, context=None) -> dict:
     """One more attempt at the fields that came back blank or as a placeholder.
 
     A model asked for twelve fields at once will occasionally skip one or answer
@@ -425,7 +476,7 @@ def _fill_gaps(lesson: str, fields, all_values: dict, label: str) -> dict:
 These fields of the lesson plan came back empty or unanswered. Answer each one
 now with real, specific content grounded in the lesson details above. Return
 strict JSON with field_key as keys and nothing else:
-{_schema_block(gap_fields)}
+{_schema_block(gap_fields, context)}
 """
     try:
         recovered = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], f"{label} (filling gaps)"), gap_fields)
@@ -461,10 +512,10 @@ def generate_full(context: dict, fields, course_guide_text: str = "", include_ke
     lesson = _lesson_block(context, guide_excerpt(course_guide_text, context))
     task = f"""
 Fill ONLY the following fields and return strict JSON with field_key as keys:
-{_schema_block(targets)}
+{_schema_block(targets, context)}
 """
     values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency"), targets)
-    values.update(_fill_gaps(lesson, targets, values, "Building Proficiency"))
+    values.update(_fill_gaps(lesson, targets, values, "Building Proficiency", context))
     return values
 
 
@@ -502,7 +553,7 @@ Already written fields (for consistency, do not repeat):
 {json.dumps(all_values)}
 
 Now fill ONLY the following fields. Return strict JSON with field_key as keys:
-{_schema_block(chunk)}
+{_schema_block(chunk, context)}
 """
         values = _trim(
             _call(_SYSTEM_INSTRUCTION, [lesson, task], f"Building Proficiency {i}/{len(chunks)}"),
@@ -517,7 +568,7 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
     gaps = ai_limits.missing_keys(all_values, fields)
     if gaps:
         yield {"type": "filling_gaps", "count": len(gaps)}
-        recovered = _fill_gaps(lesson, fields, all_values, "Building Proficiency")
+        recovered = _fill_gaps(lesson, fields, all_values, "Building Proficiency", context)
         if recovered:
             all_values.update(recovered)
             yield {"type": "section_done", "section": "Filled-in gaps",
@@ -567,7 +618,7 @@ Fields already written (do not repeat them):
 {json.dumps(written)}
 
 The teacher is writing the field "{field.label}" ({field.field_type}).
-{f"What belongs in it: {field.ai_hint}" if field.ai_hint else ""}{_field_directive(field)}{weekly_note}
+{f"What belongs in it: {field.ai_hint}" if field.ai_hint else ""}{_field_directive(field)}{_grounding_directive(field, context)}{weekly_note}
 {typed}
 
 {f"Conversation so far:{chr(10)}{turns}{chr(10)}" if turns else ""}Teacher: {message}
