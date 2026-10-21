@@ -783,7 +783,7 @@ function getClassLabel() {
 
 function getAdvancedContext() {
   const isCollege = levelTypeSelect.value === "college";
-  return {
+  const context = {
     topic: topicInput.value.trim(),
     level_type: isCollege ? "College" : "K-12",
     program: isCollege ? collegeProgramInput.value.trim() : "",
@@ -793,11 +793,15 @@ function getAdvancedContext() {
     school: schoolInput.value.trim(),
     student_teacher: studentTeacherInput.value.trim(),
     duration_minutes: parseInt(durationInput.value, 10) || "",
-    // Always sent (empty when "first lesson" / "not sure yet") so the server
-    // knows Alan asked and grounds the recap and assignment accordingly.
-    previous_topic: flowFlags.firstLesson ? "" : prevTopicInput.value.trim(),
-    next_topic: flowFlags.nextUnsure ? "" : nextTopicInput.value.trim(),
   };
+  // Only when Alan actually asked (the plan went through the flow): then an
+  // empty value means "first lesson" / "not sure yet" and the server grounds
+  // the recap and assignment on it. A plan from before the flow sends neither.
+  if (flowFlags.flowStep) {
+    context.previous_topic = flowFlags.firstLesson ? "" : prevTopicInput.value.trim();
+    context.next_topic = flowFlags.nextUnsure ? "" : nextTopicInput.value.trim();
+  }
+  return context;
 }
 
 let gateWasReady = false;
@@ -824,7 +828,8 @@ function syncOwlVisibility() {
 
 function updateGate() {
   // The name step is required for everyone; teachers have no cooperating teacher.
-  const teacherOk = studentTeacherInput.value.trim().length > 0;
+  // Plans saved before the flow existed only have the old teacher field.
+  const teacherOk = (studentTeacherInput.value || teacherNameInput.value).trim().length > 0;
   const subjectOk = subjectInput.value.trim().length > 0;
   const guideOk = !!selectedCourseGuide;
   const ready = teacherOk && subjectOk && guideOk;
@@ -2690,8 +2695,17 @@ document.querySelectorAll("[data-review-all]").forEach((btn) => {
 });
 
 let reviewReturnFocus = null;
+// Where each part of the review list lives in the popup, recorded before the
+// flow ever moves it: [node, parent, next sibling].
+const reviewHome = [".gen-review-intro", ".gen-review-bulk", "#gen-review-list", "#gen-review-hint"]
+  .map((sel) => document.querySelector(sel))
+  .filter(Boolean)
+  .map((node) => [node, node.parentNode, node.nextSibling]);
 
 function openReview() {
+  // The setup flow borrows the list for its "Which parts should I write?"
+  // screen (mountReview); bring it home before the popup shows it.
+  reviewHome.forEach(([node, parent, before]) => parent.insertBefore(node, before));
   reviewReturnFocus = document.activeElement;
   delete reviewList.dataset.lastPulse;
   renderReviewList();
@@ -3153,6 +3167,8 @@ saveBtn.addEventListener("click", async () => {
     // so the local draft has done its job. Editing on from here marks the
     // page dirty again and starts a fresh draft.
     clearDraft();
+    // A refresh now reopens the saved plan instead of an empty run.
+    if (planId) history.replaceState(null, "", `${location.pathname}?plan_id=${planId}`);
     saveStatus.textContent = "Saved.";
     enableExport();
     showToast("Lesson plan saved.");

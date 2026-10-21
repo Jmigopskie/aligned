@@ -60,6 +60,10 @@ def main():
     got = _grounding_directive(proper, {"duration_minutes": 45})
     assert "lasts 45 minutes" in got, got
     assert _grounding_directive(proper, {}) == "", "no duration, no timing line"
+    # One part of the procedure (4A's "Activity") must not be told it is the
+    # whole discussion, or it may take all the minutes.
+    assert _grounding_directive(Field("activity", "Activity"), {"duration_minutes": 45}) == ""
+    assert _grounding_directive(Field("motivational_activity", "Motivational Activity"), {"duration_minutes": 45}) == ""
     print("  timing OK")
 
     assert _grounding_directive(Field("materials", "Materials"), ctx) == ""

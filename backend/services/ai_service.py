@@ -222,7 +222,9 @@ _RECAP_WORDS = ("review", "recap", "previous lesson", "reviewing previous", "che
                 "pre-lesson", "pre lesson")
 _ASSIGNMENT_WORDS = ("assignment", "agreement", "extended learning", "additional activities", "enrichment",
                      "remediation")
-_TIMING_WORDS = ("procedure", "flow", "lesson proper", "learning experience", "activity")
+# Whole-procedure fields only: a single part (4A's "Activity") told the whole
+# discussion's length may take all of it.
+_TIMING_WORDS = ("procedure", "flow", "lesson proper", "learning experience")
 
 
 def _grounding_directive(field, context: dict) -> str:
