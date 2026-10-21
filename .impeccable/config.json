@@ -8,6 +8,24 @@
         "value": "space grotesk",
         "createdAt": "2026-09-25T14:38:45.298Z",
         "reason": "user brief: the task prompt says to keep the Space Grotesk headings"
+      },
+      {
+        "rule": "pulsing-dot",
+        "value": "*",
+        "files": [
+          "frontend/alan-3d.html"
+        ],
+        "createdAt": "2026-10-21T21:37:58.709Z",
+        "reason": "assistant triage: finding is .owl-dots in shared css/style.css (Guided-mode chat typing indicator, pre-existing, tied to live chat state); alan-3d.html has no dots"
+      },
+      {
+        "rule": "pulsing-dot",
+        "value": "*",
+        "files": [
+          "frontend/generator.html"
+        ],
+        "createdAt": "2026-10-21T23:24:51.834Z",
+        "reason": "assistant triage: .owl-dots is the pre-existing Guided-mode chat typing indicator in shared css/style.css, animated only while a reply is pending (live state); not added by the flow"
       }
     ]
   }
