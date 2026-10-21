@@ -9,7 +9,7 @@ from werkzeug.utils import secure_filename
 from extensions import db
 from models.format import LessonPlanFormat, FormatField
 from models.lesson_plan import LessonPlan
-from routes.auth_routes import login_required, current_user
+from routes.auth_routes import login_required, staff_required, current_user
 from services import ai_service, docx_service
 
 format_bp = Blueprint("formats", __name__)
@@ -99,9 +99,16 @@ def _tmp_dir():
 @login_required
 def list_formats():
     user = current_user()
-    formats = LessonPlanFormat.query.filter(
-        (LessonPlanFormat.owner_id == user.id) | (LessonPlanFormat.is_public.is_(True))
-    ).order_by(LessonPlanFormat.created_at.desc()).all()
+    if user.role == "student":
+        # A student picks from the built-ins and their own teachers' formats
+        # (shared or not); joining the class is what grants access.
+        teacher_ids = [m.section.teacher_id for m in user.section_memberships if m.section]
+        visible = LessonPlanFormat.is_builtin.is_(True)
+        if teacher_ids:
+            visible = visible | LessonPlanFormat.owner_id.in_(teacher_ids)
+    else:
+        visible = (LessonPlanFormat.owner_id == user.id) | (LessonPlanFormat.is_public.is_(True))
+    formats = LessonPlanFormat.query.filter(visible).order_by(LessonPlanFormat.created_at.desc()).all()
     return jsonify({"status": "ok", "formats": [f.to_dict() for f in formats]})
 
 def _suggest_fields(renderable_path):
@@ -153,7 +160,7 @@ def _suggest_fields(renderable_path):
     return fields, None
 
 @format_bp.post("/formats/scan")
-@login_required
+@staff_required
 def scan_format():
     """Upload a reference file and render it as a live, editable document —
     the same real tables/headers/labels as the source file — so the teacher
@@ -213,7 +220,7 @@ def scan_format():
     })
 
 @format_bp.post("/formats")
-@login_required
+@staff_required
 def create_format():
     """Save a format. When it's built from an uploaded reference file, the
     teacher never hand-picks fields — AI reads whatever the teacher leaves
@@ -311,7 +318,7 @@ def get_format(format_id):
     return jsonify({"status": "ok", "format": fmt.to_dict(include_fields=True)})
 
 @format_bp.patch("/formats/<int:format_id>")
-@login_required
+@staff_required
 def update_format(format_id):
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
@@ -355,7 +362,7 @@ def update_format(format_id):
     return jsonify({"status": "ok", "format": fmt.to_dict(include_fields=True)})
 
 @format_bp.delete("/formats/<int:format_id>")
-@login_required
+@staff_required
 def delete_format(format_id):
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
@@ -476,7 +483,7 @@ def _sanitize_content_edits(raw_edits):
     return edits
 
 @format_bp.patch("/formats/<int:format_id>/content")
-@login_required
+@staff_required
 def edit_format_content(format_id):
     """Persist edits made in the format builder's document editor — text,
     bold/italic/underline, alignment, heading level, list style, or deleting
@@ -537,7 +544,7 @@ def edit_format_content(format_id):
     return jsonify({"status": "ok", "applied": applied, "format": fmt.to_dict(include_fields=True)})
 
 @format_bp.patch("/formats/<int:format_id>/field-roles")
-@login_required
+@staff_required
 def set_field_roles(format_id):
     """Override which fields Guided walks the teacher through.
 
@@ -595,7 +602,7 @@ def _resolve_temp_renderable_path(token):
     return None
 
 @format_bp.patch("/formats/scan/content")
-@login_required
+@staff_required
 def edit_scanned_content():
     """The same content-editing toolbar as edit_format_content() above, but
     for a file that was just scanned and hasn't been saved as a format yet —

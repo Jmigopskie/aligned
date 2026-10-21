@@ -42,6 +42,22 @@ def admin_required(view_func):
         return view_func(*args, **kwargs)
     return wrapper
 
+def staff_required(view_func):
+    """Only teachers (and admins) upload or change formats; a student picks
+    from the built-ins and their own teacher's formats."""
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify({"status": "error", "message": "Not authenticated."}), 401
+        user = current_user()
+        if not user or user.role == "student":
+            return jsonify({
+                "status": "error",
+                "message": "Only teachers can upload or change formats. Pick a built-in format or one from your teacher.",
+            }), 403
+        return view_func(*args, **kwargs)
+    return wrapper
+
 def current_user():
     user_id = session.get("user_id")
     return User.query.get(user_id) if user_id else None

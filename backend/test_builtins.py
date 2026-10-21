@@ -119,7 +119,8 @@ def check_lock(app, admin, teacher, student):
     assert fmt.name == "4A's Lesson Plan" and fmt.fields[0].role is None
 
     # A teacher's own format is still theirs to change, and seeding leaves it alone.
-    c = client_for(app, student)
+    # (Students can no longer upload formats; see test_format_access.py.)
+    c = client_for(app, teacher)
     res = c.post("/api/formats", json={"name": "Mine", "fields": [{"label": "Objectives"}]})
     assert res.status_code == 201, res.get_json()
     mine = res.get_json()["format"]["id"]
