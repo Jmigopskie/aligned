@@ -435,7 +435,104 @@ const STEPS = {
     placeholder: "e.g. Making charts",
     alt: { flag: "nextUnsure", label: "Not sure yet" },
   }),
+  guide: () => {
+    const wrap = el("div", { class: "flow-answer" });
+    paintGuides(wrap);
+    return wrap;
+  },
+  mode: () => {
+    const wrap = el("div", { class: "flow-choices flow-choices-stack", role: "group", "aria-labelledby": "flow-question" });
+    const current = G.getAnswers().mode;
+    [
+      { value: "full", title: "Building Proficiency", sub: "I write the whole plan; you review and edit it." },
+      { value: "step", title: "Guided", sub: "You write each part, with me helping beside you." },
+    ].forEach((m) => {
+      const btn = el("button", { type: "button", class: "flow-choice flow-format flow-mode", "aria-pressed": String(m.value === current) },
+        twoLine(m.title, m.sub), tick());
+      btn.addEventListener("click", () => {
+        wrap.querySelectorAll(".flow-mode").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+        G.setAnswers({ mode: m.value });
+        refresh();
+      });
+      wrap.append(btn);
+    });
+    return wrap;
+  },
 };
+
+// ---- the course guide ----
+const GUIDES_SHOWN = 6;
+
+function guideCard(g, pressed, onPick) {
+  const meta = g.is_builtin
+    ? `${g.doc_type === "curriculum_guide" ? "Curriculum Guide" : "Budget of Work"} · ${g.curriculum || "DepEd"}`
+    : `${g.subject} · uploaded by ${g.uploaded_by || "a teacher"}`;
+  const text = twoLine(g.title, meta);
+  if (g.is_builtin) {
+    const badge = el("span", { class: "flow-badge" }, icon("shieldCheck"), "Official DepEd");
+    text.prepend(badge);
+  }
+  const btn = el("button", { type: "button", class: "flow-choice flow-format", "aria-pressed": String(pressed) }, text, tick());
+  btn.addEventListener("click", () => onPick(btn));
+  return btn;
+}
+
+async function paintGuides(wrap, showAll = false) {
+  const a = G.getAnswers();
+  wrap.replaceChildren(el("p", { class: "flow-help" }, `Looking for ${a.subject || "your subject"} guides…`));
+  let guides = [];
+  try {
+    guides = await G.searchCourseGuides();
+  } catch (err) {
+    showError(err.message);
+  }
+  const current = G.getAnswers().courseGuide;
+  if (current && !guides.some((g) => g.id === current.id)) guides.unshift(current);
+
+  const list = el("div", { class: "flow-choices flow-choices-stack flow-scroll", role: "group", "aria-labelledby": "flow-question" });
+  (showAll ? guides : guides.slice(0, GUIDES_SHOWN)).forEach((g) => {
+    list.append(guideCard(g, current && g.id === current.id, (btn) => {
+      list.querySelectorAll(".flow-format").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      G.selectCourseGuide(g);
+      refresh();
+    }));
+  });
+  const parts = guides.length
+    ? [list]
+    : [el("p", { class: "flow-help" }, "No course guide for this subject yet. Upload yours and I'll add it to the shared library.")];
+  if (!showAll && guides.length > GUIDES_SHOWN) {
+    const more = el("button", { type: "button", class: "flow-back flow-more" }, `Show all ${guides.length}`);
+    more.addEventListener("click", () => paintGuides(wrap, true));
+    parts.push(more);
+  }
+
+  const input = el("input", { type: "file", accept: ".docx,.dotx,.pdf", hidden: true });
+  const upload = el("button", { type: "button", class: "flow-drop" }, icon("upload"),
+    twoLine("Upload my own guide", ".docx, .dotx or .pdf · it joins the shared library"));
+  upload.addEventListener("click", () => input.click());
+  input.addEventListener("change", async () => {
+    const file = input.files[0];
+    if (!file) return;
+    if (!/\.(docx|dotx|pdf)$/i.test(file.name)) {
+      showError("Only .docx, .dotx or .pdf files work here.");
+      return;
+    }
+    errorEl.hidden = true;
+    upload.disabled = true;
+    say("Adding it to the library…", "loading");
+    try {
+      await G.uploadCourseGuide(file);
+      say(COPY.guide.say, FLOW_POSES.guide);
+      paintGuides(wrap, showAll);
+    } catch (err) {
+      showError(err.message);
+      say(COPY.guide.say, FLOW_POSES.guide);
+      upload.disabled = false;
+    }
+  });
+  wrap.replaceChildren(...parts, upload, input);
+  refresh();
+}
 
 // ---- the shell ----
 const askEl = el("div", { class: "flow-ask" });
@@ -445,7 +542,8 @@ const countEl = el("p", { class: "flow-count" });
 const backBtn = el("button", { type: "button", class: "flow-back" }, icon("arrowLeft"), "Back");
 const nextIcon = icon("arrowRight");
 nextIcon.className = "flow-next-icon";
-const nextBtn = el("button", { type: "submit", class: "flow-next" }, el("span", {}, "Next"), nextIcon);
+const nextLabel = el("span", {}, "Next");
+const nextBtn = el("button", { type: "submit", class: "flow-next" }, nextLabel, nextIcon);
 const errorEl = el("p", { class: "flow-error", role: "alert", hidden: true });
 const form = el("form", { class: "flow-step", novalidate: true });
 const actions = el("div", { class: "flow-actions" }, backBtn, nextBtn, el("span", { class: "flow-hint" }, "or press Enter"));
@@ -456,8 +554,11 @@ const sayEl = el("p", { class: "flow-say", role: "status", "aria-live": "polite"
 const alanHost = el("div", { class: "flow-alan" }, el("img", { src: "img/owl/alan-wave.png", alt: "" }));
 const stageEl = el("div", { class: "flow-stage" }, sayEl, alanHost);
 
+let currentPose = "hi";
+
 function say(text, pose) {
   sayEl.textContent = text;
+  currentPose = pose;
   alan.setPose(pose);
 }
 
@@ -478,48 +579,77 @@ function recall() {
   }
 }
 
-function render() {
-  const id = steps[index];
-  const copy = COPY[id];
+// One screen of the flow. The question steps go through render(); the review,
+// writing and lesson-details screens call screen() directly with their own
+// Next/Back handlers.
+let screenNext = null;
+let screenBack = null;
+let detailsMode = false;
+
+function screen({ count, at, q, help, body, next = "Next", onNext = null, onBack = null, showActions = true, showBack = true, sayText, pose }) {
   errorEl.hidden = true;
-  countEl.textContent = `Step ${index + 1} of ${steps.length}`;
+  countEl.textContent = count;
   progress.setAttribute("aria-valuemax", String(steps.length));
-  progress.setAttribute("aria-valuenow", String(index + 1));
-  bar.style.transform = `scaleX(${(index + 1) / steps.length})`;
-  backBtn.hidden = index === 0;
+  progress.setAttribute("aria-valuenow", String(Math.max(1, Math.round(at * steps.length))));
+  bar.style.transform = `scaleX(${at})`;
+  screenNext = onNext;
+  screenBack = onBack;
+  nextLabel.textContent = next;
+  actions.hidden = !showActions;
+  backBtn.hidden = !showBack;
 
-  const heading = el("h1", { class: "flow-question", id: "flow-question", tabindex: "-1" }, copy.q);
-  const help = id === "format" && user.role !== "student" ? "Pick a built-in format, or upload your school's own." : copy.help;
+  const heading = el("h1", { class: "flow-question", id: "flow-question", tabindex: "-1" }, q);
   const answer = el("div", { class: "flow-answer" });
-  const builder = STEPS[id];
-  answer.append(...[].concat(builder ? builder() : []));
+  body(answer);
   form.replaceChildren(heading, help ? el("p", { class: "flow-help" }, help) : "", answer);
-
   if (!calm) {
     form.classList.add("is-entering");
     requestAnimationFrame(() => requestAnimationFrame(() => form.classList.remove("is-entering")));
   }
-  say(copy.say, FLOW_POSES[id]);
-  G.setAnswers({ flowStep: id });
+  say(sayText, pose);
   refresh();
-  const first = answer.querySelector("input:not(:disabled)");
+  const first = answer.querySelector("input:not(:disabled):not([type=file])");
   (first || heading).focus({ preventScroll: true });
 }
 
+function render() {
+  const id = steps[index];
+  const copy = COPY[id];
+  screen({
+    count: detailsMode ? "Lesson details" : `Step ${index + 1} of ${steps.length}`,
+    at: (index + 1) / steps.length,
+    q: copy.q,
+    help: id === "format" && user.role !== "student" ? "Pick a built-in format, or upload your school's own." : copy.help,
+    next: detailsMode ? "Save" : "Next",
+    showBack: index > 0 || detailsMode,
+    body: (answer) => {
+      const builder = STEPS[id];
+      answer.append(...[].concat(builder ? builder() : []));
+    },
+    sayText: copy.say,
+    pose: FLOW_POSES[id],
+  });
+  G.setAnswers({ flowStep: id });
+}
+
 refresh = () => {
+  if (screenNext) {
+    nextBtn.disabled = false;
+    return;
+  }
   const id = steps[index];
   nextBtn.disabled = id === "format" ? !pendingFormatId : !isStepAnswered(id, G.getAnswers());
 };
 
 async function go(delta) {
+  if (delta > 0 && screenNext) return screenNext();
+  if (delta < 0 && screenBack) return screenBack();
   const id = steps[index];
-  const next = index + delta;
-  if (next < 0 || next >= steps.length) return;
   if (delta > 0 && id === "format") {
     if (!pendingFormatId) return;
     if (pendingFormatId !== G.getAnswers().formatId) {
       // A different format reloads the page on this run, so say where to land.
-      G.setAnswers({ flowStep: steps[next] });
+      G.setAnswers({ flowStep: steps[index + 1] });
       nextBtn.disabled = true;
       say("Opening the format…", "loading");
       try {
@@ -535,6 +665,10 @@ async function go(delta) {
     return;
   }
   if (delta > 0 && ["school", "name", "coop"].includes(id)) remember();
+  if (detailsMode) return showDetails();
+  if (delta > 0 && id === "mode") return finish();
+  const next = index + delta;
+  if (next < 0 || next >= steps.length) return;
   index = next;
   render();
 }
@@ -548,6 +682,147 @@ nextBtn.addEventListener("click", (e) => {
   go(1);
 });
 backBtn.addEventListener("click", () => go(-1));
+
+// ---- after the last question ----
+function finish() {
+  if (G.getAnswers().mode === "step") {
+    G.startGuided();
+    return;
+  }
+  // Prefill now so the review already shows the answered blanks as kept.
+  G.useMode("full");
+  renderReview();
+}
+
+function renderReview() {
+  screen({
+    count: "Last check",
+    at: 1,
+    q: "Which parts should I write?",
+    help: "I'll write everything set to Generate. Your lesson title and session number stay yours unless you change them.",
+    body: (answer) => G.mountReview(answer),
+    next: "Write my plan",
+    onNext: () => {
+      flowGenerating = true;
+      G.startFull();
+    },
+    onBack: () => {
+      index = steps.indexOf("mode");
+      render();
+    },
+    sayText: "Pick what I write, then I'll get started.",
+    pose: "check",
+  });
+}
+
+// Generation runs in generator.js; while it does, the big Alan keeps the
+// student company and the progress list moves over here.
+let flowGenerating = false;
+const progressEl = document.getElementById("generation-progress");
+const progressHome = progressEl.parentNode;
+const progressNext = progressEl.nextSibling;
+const sendProgressHome = () => progressHome.insertBefore(progressEl, progressNext);
+
+G.generationEvents.addEventListener("start", () => {
+  if (!flowGenerating) return;
+  G.hideDocument();
+  screen({
+    count: "Writing",
+    at: 1,
+    q: "Writing your plan…",
+    help: "This usually takes a minute or two. Each part shows up here as it's written.",
+    body: (answer) => answer.append(progressEl),
+    showActions: false,
+    sayText: "I'm on it. Writing each part of your plan now.",
+    pose: "loading",
+  });
+});
+
+G.generationEvents.addEventListener("done", () => {
+  if (!flowGenerating) return;
+  flowGenerating = false;
+  sendProgressHome();
+  say("Done! Here's your plan.", "celebrate");
+  setTimeout(() => G.showDocument(), calm ? 0 : 1200);
+});
+
+G.generationEvents.addEventListener("error", (e) => {
+  if (!flowGenerating) return;
+  flowGenerating = false;
+  sendProgressHome();
+  screen({
+    count: "Writing",
+    at: 1,
+    q: "That didn't work",
+    help: e.detail.message || "Something went wrong while writing your plan.",
+    body: () => {},
+    next: "Try again",
+    onNext: () => {
+      flowGenerating = true;
+      G.startFull();
+    },
+    onBack: renderReview,
+    sayText: "Sorry, that one got away from me. Let's try again.",
+    pose: "unsure",
+  });
+});
+
+// ---- lesson details: change an answer from the document ----
+function classText(a) {
+  const parts = a.levelType === "college" ? [a.program, a.year, a.section] : [a.grade, a.section];
+  return parts.filter((p) => p && String(p).trim()).join(" · ");
+}
+
+const DETAIL_ROWS = [
+  ["school", "School", (a) => a.school],
+  ["name", "Your name", (a) => a.studentTeacher],
+  ["coop", "Cooperating teacher", (a) => a.coop],
+  ["subject", "Subject", (a) => a.subject],
+  ["duration", "Discussion length", (a) => (a.durationMinutes ? `${a.durationMinutes} minutes` : "")],
+  ["class", "Class", classText],
+  ["prevTopic", "Previous topic", (a) => (a.firstLesson ? "This is the first lesson" : a.previousTopic)],
+  ["topic", "Today's topic", (a) => a.topic],
+  ["nextTopic", "Next topic", (a) => (a.nextUnsure ? "Not sure yet" : a.nextTopic)],
+  ["guide", "Course guide", (a) => (a.courseGuide ? a.courseGuide.title : "")],
+];
+
+function showDetails() {
+  ensureShell();
+  detailsMode = true;
+  G.hideDocument();
+  const a = G.getAnswers();
+  screen({
+    count: "Lesson details",
+    at: 1,
+    q: "Lesson details",
+    help: "Change an answer and I'll use it the next time I write. What's already written stays as it is.",
+    body: (answer) => {
+      const list = el("div", { class: "flow-details" });
+      if (a.formatName) {
+        list.append(el("div", { class: "flow-detail is-fixed" }, twoLine("Format", a.formatName)));
+      }
+      DETAIL_ROWS.filter(([id]) => steps.includes(id)).forEach(([id, label, value]) => {
+        const row = el("button", { type: "button", class: "flow-detail" }, twoLine(label, value(a) || "Not answered"), icon("edit"));
+        row.addEventListener("click", () => {
+          index = steps.indexOf(id);
+          render();
+        });
+        list.append(row);
+      });
+      answer.append(list);
+    },
+    next: "Back to my plan",
+    showBack: false,
+    onNext: () => {
+      detailsMode = false;
+      G.showDocument();
+    },
+    sayText: "Anything to change?",
+    pose: "present",
+  });
+}
+
+window.addEventListener("aligned:lesson-details", showDetails);
 
 // ---- Alan ----
 // Loaded on demand: if three.js or WebGL is unavailable the 2D picture stays
@@ -617,11 +892,26 @@ async function mountAlan(host) {
 }
 
 // ---- start ----
+// The shell and the 3D Alan are mounted on first use: right away for a new
+// plan, or only when Lesson details is opened from a saved plan.
+let shellMounted = false;
+
+function ensureShell() {
+  if (shellMounted) return;
+  shellMounted = true;
+  flow.replaceChildren(askEl, stageEl);
+  mountAlan(alanHost).then((ctl) => {
+    alan = ctl;
+    alan.setPose(currentPose);
+  });
+}
+
 async function start() {
   const ready = await G.ready;
-  if (ready.kind !== "flow" || ready.stage === "doc") return;
   user = ready.user;
   steps = flowSteps(user.role);
+  // A saved plan (or a run already in its document) only needs Lesson details.
+  if (ready.kind !== "flow" || ready.stage === "doc") return;
 
   if (!ready.runId) {
     resumeOffer = ready.formatId ? null : G.unfinishedRun();
@@ -639,13 +929,9 @@ async function start() {
   const resumeAt = steps.indexOf(ready.flowStep);
   index = resumeAt >= 0 ? resumeAt : Math.max(0, steps.indexOf(G.getAnswers().formatId ? "school" : "format"));
 
-  flow.replaceChildren(askEl, stageEl);
+  ensureShell();
   flow.hidden = false;
   render();
-  mountAlan(alanHost).then((ctl) => {
-    alan = ctl;
-    alan.setPose(FLOW_POSES[steps[index]]);
-  });
 }
 
 start();

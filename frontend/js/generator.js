@@ -165,10 +165,11 @@ const cgDropzone = document.getElementById("cg-dropzone");
 const cgFileInput = document.getElementById("cg-file-input");
 const cgSelectedEl = document.getElementById("cg-selected");
 const gateLock = document.getElementById("gate-lock");
-// The locked Generate tab's way out: the tab button does the real switching.
-document.getElementById("gate-setup-btn").addEventListener("click", () => {
-  document.querySelector('[data-tab="setup"]').click();
-});
+// The setup answers are changed in the flow's Lesson details (js/setup-flow.js),
+// from the header button or from the locked gate's way out.
+const openLessonDetails = () => window.dispatchEvent(new CustomEvent("aligned:lesson-details"));
+document.getElementById("gate-setup-btn").addEventListener("click", openLessonDetails);
+document.getElementById("lesson-details-btn").addEventListener("click", openLessonDetails);
 const unlockedContent = document.getElementById("unlocked-content");
 
 const genTabsEl = document.getElementById("gen-tabs");
@@ -3266,7 +3267,12 @@ function applyPrefill() {
   const filled = prefillFieldValues(plain, getAnswers(), fieldValues);
   if (!Object.keys(filled).length) return;
   Object.assign(fieldValues, filled);
+  // The student already answered these, so Alan keeps them as they are
+  // instead of writing over them.
+  Object.keys(filled).forEach((key) => staticKeys.add(key));
+  saveStaticKeys();
   paintRestoredValues();
+  paintStaticMarks();
   markDirty();
 }
 
@@ -3279,15 +3285,21 @@ function mountReview(container) {
   container.replaceChildren(...[intro, bulk, reviewList, reviewHint].filter(Boolean));
 }
 
+// Each mode keeps its own copy of the fields, so switch first and prefill
+// after: prefilling first would land in the mode being left.
+function useMode(name) {
+  if (mode !== name) modeSwitchBtns.find((b) => b.dataset.mode === name).click();
+  flowFlags.mode = name;
+  applyPrefill();
+}
+
 function startFull() {
-  if (mode !== "full") modeSwitchBtns.find((b) => b.dataset.mode === "full").click();
-  flowFlags.mode = "full";
+  useMode("full");
   runGeneration(selectedGenerateKeys());
 }
 
 function startGuided() {
-  if (mode !== "step") modeSwitchBtns.find((b) => b.dataset.mode === "step").click();
-  flowFlags.mode = "step";
+  useMode("step");
   showDocument();
 }
 
@@ -3352,6 +3364,7 @@ window.Generator = {
     return data.course_guide;
   },
   applyPrefill,
+  useMode,
   mountReview,
   startFull,
   startGuided,
