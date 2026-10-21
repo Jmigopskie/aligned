@@ -18,7 +18,7 @@ let allFormats = [];
 
 searchInput.addEventListener("input", () => renderFormats(allFormats));
 
-document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("lesson-plan");
+document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("formats");
 
 document.getElementById("new-format-btn").addEventListener("click", () => {
   window.location.href = "format-builder.html";
@@ -204,6 +204,11 @@ async function deleteFormat(id, btn) {
 async function init() {
   const user = await requireAuth();
   if (!user) return;
+  // Formats are a teacher's to manage; students start plans from the flow.
+  if (user.role === "student") {
+    window.location.replace("generator.html");
+    return;
+  }
   currentUser = user;
   wireTopbar(user);
 

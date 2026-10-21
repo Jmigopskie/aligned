@@ -8,8 +8,8 @@ const TOUR_KEY = "alignedTour";
 const TOUR_STOPS = {
   teacher: [
     { page: "dashboard.html", pose: "wave", text: "Hi, I'm Alan. I'll open each tab and show you what it's for. It takes about a minute." },
-    { page: "lesson-plan.html", focus: "#builtin-section", pose: "point", text: "This is Create Lesson Plan. Every plan starts by picking a format, and these ready-to-use ones are set up for you." },
-    { page: "lesson-plan.html", focus: "#new-format-btn", pose: "idea", text: "Does your school use its own layout? Upload a blank copy with New format and AlignED finds the fields for you." },
+    { page: "dashboard.html", focus: '#sidebar-nav a[href="generator.html"]', pose: "point", text: "Create Lesson Plan starts a new plan. I ask a few questions, one at a time, then we write it together." },
+    { page: "lesson-plan.html", focus: "#new-format-btn", pose: "idea", text: "Formats is where you upload your school's own layout with New format. Your students can use every format you upload." },
     { page: "lesson-plan-list.html", focus: ["#status-filter", "#plans-body"], pose: "point", text: "List of Lesson Plans keeps everything you make. Unfinished plans stay here as drafts; use Continue to finish one." },
     { page: "sections.html", focus: "#new-section-btn", pose: "point", text: "My Sections is where you create a class. Each one gets a join code to share with your students." },
     { page: "submissions.html", focus: ["#review-body", "#no-sections-state"], pose: "check", text: "Submissions collects the plans your students hand in, ready for you to review." },
@@ -19,7 +19,7 @@ const TOUR_STOPS = {
   ],
   student: [
     { page: "dashboard.html", pose: "wave", text: "Hi, I'm Alan. I'll open each tab and show you what it's for. It takes about a minute." },
-    { page: "lesson-plan.html", focus: "#builtin-section", pose: "point", text: "This is Create Lesson Plan. Every plan starts by picking the format your school uses." },
+    { page: "dashboard.html", focus: '#sidebar-nav a[href="generator.html"]', pose: "point", text: "Create Lesson Plan starts a new plan. I ask a few questions, one at a time, then we write it together." },
     { page: "lesson-plan-list.html", focus: ["#status-filter", "#plans-body"], pose: "point", text: "List of Lesson Plans keeps everything you make. Drafts wait here, and Submit to class hands a plan to your teacher." },
     { page: "my-classes.html", focus: "#join-form", pose: "idea", text: "In My Classes, join your teacher's class with the code they give you." },
     { page: "course-guides.html", focus: "#subject-filter", pose: "point", text: "Curriculum/Course Guide has the official DepEd guides your plans are written from. Filter them by subject here." },

@@ -79,7 +79,7 @@ function renderRecentPlans(plans) {
   if (!plans.length) {
     recentBody.innerHTML = `
       <tr class="table-empty-row">
-        <td colspan="5">No lesson plans yet. <a href="lesson-plan.html">Create your first one</a>.</td>
+        <td colspan="5">No lesson plans yet. <a href="generator.html">Create your first one</a>.</td>
       </tr>`;
     return;
   }

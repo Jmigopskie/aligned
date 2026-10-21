@@ -726,7 +726,7 @@ deleteFormatBtn.addEventListener("click", async () => {
   }
 });
 
-document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("lesson-plan");
+document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("formats");
 
 async function enterEditMode(fmt) {
   editingFormatId = fmt.id;
@@ -777,6 +777,11 @@ async function enterEditMode(fmt) {
 async function init() {
   const user = await requireAuth();
   if (!user) return;
+  // Only teachers upload or change formats (the server refuses students too).
+  if (user.role === "student") {
+    window.location.replace("generator.html");
+    return;
+  }
   wireTopbar(user);
 
   const formatId = new URLSearchParams(window.location.search).get("format_id");
