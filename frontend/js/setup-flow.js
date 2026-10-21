@@ -169,8 +169,209 @@ function optionsOf(selectId) {
     .map((o) => ({ value: o.value, label: o.textContent.trim() }));
 }
 
+// ---- step 1: the format ----
+// A card is only chosen here; Next opens it (G.loadFormat).
+let pendingFormatId = null;
+// An earlier run that never reached the document. Checked before a new run is
+// started, which would otherwise replace it as "the current run".
+let resumeOffer = null;
+
+function startNewRun() {
+  G.newRun();
+  const memory = recall();
+  G.setAnswers({
+    school: memory.school || "",
+    studentTeacher: memory.studentTeacher || user.full_name || "",
+    coop: memory.coop || "",
+    durationMinutes: 45,
+    levelType: "k12",
+  });
+}
+
+function showError(message) {
+  errorEl.textContent = message;
+  errorEl.hidden = false;
+}
+
+function twoLine(title, sub) {
+  return el("span", { class: "flow-format-text" }, el("strong", {}, title), sub ? el("small", {}, sub) : "");
+}
+
+function formatStep() {
+  const wrap = el("div", { class: "flow-answer" });
+  const answers = G.getAnswers();
+  pendingFormatId = answers.formatId;
+  const run = !answers.formatId && resumeOffer;
+  if (run) paintResume(wrap, run);
+  else paintFormats(wrap);
+  return wrap;
+}
+
+function paintResume(wrap, run) {
+  const carryOn = el("button", { type: "button", class: "flow-choice flow-format" },
+    twoLine("Continue where you left off", [run.topic, run.formatName].filter(Boolean).join(" · ") || "Your unfinished plan"),
+    icon("arrowRight"));
+  carryOn.addEventListener("click", () => {
+    location.href = `generator.html?run=${encodeURIComponent(run.runId)}&format_id=${encodeURIComponent(run.formatId)}`;
+  });
+  const fresh = el("button", { type: "button", class: "flow-choice flow-format" },
+    twoLine("Start a new plan", "Pick a format next"), icon("arrowRight"));
+  fresh.addEventListener("click", () => {
+    resumeOffer = null;
+    startNewRun();
+    paintFormats(wrap);
+  });
+  wrap.replaceChildren(el("div", { class: "flow-choices flow-choices-stack" }, carryOn, fresh));
+  carryOn.focus();
+}
+
+async function paintFormats(wrap) {
+  actions.hidden = false;
+  wrap.replaceChildren(el("p", { class: "flow-help" }, "Loading formats…"));
+  let formats;
+  try {
+    formats = (await Api.listFormats()).formats || [];
+  } catch (err) {
+    wrap.replaceChildren(el("p", { class: "flow-error" }, err.message));
+    return;
+  }
+  const groups = formatGroups(formats, user);
+  const card = (f, sub) => {
+    const btn = el("button", { type: "button", class: "flow-choice flow-format", "aria-pressed": String(f.id === pendingFormatId) },
+      twoLine(f.name, sub), tick());
+    btn.addEventListener("click", () => {
+      wrap.querySelectorAll(".flow-format").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      pendingFormatId = f.id;
+      refresh();
+    });
+    return btn;
+  };
+  const group = (title, items) => [
+    el("p", { class: "flow-label" }, title),
+    el("div", { class: "flow-choices flow-choices-formats", role: "group", "aria-label": title }, items),
+  ];
+  const parts = group("Built-in", groups.builtin.map((f) => card(f, f.description)));
+  if (user.role === "student") {
+    if (groups.teacher.length) {
+      parts.push(...group("From your teacher", groups.teacher.map((f) => card(f, f.owner_name ? `From ${f.owner_name}` : ""))));
+    } else {
+      say("Join your teacher's class to see the formats they uploaded.", "hi");
+    }
+  } else {
+    const upload = el("button", { type: "button", class: "flow-choice flow-format flow-upload" },
+      twoLine("Upload my school's format", ".docx, .dotx or .pdf"), icon("upload"));
+    upload.addEventListener("click", () => paintUpload(wrap));
+    parts.push(...group("Uploaded by you", [...groups.mine.map((f) => card(f, "")), upload]));
+  }
+  wrap.replaceChildren(...parts);
+  refresh();
+}
+
+// Teachers only: upload a blank format right here, name it, save, carry on.
+function paintUpload(wrap) {
+  actions.hidden = true;
+  errorEl.hidden = true;
+  const input = el("input", { type: "file", accept: ".docx,.dotx,.pdf", hidden: true });
+  const drop = el("button", { type: "button", class: "flow-drop" }, icon("upload"),
+    twoLine("Choose your school's blank format", "or drop it here · .docx, .dotx or .pdf"));
+  const back = el("button", { type: "button", class: "flow-back" }, icon("arrowLeft"), "Back to formats");
+  back.addEventListener("click", () => {
+    say(COPY.format.say, FLOW_POSES.format);
+    paintFormats(wrap);
+  });
+  drop.addEventListener("click", () => input.click());
+  drop.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    drop.classList.add("is-over");
+  });
+  drop.addEventListener("dragleave", () => drop.classList.remove("is-over"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("is-over");
+    if (e.dataTransfer.files.length) scan(e.dataTransfer.files[0]);
+  });
+  input.addEventListener("change", () => input.files.length && scan(input.files[0]));
+  wrap.replaceChildren(drop, input, back);
+  drop.focus();
+
+  async function scan(file) {
+    errorEl.hidden = true;
+    if (!/\.(docx|dotx|pdf)$/i.test(file.name)) {
+      showError("Only .docx, .dotx or .pdf files work here.");
+      return;
+    }
+    drop.disabled = true;
+    say("I'm reading your format…", "loading");
+    try {
+      const data = await Api.scanFormat(file);
+      if (data.scan_error) throw new Error(data.scan_error);
+      paintSave(wrap, data, file.name);
+    } catch (err) {
+      showError(err.message);
+      say(COPY.format.say, FLOW_POSES.format);
+      drop.disabled = false;
+    }
+  }
+}
+
+function paintSave(wrap, scanned, filename) {
+  say("Got it. Give it a name your students will recognise.", "present");
+  const name = el("input", { id: "flow-format-name", type: "text", maxlength: "120", autocomplete: "off" });
+  name.value = filename.replace(/\.[^.]+$/, "");
+  let share = false;
+  const shareBtn = el("button", { type: "button", class: "flow-choice flow-alt", "aria-pressed": "false" },
+    el("span", {}, "Share with other teachers"), tick());
+  shareBtn.addEventListener("click", () => {
+    share = !share;
+    shareBtn.setAttribute("aria-pressed", String(share));
+  });
+  const saveIcon = icon("arrowRight");
+  saveIcon.className = "flow-next-icon";
+  const save = el("button", { type: "button", class: "flow-next" }, el("span", {}, "Save format"), saveIcon);
+  const back = el("button", { type: "button", class: "flow-back" }, icon("arrowLeft"), "Back to formats");
+  back.addEventListener("click", () => {
+    say(COPY.format.say, FLOW_POSES.format);
+    paintFormats(wrap);
+  });
+  save.addEventListener("click", async () => {
+    errorEl.hidden = true;
+    if (!name.value.trim()) {
+      showError("Give this format a name.");
+      name.focus();
+      return;
+    }
+    save.disabled = true;
+    say("Finding the fields in your format. This can take a minute.", "loading");
+    try {
+      const data = await Api.createFormat({
+        name: name.value.trim(),
+        is_public: share,
+        source_temp_token: scanned.source_temp_token,
+        source_filename: scanned.source_filename,
+      });
+      pendingFormatId = data.format.id;
+      actions.hidden = false;
+      go(1);
+    } catch (err) {
+      // The server's wording points at the full format editor, which isn't
+      // here, so say what to do from this screen instead.
+      showError("I couldn't find the fillable fields in this file. Try saving again, or set it up on the Formats page.");
+      say("That didn't work. You can try again, or pick a built-in format.", "unsure");
+      save.disabled = false;
+    }
+  });
+  wrap.replaceChildren(
+    el("label", { class: "flow-label", for: "flow-format-name" }, "Format name"),
+    el("div", { class: "flow-field" }, name),
+    shareBtn,
+    el("div", { class: "flow-actions" }, back, save),
+  );
+  name.focus();
+}
+
 // ---- answers per step ----
 const STEPS = {
+  format: formatStep,
   school: () => textAnswer("school", { placeholder: "e.g. San Isidro National High School" }),
   name: () => textAnswer("studentTeacher", { placeholder: "e.g. Ana Cruz" }),
   coop: () => textAnswer("coop", { placeholder: "e.g. Juan Dela Cruz" }),
@@ -288,10 +489,11 @@ function render() {
   backBtn.hidden = index === 0;
 
   const heading = el("h1", { class: "flow-question", id: "flow-question", tabindex: "-1" }, copy.q);
+  const help = id === "format" && user.role !== "student" ? "Pick a built-in format, or upload your school's own." : copy.help;
   const answer = el("div", { class: "flow-answer" });
   const builder = STEPS[id];
   answer.append(...[].concat(builder ? builder() : []));
-  form.replaceChildren(heading, copy.help ? el("p", { class: "flow-help" }, copy.help) : "", answer);
+  form.replaceChildren(heading, help ? el("p", { class: "flow-help" }, help) : "", answer);
 
   if (!calm) {
     form.classList.add("is-entering");
@@ -305,15 +507,34 @@ function render() {
 }
 
 refresh = () => {
-  nextBtn.disabled = !isStepAnswered(steps[index], G.getAnswers());
+  const id = steps[index];
+  nextBtn.disabled = id === "format" ? !pendingFormatId : !isStepAnswered(id, G.getAnswers());
 };
 
-function go(delta) {
+async function go(delta) {
   const id = steps[index];
-  if (delta > 0 && !isStepAnswered(id, G.getAnswers())) return;
-  if (delta > 0 && ["school", "name", "coop"].includes(id)) remember();
   const next = index + delta;
   if (next < 0 || next >= steps.length) return;
+  if (delta > 0 && id === "format") {
+    if (!pendingFormatId) return;
+    if (pendingFormatId !== G.getAnswers().formatId) {
+      // A different format reloads the page on this run, so say where to land.
+      G.setAnswers({ flowStep: steps[next] });
+      nextBtn.disabled = true;
+      say("Opening the format…", "loading");
+      try {
+        await G.loadFormat(pendingFormatId);
+      } catch (err) {
+        showError(err.message);
+        say(COPY.format.say, FLOW_POSES.format);
+        refresh();
+        return;
+      }
+    }
+  } else if (delta > 0 && !isStepAnswered(id, G.getAnswers())) {
+    return;
+  }
+  if (delta > 0 && ["school", "name", "coop"].includes(id)) remember();
   index = next;
   render();
 }
@@ -403,15 +624,8 @@ async function start() {
   steps = flowSteps(user.role);
 
   if (!ready.runId) {
-    G.newRun();
-    const memory = recall();
-    G.setAnswers({
-      school: memory.school || "",
-      studentTeacher: memory.studentTeacher || user.full_name || "",
-      coop: memory.coop || "",
-      durationMinutes: 45,
-      levelType: "k12",
-    });
+    resumeOffer = ready.formatId ? null : G.unfinishedRun();
+    if (!resumeOffer) startNewRun();
   }
   if (!G.getAnswers().formatId && ready.formatId) {
     try {
