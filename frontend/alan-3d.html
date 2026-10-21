@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alan in 3D · AlignED</title>
+  <link rel="icon" href="img/Icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Patrick+Hand&display=swap" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-06c" />
+  <style>
+    ::selection { background: var(--primary-tint); color: var(--text-heading); }
+    .a3 { display: flex; min-height: 100dvh; }
+    .a3-stage {
+      position: sticky; top: 0;
+      flex: 0 0 55%; height: 100dvh;
+      background: radial-gradient(120% 80% at 50% 38%, #FBFCFA 0%, #EEF3EC 55%, #E1ECE5 100%);
+    }
+    .a3-stage canvas { display: block; width: 100%; height: 100%; }
+    .a3-fallback { position: absolute; inset: 0; margin: auto; max-height: 70%; max-width: 70%; object-fit: contain; }
+    .a3-panel {
+      flex: 1; display: flex; flex-direction: column; justify-content: center;
+      padding: 48px clamp(24px, 5vw, 72px); max-width: 560px;
+    }
+    .a3-back {
+      align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+      color: var(--primary); font-size: var(--text-sm); font-weight: 600; text-decoration: none;
+      text-underline-offset: 3px; margin-bottom: 40px;
+    }
+    .a3-back:hover { text-decoration: underline; }
+    .a3-back svg { width: 16px; height: 16px; }
+    .a3 h1 {
+      font-family: var(--font-display); font-weight: 700; color: var(--text-heading);
+      font-size: clamp(40px, 5vw, 64px); line-height: 1; letter-spacing: -0.03em; margin: 0 0 14px;
+    }
+    .a3-lede { font-size: var(--text-md); line-height: 1.55; margin: 0 0 40px; max-width: 42ch; }
+    .a3 h2 {
+      font-family: var(--font-display); font-size: var(--text-md); font-weight: 600;
+      color: var(--text-heading); margin: 0 0 12px;
+    }
+    .a3-poses { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+    .a3-btn {
+      height: var(--control-h); padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--surface); color: var(--text-heading); font: 500 var(--text-base) var(--font);
+      text-align: left; cursor: pointer; transition: background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out;
+    }
+    .a3-btn:hover { border-color: var(--primary); }
+    .a3-btn[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+    @media (max-width: 860px) {
+      .a3 { flex-direction: column; }
+      .a3-stage { position: relative; flex: none; height: 64svh; }
+      .a3-panel { max-width: none; padding: 28px 16px 40px; }
+      .a3-back { margin-bottom: 20px; }
+      .a3-lede { margin-bottom: 28px; }
+    }
+    @media (prefers-reduced-motion: reduce) { .a3-btn { transition: none; } }
+  </style>
+</head>
+<body>
+  <main class="a3">
+    <div class="a3-stage" id="stage" role="img" aria-label="3D model of Alan the owl, idle pose">
+      <img class="a3-fallback" id="fallback" src="img/owl/alan-idle.png" alt="" />
+    </div>
+    <section class="a3-panel" aria-labelledby="a3-title">
+      <a class="a3-back" href="dashboard.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+        Back to AlignED
+      </a>
+      <h1 id="a3-title">Alan</h1>
+      <p class="a3-lede">AlignED's lesson-planning guide, in 3D. Pick a pose to watch him move.</p>
+      <h2 id="pose-label">Pose</h2>
+      <div class="a3-poses" id="poses" role="group" aria-labelledby="pose-label"></div>
+    </section>
+  </main>
+
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+    } }
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { createAlan, POSES } from "./js/alan3d.js?v=2026-10-22a";
+
+    const stage = document.getElementById("stage");
+    const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    } catch {
+      stage.setAttribute("aria-label", "Alan the owl (3D view needs WebGL, which this browser has turned off)");
+      throw new Error("WebGL unavailable");
+    }
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    document.getElementById("fallback").remove();
+    stage.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    // Lit side of the toon ramp lands exactly on the art's flat colours (0.55 + 0.45 = 1).
+    scene.add(new THREE.AmbientLight(0xffffff, Math.PI * 0.55));
+    const sun = new THREE.DirectionalLight(0xffffff, Math.PI * 0.45);
+    sun.position.set(-2, 4, 5);
+    scene.add(sun);
+
+    const alan = createAlan();
+    scene.add(alan.root);
+
+    const shadowCv = Object.assign(document.createElement("canvas"), { width: 256, height: 256 });
+    const sg = shadowCv.getContext("2d");
+    const grad = sg.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0, "rgba(22,35,30,0.28)");
+    grad.addColorStop(1, "rgba(22,35,30,0)");
+    sg.fillStyle = grad; sg.fillRect(0, 0, 256, 256);
+    const shadow = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.9, 1.1),
+      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(shadowCv), transparent: true, depthWrite: false })
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.set(0, -0.08, 0.1);
+    scene.add(shadow);
+
+    // Fixed, head-on camera framed on Alan plus his widest props, so he fills the stage.
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+    const target = new THREE.Vector3(0, 1.2, 0);
+    function fit() {
+      const { clientWidth: w, clientHeight: h } = stage;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const width = camera.aspect < 0.8 ? 2.5 : 2.95; // phones: favour Alan's size over prop margins
+      const dist = Math.max(2.85 / 2 / t, width / 2 / (t * camera.aspect));
+      camera.position.set(target.x, target.y + 0.12, target.z + dist);
+      camera.lookAt(target);
+      camera.updateProjectionMatrix();
+    }
+    new ResizeObserver(fit).observe(stage);
+    fit();
+
+    const posesEl = document.getElementById("poses");
+    const buttons = POSES.map(({ key, label }) => {
+      const b = Object.assign(document.createElement("button"), { type: "button", className: "a3-btn", textContent: label });
+      b.addEventListener("click", () => select(key, label));
+      posesEl.appendChild(b);
+      return [key, b];
+    });
+    function select(key, label) {
+      alan.setPose(key);
+      buttons.forEach(([k, b]) => b.setAttribute("aria-pressed", String(k === key)));
+      stage.setAttribute("aria-label", `3D model of Alan the owl, ${label.toLowerCase()} pose`);
+    }
+    const start = POSES.find((p) => p.key === new URLSearchParams(location.search).get("pose")) || POSES[0];
+    select(start.key, start.label);
+
+    const clock = new THREE.Clock();
+    renderer.setAnimationLoop(() => {
+      const dt = Math.min(clock.getDelta(), 0.05);
+      alan.update(dt, clock.elapsedTime, calm);
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>
