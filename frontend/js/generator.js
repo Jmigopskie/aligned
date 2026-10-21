@@ -17,6 +17,12 @@ let dirty = false;
 // stream write the rest into what is now the OTHER mode's slot, splitting
 // the plan across both and overwriting whatever the teacher had typed there.
 let generating = false;
+// Tells the setup flow when Alan starts, finishes or fails writing the plan,
+// so the big Alan can show it (start / done / error with detail.message).
+const generationEvents = new EventTarget();
+function emitGeneration(type, detail = {}) {
+  generationEvents.dispatchEvent(new CustomEvent(type, { detail }));
+}
 
 // Guided mode: the flat, ordered list of every field on this format
 // (document order via sort_order) and which one is currently unlocked.
@@ -137,6 +143,17 @@ const collegeYearSelect = document.getElementById("ctx-college-year");
 const k12GradeWrap = document.getElementById("ctx-k12-grade-wrap");
 const k12GradeSelect = document.getElementById("ctx-k12-grade");
 const sectionInput = document.getElementById("ctx-section");
+// Answers the Create Lesson Plan flow asks for (js/setup-flow.js).
+const schoolInput = document.getElementById("ctx-school");
+const studentTeacherInput = document.getElementById("ctx-student-teacher");
+const durationInput = document.getElementById("ctx-duration");
+const prevTopicInput = document.getElementById("ctx-prev-topic");
+const nextTopicInput = document.getElementById("ctx-next-topic");
+// The flow's own state, saved with the setup so a refresh lands on the same step.
+let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null };
+// One run = one pass through the flow; its draft is keyed by run, not by
+// format, so picking a format never silently brings back an older draft.
+let currentRunId = new URLSearchParams(window.location.search).get("run");
 const cgTabsEl = document.getElementById("cg-tabs");
 const cgTabSearch = document.getElementById("cg-tab-search");
 const cgTabUpload = document.getElementById("cg-tab-upload");
@@ -772,6 +789,13 @@ function getAdvancedContext() {
     year: isCollege ? collegeYearSelect.value.trim() : "",
     grade_level: isCollege ? "" : k12GradeSelect.value.trim(),
     section: sectionInput.value.trim(),
+    school: schoolInput.value.trim(),
+    student_teacher: studentTeacherInput.value.trim(),
+    duration_minutes: parseInt(durationInput.value, 10) || "",
+    // Always sent (empty when "first lesson" / "not sure yet") so the server
+    // knows Alan asked and grounds the recap and assignment accordingly.
+    previous_topic: flowFlags.firstLesson ? "" : prevTopicInput.value.trim(),
+    next_topic: flowFlags.nextUnsure ? "" : nextTopicInput.value.trim(),
   };
 }
 
@@ -798,7 +822,8 @@ function syncOwlVisibility() {
 }
 
 function updateGate() {
-  const teacherOk = teacherNameInput.value.trim().length > 0;
+  // The name step is required for everyone; teachers have no cooperating teacher.
+  const teacherOk = studentTeacherInput.value.trim().length > 0;
   const subjectOk = subjectInput.value.trim().length > 0;
   const guideOk = !!selectedCourseGuide;
   const ready = teacherOk && subjectOk && guideOk;
@@ -827,7 +852,8 @@ subjectInput.addEventListener("change", () => {
 // The setup answers are part of the plan in progress, so they are saved the
 // same way the fields are. markDirty() covers everything in the generate tab.
 [teacherNameInput, subjectInput, topicInput, levelTypeSelect, collegeProgramInput,
- collegeYearSelect, k12GradeSelect, sectionInput].forEach((el) => {
+ collegeYearSelect, k12GradeSelect, sectionInput, schoolInput, studentTeacherInput,
+ durationInput, prevTopicInput, nextTopicInput].forEach((el) => {
   el.addEventListener("input", saveDraft);
   el.addEventListener("change", saveDraft);
 });
@@ -2007,6 +2033,14 @@ function setupContext() {
       collegeYear: collegeYearSelect.value,
       k12Grade: k12GradeSelect.value,
       section: sectionInput.value,
+      school: schoolInput.value,
+      studentTeacher: studentTeacherInput.value,
+      durationMinutes: durationInput.value,
+      previousTopic: prevTopicInput.value,
+      nextTopic: nextTopicInput.value,
+      runId: currentRunId,
+      formatId: fmt ? fmt.id : null,
+      flow: { ...flowFlags },
     },
     courseGuide: selectedCourseGuide,
   };
@@ -2024,6 +2058,12 @@ function applySetupContext(ctx) {
   if (setup.collegeYear) collegeYearSelect.value = setup.collegeYear;
   if (setup.k12Grade) k12GradeSelect.value = setup.k12Grade;
   if (setup.section) sectionInput.value = setup.section;
+  if (setup.school) schoolInput.value = setup.school;
+  if (setup.studentTeacher) studentTeacherInput.value = setup.studentTeacher;
+  if (setup.durationMinutes) durationInput.value = setup.durationMinutes;
+  if (setup.previousTopic) prevTopicInput.value = setup.previousTopic;
+  if (setup.nextTopic) nextTopicInput.value = setup.nextTopic;
+  if (setup.flow) flowFlags = { ...flowFlags, ...setup.flow };
   updateLevelFields();
   if (ctx && ctx.courseGuide) selectCourseGuide(ctx.courseGuide);
 }
@@ -2145,7 +2185,7 @@ function draftKey() {
   // two drafts of the same format share one slot and overwrite each other.
   const planKey = params.get("plan_id");
   if (planKey) return `${DRAFT_PREFIX}plan:${planKey}`;
-  return `${DRAFT_PREFIX}${params.get("format_id") || "none"}`;
+  return runDraftKey(currentRunId || "none");
 }
 
 function saveDraft() {
@@ -2158,7 +2198,12 @@ function saveDraft() {
   // slot instead of what is actually on screen right now.
   captureModeSlot();
   clearTimeout(draftTimer);
-  draftTimer = setTimeout(() => {
+  draftTimer = setTimeout(writeDraft, 400);
+}
+
+function writeDraft() {
+  clearTimeout(draftTimer);
+  {
     try {
       localStorage.setItem(draftKey(), JSON.stringify({
         at: Date.now(),
@@ -2175,7 +2220,7 @@ function saveDraft() {
     } catch (err) {
       /* private mode or quota — the page still works, it just won't persist */
     }
-  }, 400);
+  }
 }
 
 function readDraft() {
@@ -2433,7 +2478,8 @@ modeSwitchBtns.forEach((btn) => {
 function baseGenerationPayload() {
   return {
     format_id: fmt.id,
-    teacher_name: teacherNameInput.value.trim(),
+    // The cooperating teacher; a teacher writing their own plan has none.
+    teacher_name: teacherNameInput.value.trim() || studentTeacherInput.value.trim(),
     subject: subjectInput.value.trim(),
     course_guide_id: selectedCourseGuide ? selectedCourseGuide.id : null,
     context: getAdvancedContext(),
@@ -2471,12 +2517,16 @@ ownFieldsGenerateBtn.addEventListener("click", () => {
 async function runGeneration(includeKeys) {
   if (generating) return;
   if (!updateGate()) {
-    showError("Fill in the cooperating teacher, subject, and course guide first.");
+    const message = "Answer Alan's questions first: your name, the subject and the course guide.";
+    showError(message);
+    emitGeneration("error", { message });
     return;
   }
 
   if (!includeKeys.length) {
-    showError("Tick at least one field for me to write, or fill the plan in yourself.");
+    const message = "Tick at least one field for me to write, or fill the plan in yourself.";
+    showError(message);
+    emitGeneration("error", { message });
     return;
   }
 
@@ -2485,6 +2535,7 @@ async function runGeneration(includeKeys) {
   setButtonLoading(generateFullBtn, true, "Generating");
   setOwlState("thinking", "Thinking hard about your lesson...");
   generating = true;
+  emitGeneration("start");
 
   // Built up live from the stream's own chunk names as they arrive — the
   // Building Proficiency mode batches fields for pacing/streaming purposes,
@@ -2528,8 +2579,10 @@ async function runGeneration(includeKeys) {
     });
     generateFullBtn.dataset.originalLabel = "Regenerate full plan";
     reportGenerationOutcome(finalEvent, payload.include_keys);
+    emitGeneration("done");
   } catch (err) {
     showError(err.message);
+    emitGeneration("error", { message: err.message });
   } finally {
     generating = false;
     setButtonLoading(generateFullBtn, false);
@@ -3122,23 +3175,205 @@ document.querySelectorAll("[data-icon]").forEach((el) => {
   if (icon) el.innerHTML = icon;
 });
 
+// ---- Bridge for the Create Lesson Plan flow (js/setup-flow.js) ----
+// The flow asks the questions; this page keeps doing what it always did with
+// the answers (drafts, the gate, generation, the document). The flow only
+// talks to it through window.Generator below.
+
+const flowEl = document.getElementById("flow");
+let readyResolve;
+const generatorReady = new Promise((resolve) => (readyResolve = resolve));
+
+function setRunInUrl() {
+  const params = new URLSearchParams();
+  if (currentRunId) params.set("run", currentRunId);
+  if (fmt) params.set("format_id", fmt.id);
+  history.replaceState(null, "", `${location.pathname}?${params}`);
+}
+
+async function loadFormat(formatId) {
+  if (fmt) {
+    if (String(fmt.id) === String(formatId)) return fmt;
+    // A different format mid-run: reload on the same run. The answers live in
+    // the run's draft, so they come back; the new format's blanks start empty.
+    writeDraft();
+    location.replace(`${location.pathname}?run=${encodeURIComponent(currentRunId || "")}&format_id=${encodeURIComponent(formatId)}`);
+    return new Promise(() => {});
+  }
+  const data = await Api.getFormat(formatId);
+  if (!data.format.fields || !data.format.fields.length) {
+    throw new Error("This format doesn't have any fields defined yet.");
+  }
+  fmt = data.format;
+  sections = buildSections(fmt.fields);
+  document.title = `${fmt.name} | AlignED`;
+  document.getElementById("format-name").textContent = fmt.name;
+  // Guided walks the fields that need real thinking. The quick ones are left
+  // out of the walkthrough entirely: a teacher does not need to be guided
+  // through their own name, and locking those behind a step was most of why
+  // fields felt uneditable.
+  const heavy = heavyFieldKeys();
+  // A format with no heavy fields would leave Guided with nothing to do, so it
+  // falls back to walking everything.
+  stepFieldKeys = heavy.length ? heavy : fieldsInDocumentOrder().map((f) => f.field_key);
+  stepIndex = 0;
+  loadStaticKeys();
+  await initLiveDocView();
+  paintStaticMarks();
+  flowFlags.formatName = fmt.name;
+  if (!new URLSearchParams(location.search).get("plan_id")) setRunInUrl();
+  // The chat history is kept per format, which is only known now.
+  loadChatThreads();
+  return fmt;
+}
+
+const ANSWER_INPUTS = {
+  school: schoolInput, studentTeacher: studentTeacherInput, coop: teacherNameInput,
+  subject: subjectInput, durationMinutes: durationInput, levelType: levelTypeSelect,
+  grade: k12GradeSelect, program: collegeProgramInput, year: collegeYearSelect,
+  section: sectionInput, previousTopic: prevTopicInput, topic: topicInput, nextTopic: nextTopicInput,
+};
+const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode"];
+
+function getAnswers() {
+  const answers = {};
+  Object.entries(ANSWER_INPUTS).forEach(([key, el]) => (answers[key] = el.value));
+  ANSWER_FLAGS.forEach((key) => (answers[key] = flowFlags[key]));
+  answers.durationMinutes = parseInt(durationInput.value, 10) || null;
+  answers.formatId = fmt ? fmt.id : null;
+  answers.formatName = flowFlags.formatName;
+  answers.courseGuide = selectedCourseGuide;
+  answers.courseGuideId = selectedCourseGuide ? selectedCourseGuide.id : null;
+  return answers;
+}
+
+function setAnswers(partial) {
+  Object.entries(partial || {}).forEach(([key, value]) => {
+    if (ANSWER_INPUTS[key]) ANSWER_INPUTS[key].value = value == null ? "" : String(value);
+    else if (ANSWER_FLAGS.includes(key)) flowFlags[key] = value;
+  });
+  updateLevelFields();
+  updateGate();
+  saveDraft();
+}
+
+// Answers given once go straight into the format's matching blanks (school,
+// your name, learning area, grade). Weekly fields hold one answer per day, so
+// they are left alone.
+function applyPrefill() {
+  if (!fmt) return;
+  const plain = (fmt.fields || []).filter((f) => f.field_type !== "weekly");
+  const filled = prefillFieldValues(plain, getAnswers(), fieldValues);
+  if (!Object.keys(filled).length) return;
+  Object.assign(fieldValues, filled);
+  paintRestoredValues();
+  markDirty();
+}
+
+// "Which parts should I write?" becomes a screen in the flow instead of a popup:
+// the same list (and its listeners) moves into the flow's answer area.
+function mountReview(container) {
+  renderReviewList();
+  const intro = document.querySelector(".gen-review-intro");
+  const bulk = document.querySelector(".gen-review-bulk");
+  container.replaceChildren(...[intro, bulk, reviewList, reviewHint].filter(Boolean));
+}
+
+function startFull() {
+  if (mode !== "full") modeSwitchBtns.find((b) => b.dataset.mode === "full").click();
+  flowFlags.mode = "full";
+  runGeneration(selectedGenerateKeys());
+}
+
+function startGuided() {
+  if (mode !== "step") modeSwitchBtns.find((b) => b.dataset.mode === "step").click();
+  flowFlags.mode = "step";
+  showDocument();
+}
+
+function showDocument() {
+  flowEl.hidden = true;
+  loadingState.hidden = true;
+  content.hidden = false;
+  flowFlags.stage = "doc";
+  saveDraft();
+  syncOwlVisibility();
+  window.scrollTo({ top: 0 });
+}
+
+function hideDocument() {
+  content.hidden = true;
+  flowEl.hidden = false;
+  syncOwlVisibility();
+}
+
+function runPointerKey() {
+  return `alignedFlowRun:v1:${currentUser ? currentUser.id : "anon"}`;
+}
+
+// The last run that never reached the document, so step 1 can offer to carry on.
+function unfinishedRun() {
+  try {
+    const runId = localStorage.getItem(runPointerKey());
+    if (!runId || runId === currentRunId) return null;
+    const draft = JSON.parse(localStorage.getItem(runDraftKey(runId)) || "null");
+    const setup = draft && draft.setup;
+    if (!setup || !setup.formatId || (setup.flow && setup.flow.stage === "doc")) return null;
+    return { runId, formatId: setup.formatId, topic: setup.topic || "", formatName: (setup.flow || {}).formatName || "" };
+  } catch (err) {
+    return null;
+  }
+}
+
+function newRun() {
+  currentRunId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+  try {
+    localStorage.setItem(runPointerKey(), currentRunId);
+  } catch (err) {
+    /* private mode: the run still works, it just can't be resumed later */
+  }
+  setRunInUrl();
+  return currentRunId;
+}
+
+window.Generator = {
+  ready: generatorReady,
+  loadFormat,
+  getAnswers,
+  setAnswers,
+  searchCourseGuides: async () => {
+    const data = await Api.searchCourseGuides({ subject: subjectInput.value.trim(), prefer_grade_band: gradeBandFor() });
+    return data.course_guides || [];
+  },
+  selectCourseGuide: (guide) => selectCourseGuide(guide),
+  uploadCourseGuide: async (file) => {
+    const data = await Api.uploadCourseGuide(file, subjectInput.value.trim(), file.name);
+    selectCourseGuide(data.course_guide);
+    return data.course_guide;
+  },
+  applyPrefill,
+  mountReview,
+  startFull,
+  startGuided,
+  showDocument,
+  hideDocument,
+  unfinishedRun,
+  newRun,
+  generationEvents,
+};
+
 async function init() {
   const user = await requireAuth();
   if (!user) return;
   currentUser = user;
   wireTopbar(user);
-  // Bring back any conversations saved for this format before the chat can
-  // render, so a reload reopens the thread instead of an empty log.
-  loadChatThreads();
-  teacherNameInput.value = user.full_name || "";
-
   updateLevelFields();
   updateGate();
 
-  // Two ways in: ?format_id= starts a new plan, ?plan_id= reopens one already
-  // saved (what Continue in the list of lesson plans links to). A reopened
-  // plan supplies its own format, so the format id doesn't have to be passed
-  // alongside it.
+  // ?plan_id= reopens a saved plan straight into the document (what Continue
+  // in the list of lesson plans links to). Anything else is a new plan, and
+  // the flow asks the questions; ?run= (with ?format_id=) resumes a run after
+  // a refresh.
   const params = new URLSearchParams(window.location.search);
   const requestedPlanId = params.get("plan_id");
   if (requestedPlanId) {
@@ -3146,74 +3381,42 @@ async function init() {
     const back = document.querySelector(".back-link");
     back.href = "lesson-plan-list.html";
     back.lastChild.textContent = "Back to List of Lesson Plans";
-  }
-  let formatId = params.get("format_id");
-  let openedPlan = null;
-
-  if (requestedPlanId) {
     try {
       const data = await Api.getLessonPlan(requestedPlanId);
-      openedPlan = data.lesson_plan;
-      formatId = openedPlan.format_id;
+      await loadFormat(data.lesson_plan.format_id);
+      applyOpenedPlan(data.lesson_plan);
+      showDocument();
+      showToast("Draft reopened.");
+      setOwlState("guide", "I brought back what you had so far. Carry on where you left off.");
     } catch (err) {
       loadingState.hidden = true;
       showError(`That lesson plan couldn't be opened: ${err.message}`);
-      return;
     }
-  }
-
-  if (!formatId) {
-    loadingState.hidden = true;
-    showError("No format selected. Go back to Lesson Plan and pick a format.");
+    readyResolve({ user, kind: "plan" });
     return;
   }
 
-  try {
-    const data = await Api.getFormat(formatId);
-    fmt = data.format;
-
-    if (!fmt.fields || !fmt.fields.length) {
-      loadingState.hidden = true;
-      showError("This format doesn't have any fields defined yet.");
-      return;
+  loadingState.hidden = true;
+  const formatId = params.get("format_id");
+  let resumed = false;
+  if (currentRunId && formatId) {
+    try {
+      await loadFormat(formatId);
+      resumed = restoreDraft();
+    } catch (err) {
+      showError(err.message);
     }
-
-    sections = buildSections(fmt.fields);
-    document.title = `${fmt.name} | AlignED`;
-    document.getElementById("format-name").textContent = fmt.name;
-
-    // Guided walks the fields that need real thinking. The quick ones are left
-    // out of the walkthrough entirely: a teacher does not need to be guided
-    // through their own name, and locking those behind a step was most of why
-    // fields felt uneditable.
-    const heavy = heavyFieldKeys();
-    // A format with no heavy fields would leave Guided with nothing to do, so it
-    // falls back to walking everything.
-    stepFieldKeys = heavy.length ? heavy : fieldsInDocumentOrder().map((f) => f.field_key);
-    stepIndex = 0;
-    loadStaticKeys();
-
-    await initLiveDocView();
-    paintStaticMarks();
-
-    // Bring back anything left from a previous visit before the page is
-    // shown, so the teacher never sees their work blank out and refill. A
-    // plan opened by id loads from its own saved row instead: that is the
-    // authoritative copy, and it may well have been written on another
-    // device where no local draft exists.
-    const resumed = openedPlan ? applyOpenedPlan(openedPlan) : restoreDraft();
-
-    loadingState.hidden = true;
-    content.hidden = false;
-
-    if (resumed) {
-      showToast(openedPlan ? "Draft reopened." : "Picked up where you left off.");
-      setOwlState("guide", "I brought back what you had so far. Carry on where you left off.");
-    }
-  } catch (err) {
-    loadingState.hidden = true;
-    showError(err.message);
   }
+  if (fmt && flowFlags.stage === "doc") showDocument();
+  readyResolve({
+    user,
+    kind: "flow",
+    runId: currentRunId,
+    formatId: fmt ? fmt.id : formatId || null,
+    stage: flowFlags.stage,
+    flowStep: flowFlags.flowStep,
+    resumed,
+  });
 }
 
 init();

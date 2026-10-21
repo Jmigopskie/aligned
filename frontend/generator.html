@@ -67,18 +67,26 @@
 
       <div id="loading-state" class="panel skeleton" style="height: 220px;"></div>
 
+      <!-- Create Lesson Plan: Alan asks one question at a time (js/setup-flow.js). -->
+      <section id="flow" class="flow" hidden></section>
+
       <div id="content" hidden>
 
-        <div class="gen-tabs" id="gen-tabs">
-          <button type="button" class="active" data-tab="setup">
-            <span class="tab-step-num">1</span> Setup
-          </button>
-          <button type="button" data-tab="generate">
-            <span class="tab-step-num">2</span> Generate &amp; review
-          </button>
+        <!-- The old two-tab layout is gone: the flow asks the setup questions.
+             These stay (hidden) because generator.js still reads them. -->
+        <div class="gen-tabs" id="gen-tabs" hidden>
+          <button type="button" data-tab="setup">Setup</button>
+          <button type="button" class="active" data-tab="generate">Generate</button>
         </div>
 
-        <div id="tab-panel-setup" class="tab-panel">
+        <div id="tab-panel-setup" class="tab-panel" hidden>
+          <!-- The flow's answers live in these inputs; the draft and the
+               generation payload read them from here. -->
+          <input type="hidden" id="ctx-school" />
+          <input type="hidden" id="ctx-student-teacher" />
+          <input type="hidden" id="ctx-duration" />
+          <input type="hidden" id="ctx-prev-topic" />
+          <input type="hidden" id="ctx-next-topic" />
           <section class="panel setup-panel">
             <div class="setup-intro">
               <h2>Before we start</h2>
@@ -201,7 +209,7 @@
           </div>
         </div>
 
-        <div id="tab-panel-generate" class="tab-panel" hidden>
+        <div id="tab-panel-generate" class="tab-panel">
 
           <div id="gate-lock" class="gate-lock">
             <p>Fill in the cooperating teacher, subject and course guide on the Setup tab first. Generating starts from those answers.</p>
@@ -361,6 +369,7 @@
   <script src="js/api.js?v=2026-10-06c"></script>
   <script src="js/icons.js?v=2026-10-06c"></script>
   <script src="js/doc-toolbar.js?v=2026-10-06c"></script>
-  <script src="js/generator.js?v=2026-10-06c"></script>
+  <script src="js/setup-flow-steps.js?v=2026-10-22a"></script>
+  <script src="js/generator.js?v=2026-10-22a"></script>
 </body>
 </html>
