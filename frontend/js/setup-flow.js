@@ -64,8 +64,8 @@ const COPY = {
     say: "Last topic question. What comes after?",
   },
   guide: {
-    q: "Which curriculum or course guide should I follow?",
-    help: "",
+    q: "Which course guide should I follow?",
+    help: "A curriculum guide or a budget of work both work.",
     say: "I'll follow this guide's scope and words closely.",
   },
   mode: {

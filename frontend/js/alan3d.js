@@ -512,7 +512,8 @@ export function createAlan() {
       bulb.position.y = 1.95 + Math.sin(t * 2.4) * 0.03;
     }
 
-    if (t > nextBlink) { blinkEnd = t + 0.13; nextBlink = t + 2.5 + Math.random() * 3; }
+    // Reduced motion: Alan holds still, blinking included.
+    if (!calm && t > nextBlink) { blinkEnd = t + 0.13; nextBlink = t + 2.5 + Math.random() * 3; }
     face.blink = face.eyes === "open" && t < blinkEnd;
     face.look = [Math.round(cur.look[0]), Math.round(cur.look[1])];
     const sig = `${face.eyes}|${face.blink}|${face.look}`;
