@@ -62,6 +62,11 @@ class LessonPlan(db.Model):
     # one teacher's rewording never reaches the shared format.
     doc_edits = db.Column(db.Text)
 
+    # Bumped on every autosave. A device sends the revision it last saw and the
+    # update only lands if nobody else has saved since, so a laptop tab left
+    # open with an older copy can't overwrite what was just written on a phone.
+    revision = db.Column(db.Integer, nullable=False, default=0)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -162,6 +167,7 @@ class LessonPlan(db.Model):
             "mode_values": self.get_mode_values(),
             "setup_context": self.get_setup_context(),
             "doc_edits": self.get_doc_edits(),
+            "revision": self.revision or 0,
             "created_at": iso_utc(self.created_at),
             "updated_at": iso_utc(self.updated_at),
         }

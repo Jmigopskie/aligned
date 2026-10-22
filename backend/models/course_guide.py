@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from sqlalchemy.dialects.mysql import MEDIUMTEXT
+
 from extensions import db, iso_utc
 
 class CourseGuide(db.Model):
@@ -12,7 +14,8 @@ class CourseGuide(db.Model):
     title = db.Column(db.String(200), nullable=False)
     file_path = db.Column(db.String(255), nullable=False)
     file_hash = db.Column(db.String(64), index=True)  # sha256 of file bytes, used to dedupe uploads
-    extracted_text = db.Column(db.Text)
+    # MEDIUMTEXT on MySQL, whose TEXT stops at 64 KB; see app._widen_course_guide_text.
+    extracted_text = db.Column(db.Text().with_variant(MEDIUMTEXT(), "mysql"))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Official DepEd documents shipped in backend/builtin/course_guides and

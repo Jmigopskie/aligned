@@ -53,9 +53,11 @@ def search_course_guides():
 
     subject: a generator subject value (or any text), matched with its aliases
     against subject and title. q: free text, matched the same way.
-    grade_band / doc_type: filters (a guide's grade_band may list several
-    bands, comma-separated, so it matches each); only official guides carry them, so
-    setting one narrows the results to official guides. prefer_grade_band:
+    grade_band: a filter (a guide's grade_band may list several bands,
+    comma-separated, so it matches each); only official guides carry one, so
+    setting it narrows the results to official guides. doc_type: a filter too,
+    but an upload with no type (one from before uploads were typed) matches
+    either kind. prefer_grade_band:
     not a filter, it only ranks that band's guides above the rest, which is
     what the generator wants when it knows the grade but a guide for another
     band could still help.
@@ -74,7 +76,9 @@ def search_course_guides():
     if grade_band in GRADE_BANDS:
         query = query.filter(CourseGuide.grade_band.like(f"%{grade_band}%"))
     if doc_type in DOC_TYPES:
-        query = query.filter(CourseGuide.doc_type == doc_type)
+        # Uploads from before the Budget of Work / Curriculum Guide split carry
+        # no type, so they stay findable from either picker.
+        query = query.filter(or_(CourseGuide.doc_type == doc_type, CourseGuide.doc_type.is_(None)))
 
     order = [CourseGuide.is_builtin.desc()]
     if prefer in GRADE_BANDS:
@@ -119,6 +123,9 @@ def upload_course_guide():
     file = request.files["file"]
     subject = (request.form.get("subject") or "").strip()
     title = (request.form.get("title") or "").strip() or file.filename
+    # Which picker it was dropped on: a Budget of Work or a Curriculum Guide.
+    doc_type = (request.form.get("doc_type") or "").strip()
+    doc_type = doc_type if doc_type in DOC_TYPES else None
 
     if file.filename == "" or not _allowed(file.filename):
         return jsonify({"status": "error", "message": "Only .docx, .dotx, or .pdf files are allowed."}), 400
@@ -153,6 +160,7 @@ def upload_course_guide():
         file_path=save_path,
         file_hash=file_hash,
         extracted_text=extracted,
+        doc_type=doc_type,
     )
     db.session.add(guide)
     db.session.commit()

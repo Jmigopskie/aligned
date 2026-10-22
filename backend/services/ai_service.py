@@ -21,7 +21,7 @@ import time
 import requests
 
 from config import Config
-from services import ai_limits
+from services import ai_limits, grounding
 
 _log = logging.getLogger(__name__)
 
@@ -34,18 +34,58 @@ if PROVIDER == "gemini" and not Config.GEMINI_API_KEY:
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 _gemini_client = None
 
-# Ceilings on what one field may contain. Stated in the prompt AND enforced on
-# the reply in _enforce_limits(), because asking a model for brevity is a
-# request, not a guarantee: the trim is what actually holds the line when it
-# writes four sentences anyway.
-_MAX_LIST_ITEMS = 5
-_MAX_ITEM_WORDS = 15
-_MAX_PROSE_SENTENCES = 3
-_MAX_PROSE_WORDS = 60
+# Ceilings on what one field may contain, stated in the prompt and enforced on
+# the reply. They are set to give a capable model room for complete,
+# classroom-ready content (timings, steps, concrete examples): the old 15-word
+# items and 3-sentence fields made a model like Mistral Large get chopped
+# mid-sentence. They are a guard against runaway answers now, not a style rule,
+# and the trim in ai_limits cuts at a sentence or clause when it has to cut.
+_MAX_LIST_ITEMS = 8
+_MAX_ITEM_WORDS = 40
+_MAX_PROSE_SENTENCES = 6
+_MAX_PROSE_WORDS = 140
+
+# The length of one class session. Every day's plan, all parts together, must
+# fit inside it (the teacher's rule: content is capped at 45 minutes). The
+# Create Lesson Plan flow asks for the discussion length; this is the default.
+_SESSION_MINUTES = 45
+
+
+def _session_minutes(context) -> int:
+    """The session cap for this plan: the discussion length Alan asked for,
+    or _SESSION_MINUTES when none (or nonsense) was given."""
+    try:
+        minutes = int((context or {}).get("duration_minutes") or 0)
+    except (TypeError, ValueError):
+        return _SESSION_MINUTES
+    return minutes if 5 <= minutes <= 240 else _SESSION_MINUTES
 
 _SYSTEM_INSTRUCTION = (
     "You are helping a K-12 ICT/TLE teacher in the Philippines write a lesson plan. "
-    "Follow DepEd K-12 tone and terminology. Return concise, classroom-ready content.\n\n"
+    "Follow DepEd K-12 tone and terminology. Return specific, classroom-ready content a "
+    "teacher can use as written.\n\n"
+    "Follow DepEd Order No. 016, s. 2026 (Guidelines on Lesson Planning and Learning Design, "
+    "the ILAW framework):\n"
+    "- Keep it simple: brief notes, no excessive detail. Another teacher must still be able "
+    "to run the lesson without extra explanation.\n"
+    "- Coherence: the intentions are evident in every section. Each learning objective is "
+    "unpacked from the curriculum competency, is taught in the flow, is checked by the "
+    "formative assessment, and is extended in ways forward. The resources listed are the "
+    "ones the flow actually uses. Nothing appears in one section that the others ignore.\n"
+    "- Intentions: learning objectives are the smaller knowledge, skills or tasks from the "
+    "competency that learners can show by the end of the session(s), achievable in the time.\n"
+    "- Learning experience: the pre-lesson is a brief routine or check-in that activates "
+    "prior knowledge (its minutes count toward the session). The flow applies the learning "
+    "design principles where they fit: make the objective clear to learners, guide or model "
+    "before learners try on their own, check understanding during the lesson, connect to a "
+    "past competency, use collaboration, let learners see why it matters, and include "
+    "learners of varied abilities. Learning resources include an alternative for home-based "
+    "learning in case face-to-face class is interrupted.\n"
+    "- Assessing learning: formative checks happen during the session, include a way for "
+    "learners to ask for help, and allow an accommodation (e.g. oral answer, visual aid, "
+    "pair support).\n"
+    "- Ways forward: an extended learning opportunity beyond class time; reflections are the "
+    "teacher's own after teaching.\n\n"
     "Grounding rules (follow strictly):\n"
     "- Every field must be grounded in the specific topic, subject, and any course guide "
     "text given below — never generic filler that could apply to any lesson.\n"
@@ -56,23 +96,40 @@ _SYSTEM_INSTRUCTION = (
     "- Never reuse the same stock activity across different lessons or sections; if a "
     "course guide or references are provided, pull concrete details (terms, examples, "
     "page/unit names) from them rather than inventing generic ones.\n\n"
-    "Length rules (follow strictly. A teacher is copying this into a form, not "
-    "reading an essay):\n"
-    f"- A list field: at most {_MAX_LIST_ITEMS} items, one per line, each a single "
-    f"line of at most {_MAX_ITEM_WORDS} words. No item may be a paragraph.\n"
-    f"- A prose field: at most {_MAX_PROSE_SENTENCES} sentences.\n"
+    "Length (concise, per DO 016): say what the teacher and learners do, no explanations of "
+    "why, no repetition of other fields:\n"
+    "- Most fields: one or two sentences, or three to five short items, one per line.\n"
+    "- A flow, procedure or lesson-proper field: one short line per part (its heading, its "
+    "minutes, what happens), about 60 to 90 words for a session in total.\n"
+    "- Always finish the sentence; never stop mid-thought.\n"
+    "- Time: each day is ONE class session lasting the discussion length given in the lesson "
+    f"details ({_SESSION_MINUTES} minutes when none is given), a hard cap. "
+    "Everything planned for a session (pre-lesson routine and review, motivation, discussion, "
+    "practice, assessment) must fit inside that length together, never "
+    "more; give the minutes for each part, including the pre-lesson, so it visibly adds up.\n"
     "- Never restate the field's own label, never open with filler such as 'In this "
     "lesson' or 'The teacher will', and never explain your reasoning or comment on "
     "the plan. Write the content only: no preamble, no closing sentence, no "
     "meta-text.\n\n"
     "Answer every field you are asked for with real content. Never return an empty "
-    "string, a placeholder such as 'N/A' or 'To be determined', or a restatement "
-    "of the label. If a field is hard to ground in the topic or guide, still answer "
-    "it with the most specific content the topic supports.\n\n"
-    "Formatting: plain text only, except that a step-by-step procedure may number "
-    "its steps ('1. ', '2. ') and a list may put one item per line. Never use "
-    "markdown syntax (no **bold**, no ## headings, no - bullets); the app applies "
-    "its own formatting."
+    "string, a placeholder such as 'To be determined', or a restatement of the label "
+    "(the one exception: integration and contextualization may be 'N/A' when there is "
+    "genuinely no meaningful link). If a field is hard to ground in the topic or guide, "
+    "still answer it with the most specific content the topic supports.\n\n"
+    "Formatting: plain text only. Any field (or day of a weekly field) that holds "
+    "several parts or items puts EACH ON ITS OWN LINE, so the app can show it as a "
+    "bulleted list instead of one dense paragraph: the pre-lesson's routine and review "
+    "steps, each part of the flow, materials and resources, assessment questions or "
+    "tasks, extended-learning tasks, reflection questions, values, objectives. ONE thing "
+    "per line: never join separate steps, items, materials or routines in one line with "
+    "commas, semicolons or 'and' (write 'Prayer', 'Greetings', 'Attendance check' as three "
+    "lines, not 'Prayer, greetings, and attendance check'). Commas belong only inside a "
+    "real sentence. A line may start with its own short label ('Review:', 'Guided "
+    "Practice (10 min):'). Only a "
+    "single idea (a standard, a competency, learner context, a generalization) stays one "
+    "sentence or short paragraph. Do not number items or add bullet characters yourself "
+    "(the app adds bullets), except that a step-by-step procedure may number its steps "
+    "('1. ', '2. '). Never use markdown syntax (no **bold**, no ## headings)."
 )
 
 _ANCHOR_SYSTEM_INSTRUCTION = (
@@ -102,7 +159,7 @@ _OWL_SYSTEM_INSTRUCTION = (
     "- A \"use\" choice is finished content for the current field that the teacher can "
     "insert as is: classroom-ready, in DepEd K-12 terminology, grounded in the lesson's "
     "topic, subject and course guide. Fit the field: one line for a short text field; for "
-    "a list, one item per line and at most 5 items. Its label names the option in at most "
+    f"a list, one item per line and at most {_MAX_LIST_ITEMS} complete items. Its label names the option in at most "
     "6 words.\n"
     "- An \"ask\" choice is a follow-up question the teacher may want to ask next, at most "
     "8 words; its label and text are that question.\n"
@@ -128,14 +185,131 @@ _STOPWORDS = set(
 )
 
 
-def guide_excerpt(text: str, context: dict, budget: int = GUIDE_BUDGET) -> str:
-    """The parts of a course guide most relevant to this lesson, within budget.
+def _focus_terms(*values):
+    words = re.findall(r"[a-z0-9][a-z0-9+#.-]{2,}", " ".join(str(v or "") for v in values).lower())
+    # A stem so "conversion" also finds "convert" and "systems" "system". Six
+    # letters, matched only at the start of a word: five let "underwater" hit
+    # "understanding".
+    return {w[:6] for w in words if w not in _STOPWORDS}
 
-    A guide that fits is used whole. A longer one keeps its opening (scope and
-    overview) and then the passages that mention the lesson's topic and
-    subject most, in their original order, so the AI sees the section being
-    taught even when it sits deep in the guide."""
+
+# Where a section's standards start. Competencies sit under these, so a topic
+# found in a competency is read together with the standards above it. The
+# Budget of Work writes them in Title Case, the curriculum guide in CAPITALS.
+_STANDARDS_HEADING = re.compile(
+    r"Performance Standards?|Content Standards?|Learning Competenc(?:y|ies)|(?:First|Second|Third|Fourth) "
+    r"(?:Term|Quarter)|Quarter (?:\d|[IVX]+)|GRADE \d+", re.I)
+_LOOK_BACK = 6000
+_LOOK_AHEAD = 2500
+_MAX_HITS = 3
+
+
+def _topic_sections(text: str, terms: set, budget: int) -> str:
+    """The guide searched for the topic: the passages that mention it most,
+    each widened back to the standards heading it sits under and a little past
+    it, merged and kept in document order. "" when the topic isn't in the guide."""
+    low = text.lower()
+    patterns = {t: re.compile(r"\b" + re.escape(t)) for t in terms}
+    # A passage that holds one stray word of the topic isn't the topic: a short
+    # topic needs every word, a longer one most of them.
+    needed = len(terms) if len(terms) <= 2 else -(-len(terms) * 3 // 5)
+    hits = []
+    for start in range(0, len(text), _BLOCK_CHARS // 2):
+        block = low[start:start + _BLOCK_CHARS]
+        counts = {t: len(p.findall(block)) for t, p in patterns.items()}
+        present = [t for t, n in counts.items() if n]
+        if len(present) >= needed:
+            # Covering more of the topic's words beats repeating one of them,
+            # and a passage inside a standards/competencies table beats the
+            # guide's overview pages, which mention every topic in passing.
+            score = len(present) ** 2 * 10 + sum(counts.values())
+            if _STANDARDS_HEADING.search(text, max(0, start - 1500), start + _BLOCK_CHARS):
+                score *= 2
+            hits.append((score, start))
+    if not hits:
+        return ""
+    hits.sort(reverse=True)
+
+    windows = []
+    for score, start in hits:
+        # Further passages only when they are nearly as good a match as the
+        # best one, so a passing mention doesn't pull in an unrelated section.
+        if len(windows) == _MAX_HITS or score < hits[0][0] / 2:
+            break
+        if any(a <= start < b for a, b in windows):
+            continue
+        heads = [m.start() for m in _STANDARDS_HEADING.finditer(text, max(0, start - _LOOK_BACK), start)]
+        begin = max(0, start - 1500)
+        if heads:
+            # Walk back through the run of headings nearest the hit (Term,
+            # Performance Standard, Content Standard sit close together), not
+            # to the first heading in range, which may be a section earlier.
+            # The curriculum guide repeats its headers on every page and puts
+            # PERFORMANCE STANDARD at the END of a table, so the walk stops at
+            # one of those: it belongs to the previous table, not this one.
+            begin = heads[-1]
+            for h in reversed(heads[:-1]):
+                if begin - h > 600 or text.startswith("PERFORMANCE", h):
+                    break
+                begin = h
+        windows.append((begin, min(len(text), start + _BLOCK_CHARS + _LOOK_AHEAD)))
+
+    out, used = [], 0
+    for a, b in sorted(windows):
+        if out and a <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], b))
+        else:
+            out.append((a, b))
+    parts = []
+    for a, b in out:
+        piece = text[a:b]
+        if used + len(piece) > budget:
+            piece = piece[: max(0, budget - used)]
+        if piece:
+            parts.append(piece)
+            used += len(piece)
+    return "\n[...]\n".join(parts)
+
+
+def _guide_inputs(course_guide_text, context: dict):
+    """(excerpt for the prompt, full text for the verbatim check).
+
+    course_guide_text is one guide's text, or a list of (title, text) when the
+    teacher picked a Budget of Work and a Curriculum Guide. Each document is
+    searched for the topic on its own share of the budget and labelled, so one
+    long guide can't crowd the other out of the prompt; the verbatim check
+    runs against all of them."""
+    if isinstance(course_guide_text, (list, tuple)):
+        sources = [(t or "", x or "") for t, x in course_guide_text if (x or "").strip()]
+    else:
+        sources = [("", course_guide_text or "")] if (course_guide_text or "").strip() else []
+    if not sources:
+        return "", ""
+    share = GUIDE_BUDGET // len(sources)
+    parts = [(f"[From: {title}]\n" if title else "") + guide_excerpt(text, context, share) for title, text in sources]
+    return "\n\n".join(parts), "\n\n".join(text for _, text in sources)
+
+
+def guide_excerpt(text: str, context: dict, budget: int = GUIDE_BUDGET) -> str:
+    """The parts of a course guide that cover this lesson, within budget.
+
+    The guide is searched for the lesson's topic and only the sections that
+    teach it are sent (with the standards they sit under), rather than reading
+    the document from its first page. When the topic can't be found, the old
+    fallback applies: the whole guide if it fits, otherwise its opening plus the
+    passages that mention the topic and subject most."""
     text = (text or "").strip()
+    # PDF extraction of the DepEd Budget of Work files puts every word on its
+    # own line, which wastes most of the budget on line breaks and leaves the
+    # line-based blocks below meaningless.
+    lines = [l for l in text.split("\n") if l.strip()]
+    if lines and sum(len(l) for l in lines) / len(lines) < 20:
+        text = grounding.tidy_guide(text)
+    topic_terms = _focus_terms(context.get("topic"))
+    if topic_terms:
+        found = _topic_sections(text, topic_terms, budget)
+        if found:
+            return found
     if len(text) <= budget:
         return text
     focus = " ".join(str(context.get(k) or "") for k in ("topic", "subject", "grade_level", "program"))
@@ -184,6 +358,84 @@ def _field_directive(field):
     model detail where a general category is what's wanted."""
     haystack = f"{field.field_key or ''} {field.label or ''}".lower()
 
+    if "pre-lesson" in haystack or "pre lesson" in haystack:
+        return (
+            " One short line per step, each its own bullet, never several steps in one line: "
+            "e.g. 'Prayer (1 min)', 'Greetings (1 min)', 'Attendance check (1 min)', 'Wellness "
+            "check (1 min): ...', 'Review (3 min): ...' with the question or task. About 5 "
+            "minutes in total, counted toward the session."
+        )
+    # DO 016 s.2026: learner context is the teacher's own observation and
+    # reflections are written after teaching. A model can't observe either, so
+    # it drafts something the teacher confirms instead of inventing outcomes.
+    if "learner context" in haystack:
+        return (
+            " The AI cannot observe this class: write one or two sentences of anticipated "
+            "context for this grade and topic (likely strengths, interests, possible "
+            "barriers), starting with 'Anticipated:' so the teacher confirms or edits it."
+        )
+    if "reflection" in haystack:
+        return (
+            " Reflections are written by the teacher after the session: give two or three "
+            "short questions to answer then (e.g. which objective needs reteaching, who needs "
+            "remediation or enrichment), not invented results."
+        )
+    if "declaration of ai" in haystack or "ai use" in haystack:
+        return (
+            " One honest sentence: the plan was drafted with AlignED's AI from the selected "
+            "Budget of Work / Curriculum Guide and reviewed and edited by the teacher "
+            "(DO 003 s.2026)."
+        )
+    if "integration" in haystack or "contextuali" in haystack:
+        return (
+            " One concrete link to another learning area or to the learners' local context "
+            "that the flow actually uses; write N/A if there is genuinely none."
+        )
+    # Only when the format doesn't say how to write it (ILAW asks for the term
+    # number alone, which must win over this).
+    if not field.ai_hint and re.search(r"\b(?:semester|quarter|term)\b", field.label or "", re.I):
+        return (
+            " Use the guide's own heading for the section the lesson's competency sits in, "
+            "worded as the guide words it (e.g. 'First Term' if the guide says Term, never "
+            "'First Quarter' instead)."
+        )
+    if grounding.is_logistics_field(field):
+        return (
+            " Fill this only from the lesson details given above. If they don't state it, "
+            "return an empty string: never invent a school, date, time, room or section."
+        )
+    if _is_objective_field(field):
+        combined = re.search(r"competenc", field.label or "", re.I)
+        return (
+            (" First line: the learning competency copied word for word from the guide. Then"
+             if combined else "")
+            + " the line 'At the end of the lesson, the learners are expected to:' (not counted, not "
+            f"numbered), then at least {_MIN_OBJECTIVES} learning objectives, one per line with no "
+            "numbers or bullet characters (the app bullets them; this overrides any 'numbered' "
+            "wording above). Each is unpacked from the competency, achievable in the session, and "
+            "starts with a measurable Bloom's taxonomy action verb in lowercase, never 'understand', "
+            "'know', 'learn' or 'appreciate the importance of'. Cover the domains the lesson really "
+            "has: cognitive (e.g. identify, describe, explain, compare, classify, analyze, evaluate, "
+            "create), affective (e.g. value, show willingness to, demonstrate respect for, cooperate "
+            "in, practice), and psychomotor (e.g. perform, construct, operate, assemble, demonstrate "
+            "the procedure for) ONLY when the lesson has a real hands-on skill; never force a "
+            "psychomotor objective. Order them from lower to higher thinking."
+        )
+    if grounding.is_verbatim_field(field):
+        return (
+            " Copy the matching statement(s) from the course guide / budget of work above "
+            "WORD FOR WORD: exact wording, no paraphrasing, shortening, merging or added "
+            "words, one statement per line. The length limits do not apply to this field. "
+            "Lines not found in the guide are removed."
+        )
+    if grounding.is_reference_field(field):
+        return (
+            " The sources this plan's content is drawn from: real, publicly accessible pages, "
+            "one per line, each in APA 7th format exactly: Author. (Year). Title. Site Name. "
+            "https://full-url (use n.d. when undated; no full stop after the URL). Put the "
+            "course guide citation given above first. Never invent a URL or a source; every "
+            "line is checked and any that isn't APA or whose link doesn't open is removed."
+        )
     if "value" in haystack:
         return (
             " Each item must be a single word only (e.g. 'Patience', 'Accuracy') — "
@@ -191,9 +443,11 @@ def _field_directive(field):
         )
     if "material" in haystack or "resource" in haystack:
         return (
-            " Each item must be a general category only (e.g. 'Laptop', 'Whiteboard', "
-            "'Printed handouts') — no brand names, software names, or specific model "
-            "numbers, and no parenthetical examples."
+            " Three to five items, one per line: the materials the flow actually uses, each a "
+            "general category (e.g. 'Laptop', 'Whiteboard', 'Printed case study handouts'), no "
+            "brand names, software names or model numbers. For learning resources, end with one "
+            "line 'Home-based alternative: ...' for learners who cannot attend face to face "
+            "(DO 016 s.2026)."
         )
     if any(kw in haystack for kw in ("energizer", "motivation", "warm up", "warm-up", "icebreaker", "routine")):
         return (
@@ -269,10 +523,45 @@ def _grounding_directive(field, context: dict) -> str:
     return out
 
 
+# What the standard DepEd lesson-plan parts are for, used only when a format
+# gives a field no hint of its own. Without them a model saw a bare label such
+# as "Analysis" and had to guess (one read it as questions for learners,
+# another as an analysis of the lesson plan itself). A format's own hint
+# always wins; these only fill the silence, the same for every model.
+_PART_MEANINGS = [
+    (r"\bmotivation\b", "A short, engaging opener (about 5 minutes) on today's topic "
+     "that gets learners curious; say what learners do."),
+    (r"\banalysis\b", "Two to four questions the teacher asks so learners process the activity they just did "
+     "and draw out the concept. Questions only, addressed to learners."),
+    (r"\babstraction\b|\blesson proper\b|\bdiscussion\b", "The core teaching of the concept, as ordered steps the "
+     "teacher follows, with the key facts or definitions learners must get."),
+    (r"\bapplication\b", "One task where learners use the new concept themselves (individually, in pairs or "
+     "groups), with what they produce."),
+    (r"\bgeneralization\b", "The key idea of the lesson in one to three sentences, as learners should be able to "
+     "state it."),
+    (r"\bevaluation\b|\bassessment\b", "A short check of the competency that fits the remaining time: three to "
+     "five items or one task, with the answer key or criteria."),
+    (r"\bassignment\b|\bagreement\b", "A brief task for home that extends today's lesson."),
+    (r"\breview\b", "A quick recap of the previous lesson (a few questions or a short activity) that leads into "
+     "today's topic."),
+]
+
+
+def _part_meaning(field):
+    if field.ai_hint:
+        return ""
+    label = (field.label or "").lower()
+    for pattern, meaning in _PART_MEANINGS:
+        if re.search(pattern, label):
+            return f" ({meaning})"
+    return ""
+
+
 def _schema_block(fields, context=None):
     context = context or {}
     return "\n".join(
-        f"- {f.field_key} ({f.field_type}): {f.ai_hint or f.label}{_field_directive(f)}{_weekly_directive(f)}"
+        f"- {f.field_key} ({f.field_type}): {f.ai_hint or f.label}{_part_meaning(f)}"
+        f"{_field_directive(f)}{_weekly_directive(f)}"
         f"{_grounding_directive(f, context) if context else ''}"
         for f in fields
     )
@@ -282,20 +571,28 @@ def _context_block(context: dict):
     return ", ".join(f"{k}: {v}" for k, v in context.items() if v)
 
 
-def _lesson_block(context: dict, guide_text: str) -> str:
+def _lesson_block(context: dict, guide_text: str, citation: str = "") -> str:
     """The part of every generation and chat request that stays the same for a
     lesson, sent first so it can be served from the provider's prompt cache."""
     block = f"Lesson details: {_context_block(context)}\n"
     if guide_text:
         block += f"""
-Base the content on this course guide (follow its scope, sequence, and terminology closely).
-Every field that references material, examples, or activities must be traceable back to
-something in this guide — do not introduce topics, terms, or activities that aren't
-supported by it:
+This is the section of the course guide that covers the lesson's topic. EVERY field must be
+grounded in it or in a source listed under References: the lesson content, examples,
+activities, questions, assessment and materials all come from this section's competencies,
+suggested activities and performance tasks (or from a listed reference), using its terms.
+Do not add facts, topics, activities or examples that neither the guide nor a listed
+reference supports. Content standards, performance standards, learning competencies and
+objectives are copied from it word for word, never reworded, and all from the SAME section
+(term/quarter and week) as the lesson's topic, so they belong together. Every other field
+builds on that one competency: the lesson, activities, generalization and evaluation teach
+and assess exactly what it names, and the topic, term and dates agree with it:
 ---
 {guide_text}
 ---
 """
+    if citation:
+        block += f"\nAPA citation of the curriculum documents above (list them first in References):\n{citation}\n"
     return block
 
 
@@ -448,49 +745,243 @@ Return strict JSON: {{"fields": [...]}} where each item is:
 # Writing a lesson plan (Building Proficiency)
 # ---------------------------------------------------------------------------
 
-def _trim(values, fields):
+def _is_exact(field):
+    return grounding.is_verbatim_field(field) or grounding.is_reference_field(field)
+
+
+def _trim(values, fields, guide_text="", citation="", context=None):
     """Every value the model returns goes through here before it leaves this
-    module, so the length ceilings hold regardless of which call produced it."""
-    return ai_limits.enforce_limits(
-        values, fields,
+    module, so the length ceilings hold regardless of which call produced it.
+
+    Curriculum statements and APA references are exempt from the word ceilings
+    (a DepEd competency is often longer than 15 words, and clipping it is
+    exactly the rewording that must not happen); instead they are snapped to
+    the guide's own wording and held to links that open."""
+    plain = [f for f in fields if not _is_exact(f)]
+    exact = [f for f in fields if _is_exact(f)]
+    out = ai_limits.enforce_limits(
+        values, plain,
         max_items=_MAX_LIST_ITEMS,
         max_item_words=_MAX_ITEM_WORDS,
         max_sentences=_MAX_PROSE_SENTENCES,
         max_prose_words=_MAX_PROSE_WORDS,
     )
+    if exact:
+        kept = ai_limits.enforce_limits(
+            values, exact, max_items=10, max_item_words=120, max_sentences=12, max_prose_words=400,
+        )
+        kept = grounding.snap_to_guide(kept, exact, guide_text)
+        out.update(grounding.keep_working_links(kept, exact, citation))
+    return _unnumber_objectives(grounding.keep_given_logistics(out, fields, context), fields)
 
 
-def _fill_gaps(lesson: str, fields, all_values: dict, label: str, context=None) -> dict:
-    """One more attempt at the fields that came back blank or as a placeholder.
+_LIST_NUMBER = re.compile(r"^\s*\(?\d{1,2}[.)]\s+")
 
-    A model asked for twelve fields at once will occasionally skip one or answer
-    it with "N/A". Re-asking for just those, naming them, recovers most of them
-    on the second try. Only one extra pass: if a field is still empty after
-    being asked on its own, the caller reports it as unanswered rather than
-    looping and spending a teacher's time.
+
+def _unnumber_objectives(values: dict, fields) -> dict:
+    """Objectives are a bulleted list under an unnumbered lead-in ('At the end
+    of the lesson, the learners are expected to:'), so any numbering the model
+    added anyway (ILAW's own field hint says 'numbered') comes off here and the
+    page bullets the lines. A numbered list would also keep the page from
+    bulleting them, since it treats numbers as an ordered procedure."""
+    out = dict(values)
+    for f in fields:
+        if f.field_key not in out or not _is_objective_field(f):
+            continue
+
+        def clean(text):
+            return "\n".join(_LIST_NUMBER.sub("", line) for line in str(text or "").split("\n"))
+
+        value = out[f.field_key]
+        out[f.field_key] = [clean(v) for v in value] if isinstance(value, list) else clean(value)
+    return out
+
+
+def _must_answer(fields):
+    """The fields a reply is held to: logistics a teacher didn't give are left
+    blank on purpose, so they are neither re-asked nor reported missing."""
+    return [f for f in fields if not grounding.is_logistics_field(f)
+            and not re.search(r"integration|contextuali", f"{f.field_key} {f.label}", re.I)]
+
+
+# A learning objective field must carry at least this many objectives
+# (the teacher's rule, matching DO 016's knowledge / skill / attitude split).
+_MIN_OBJECTIVES = 3
+_OBJECTIVE_STEM = re.compile(r"(?i)^\s*at the end of the")
+
+
+def _is_objective_field(field):
+    return bool(re.search(r"objective", f"{field.field_key or ''} {field.label or ''}", re.I))
+
+
+def _cell_complete(field, value):
+    """One cell (or a whole non-weekly field) really answered."""
+    if not ai_limits.is_answered(value):
+        return False
+    if _is_objective_field(field):
+        lines = [l for l in str(value).split("\n") if l.strip() and not _OBJECTIVE_STEM.match(l)]
+        # A combined "Competencies / Objectives" field also holds the competency line.
+        need = _MIN_OBJECTIVES + (1 if re.search(r"competenc", field.label or "", re.I) else 0)
+        return len(lines) >= need
+    return True
+
+
+def _field_complete(field, value):
+    """Whether a field came back usable: answered, every day of a weekly field
+    filled (an answer for Monday alone used to count as done), and objective
+    fields holding at least _MIN_OBJECTIVES objectives."""
+    if field.field_type == "weekly":
+        names = getattr(field, "parts_list", None) or []
+        parts = value if isinstance(value, list) else [value]
+        if names and len(parts) < len(names):
+            return False
+        return all(_cell_complete(field, p) for p in parts)
+    return _cell_complete(field, value)
+
+
+def _incomplete(values: dict, fields) -> list:
+    """The field_keys of `fields` that still need work, in field order."""
+    return [f.field_key for f in _must_answer(fields) if not _field_complete(f, (values or {}).get(f.field_key))]
+
+
+def _fill_gaps(lesson: str, fields, all_values: dict, label: str, guide_text="", citation="",
+               context=None) -> dict:
+    """One more attempt at the fields that came back blank, as a placeholder,
+    with days missing, or with too few objectives.
+
+    A model asked for several fields at once will occasionally skip one, leave a
+    day empty or answer it with "N/A". Re-asking for just those, naming what is
+    wrong, recovers most of them. The callers run this after every batch (so a
+    gap is fixed before the next batch builds on it) and once more at the end.
     """
-    gaps = ai_limits.missing_keys(all_values, fields)
+    gaps = _incomplete(all_values, fields)
     if not gaps:
         return {}
 
     gap_fields = [f for f in fields if f.field_key in set(gaps)]
     task = f"""
-These fields of the lesson plan came back empty or unanswered. Answer each one
-now with real, specific content grounded in the lesson details above. Return
-strict JSON with field_key as keys and nothing else:
+These fields of the lesson plan came back incomplete: empty, a placeholder, a
+weekly field with a day missing, or an objectives field with fewer than
+{_MIN_OBJECTIVES} objectives. Answer each one again, in full, with real, specific
+content grounded in the lesson details above and consistent with the fields
+already written. Give every day of a weekly field. Return strict JSON with
+field_key as keys and nothing else:
 {_schema_block(gap_fields, context)}
 """
     try:
-        recovered = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], f"{label} (filling gaps)"), gap_fields)
+        recovered = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], f"{label} (filling gaps)"), gap_fields,
+                          guide_text, citation, context)
     except Exception:
         # The gap pass is best-effort: a failure here must not lose the fields
         # that were generated successfully.
         _log.warning("[%s] gap-fill pass failed; reporting the blanks instead", label, exc_info=True)
         return {}
 
-    # Only real answers are taken: a second empty reply must not overwrite
-    # anything, nor make the field look answered.
-    return {k: v for k, v in recovered.items() if ai_limits.is_answered(v)}
+    # Only an improvement is taken: a second reply that is still empty must not
+    # overwrite anything, nor make the field look answered.
+    by_key = {f.field_key: f for f in gap_fields}
+    return {k: v for k, v in recovered.items()
+            if k in by_key and (_field_complete(by_key[k], v) or not ai_limits.is_answered(all_values.get(k)))
+            and ai_limits.is_answered(v)}
+
+
+# How many times a batch's incomplete fields are asked for again before the
+# next batch starts.
+_BATCH_RETRIES = 2
+
+# The parts of one class session whose minutes must add up to at most
+# _SESSION_MINUTES, matched by label: the pre-lesson, the flow/procedure, and
+# the formative assessment when it is timed on its own.
+_TIMED_PARTS = re.compile(r"pre-?lesson|\bflow\b|procedure|lesson proper|formative", re.I)
+_PRE_LESSON = re.compile(r"pre-?lesson", re.I)
+_MINUTES = re.compile(r"(\d{1,2})\s*(?:-|–|to)?\s*(?:\d{1,2}\s*)?min(?:ute)?s?\b", re.I)
+
+
+def _timing_problems(values: dict, fields, cap: int = _SESSION_MINUTES) -> list:
+    """(day index, total minutes, pre-lesson timed?) for every session that runs
+    past _SESSION_MINUTES or whose pre-lesson gives no minutes (so its time is
+    unaccounted for). The model was told the cap and still timed the flow
+    alone to 45 with the routine on top, so the plan is checked, not trusted."""
+    timed = [f for f in fields if _TIMED_PARTS.search(f.label or "")]
+    if not timed or not any(_PRE_LESSON.search(f.label or "") for f in timed):
+        return []
+
+    def cells(f):
+        v = values.get(f.field_key)
+        return v if isinstance(v, list) else [v]
+
+    days = max(len(cells(f)) for f in timed)
+    problems = []
+    for d in range(days):
+        total, pre_timed = 0, False
+        for f in timed:
+            parts = cells(f)
+            text = str(parts[d] if d < len(parts) else "") or ""
+            mins = sum(int(m) for m in _MINUTES.findall(text))
+            total += mins
+            if _PRE_LESSON.search(f.label or "") and mins:
+                pre_timed = True
+        if total > cap or not pre_timed:
+            problems.append((d, total, pre_timed))
+    return problems
+
+
+def _fix_timing(lesson, fields, values, label, guide_text, citation, context):
+    """Re-time the sessions that break the cap: the pre-lesson and the flow are
+    asked for again with the exact totals, up to _BATCH_RETRIES times, and a
+    reply is kept only when it actually brings every day within the cap."""
+    cap = _session_minutes(context)
+    for attempt in range(_BATCH_RETRIES):
+        problems = _timing_problems(values, fields, cap)
+        if not problems:
+            return values
+        targets = [f for f in fields if _TIMED_PARTS.search(f.label or "")
+                   and not re.search(r"formative", f.label or "", re.I)]
+        if not targets:
+            return values
+        detail = "; ".join(
+            f"day {d + 1} adds up to {total} minutes{'' if pre else ' and its pre-lesson has no minutes'}"
+            for d, total, pre in problems
+        )
+        task = f"""
+Already written fields (keep them consistent):
+{json.dumps(values)}
+
+The session timing is wrong: {detail}. Every session must total AT MOST
+{cap} minutes INCLUDING the pre-lesson (about 5 minutes) and any
+timed assessment. Rewrite these fields for every day so each part shows its
+minutes and each day adds up to {cap} minutes or less; keep the
+same activities, shortened if needed, one part per line. Return strict JSON with
+field_key as keys:
+{_schema_block(targets, context)}
+"""
+        try:
+            fixed = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], f"{label} (timing {attempt + 1})"),
+                          targets, guide_text, citation, context)
+        except Exception:
+            _log.warning("[%s] timing pass failed; keeping the plan as written", label, exc_info=True)
+            return values
+        candidate = dict(values)
+        candidate.update({k: v for k, v in fixed.items() if ai_limits.is_answered(v)})
+        if len(_timing_problems(candidate, fields, cap)) < len(problems) and not _incomplete(candidate, targets):
+            values = candidate
+    return values
+
+
+def _complete_batch(lesson, chunk, values, label, guide_text, citation, context):
+    """Ask again for whatever in this batch is incomplete, up to _BATCH_RETRIES
+    times, so the next batch (which reads these as "already written") builds
+    on complete fields. Returns the merged values."""
+    values = dict(values)
+    for attempt in range(_BATCH_RETRIES):
+        if not _incomplete(values, chunk):
+            break
+        recovered = _fill_gaps(lesson, chunk, values, f"{label} (check {attempt + 1})",
+                               guide_text, citation, context)
+        if not recovered:
+            continue
+        values.update(recovered)
+    return values
 
 
 def select_fields(fields, include_keys):
@@ -507,18 +998,22 @@ def select_fields(fields, include_keys):
     return [f for f in fields if f.field_key in wanted]
 
 
-def generate_full(context: dict, fields, course_guide_text: str = "", include_keys=None) -> dict:
+def generate_full(context: dict, fields, course_guide_text: str = "", include_keys=None,
+                  course_guide_citation: str = "") -> dict:
     targets = select_fields(fields, include_keys)
     if not targets:
         return {}
-    lesson = _lesson_block(context, guide_excerpt(course_guide_text, context))
+    cite = course_guide_citation
+    excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
+    lesson = _lesson_block(context, excerpt, cite)
     task = f"""
 Fill ONLY the following fields and return strict JSON with field_key as keys:
 {_schema_block(targets, context)}
 """
-    values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency"), targets)
-    values.update(_fill_gaps(lesson, targets, values, "Building Proficiency", context))
-    return values
+    values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency"), targets,
+                   course_guide_text, cite, context)
+    values = _complete_batch(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
+    return _fix_timing(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
 
 
 _STREAM_CHUNK_SIZE = 4
@@ -528,7 +1023,8 @@ def _chunk_label(chunk):
     return chunk[0].label if len(chunk) == 1 else f"{chunk[0].label} – {chunk[-1].label}"
 
 
-def generate_full_streaming(context: dict, fields, course_guide_text: str = "", include_keys=None):
+def generate_full_streaming(context: dict, fields, course_guide_text: str = "", include_keys=None,
+                            course_guide_citation: str = ""):
     """Fields have no meaningful grouping anymore (section_group isn't
     collected — see the format builder), so this batches them in fixed-size
     groups by document order instead: enough fields per AI call to stay fast
@@ -543,7 +1039,9 @@ def generate_full_streaming(context: dict, fields, course_guide_text: str = "", 
         return
     chunks = [fields[i:i + _STREAM_CHUNK_SIZE] for i in range(0, len(fields), _STREAM_CHUNK_SIZE)]
     # Built once per plan: every chunk shares this exact prefix.
-    lesson = _lesson_block(context, guide_excerpt(course_guide_text, context))
+    cite = course_guide_citation
+    excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
+    lesson = _lesson_block(context, excerpt, cite)
 
     all_values = {}
     for i, chunk in enumerate(chunks, start=1):
@@ -559,29 +1057,49 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
 """
         values = _trim(
             _call(_SYSTEM_INSTRUCTION, [lesson, task], f"Building Proficiency {i}/{len(chunks)}"),
-            chunk,
+            chunk, course_guide_text, cite, context,
         )
+        # Check this batch before moving on: anything blank, a weekly field
+        # with a day missing, or objectives short of the minimum is asked for
+        # again now, while it is still the next batch's context.
+        if _incomplete(values, chunk):
+            yield {"type": "filling_gaps", "count": len(_incomplete(values, chunk))}
+            values = _complete_batch(lesson, chunk, values, f"Building Proficiency {i}/{len(chunks)}",
+                                     course_guide_text, cite, context)
         all_values.update(values)
         yield {"type": "section_done", "section": name, "index": i, "total": len(chunks), "values": values}
 
     # Anything still blank or answered with a placeholder gets one more,
     # targeted attempt before this reports back. Without it the page announced
     # a finished plan over fields the model had quietly skipped.
-    gaps = ai_limits.missing_keys(all_values, fields)
+    gaps = _incomplete(all_values, fields)
     if gaps:
         yield {"type": "filling_gaps", "count": len(gaps)}
-        recovered = _fill_gaps(lesson, fields, all_values, "Building Proficiency", context)
+        recovered = _fill_gaps(lesson, fields, all_values, "Building Proficiency", course_guide_text, cite,
+                               context)
         if recovered:
             all_values.update(recovered)
             yield {"type": "section_done", "section": "Filled-in gaps",
                    "index": len(chunks), "total": len(chunks), "values": recovered}
+
+    # The whole session, pre-lesson included, must fit the cap. Only checkable
+    # once every timed part is written, so it runs after the batches.
+    cap = _session_minutes(context)
+    if _timing_problems(all_values, fields, cap):
+        yield {"type": "filling_gaps", "count": len(_timing_problems(all_values, fields, cap))}
+        retimed = _fix_timing(lesson, fields, all_values, "Building Proficiency", course_guide_text, cite, context)
+        changed = {k: v for k, v in retimed.items() if all_values.get(k) != v}
+        if changed:
+            all_values.update(changed)
+            yield {"type": "section_done", "section": "Session timing",
+                   "index": len(chunks), "total": len(chunks), "values": changed}
 
     # `missing` answers "did everything I was asked to write come back": the
     # requested field keys with no real content even after the retry. It says
     # nothing about fields outside include_keys, so the page must combine this
     # with its own check of any fields the teacher chose to write themselves
     # before it can claim the plan is finished.
-    missing = ai_limits.missing_keys(all_values, fields)
+    missing = _incomplete(all_values, fields)
     yield {
         "type": "complete",
         "values": all_values,
@@ -598,10 +1116,11 @@ _MAX_CHOICES = 4
 
 
 def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
-             history: list, message: str) -> dict:
+             history: list, message: str, course_guide_citation: str = "") -> dict:
     """One turn of the Guided mode chat about `field`. Returns
     {"reply": str, "choices": [{"type": "use"|"ask", "label": str, "text": str}]}."""
-    lesson = _lesson_block(context, guide_excerpt(course_guide_text, context))
+    excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
+    lesson = _lesson_block(context, excerpt, course_guide_citation)
     written = {k: v for k, v in (prior_values or {}).items() if v and k != field.field_key}
     current = (prior_values or {}).get(field.field_key) or ""
     names = getattr(field, "parts_list", None) or []
@@ -626,7 +1145,26 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
 {f"Conversation so far:{chr(10)}{turns}{chr(10)}" if turns else ""}Teacher: {message}
 """
     data = _call(_OWL_SYSTEM_INSTRUCTION, [lesson, task], "Owl chat")
-    return _clean_owl_reply(data)
+    return _ground_choices(_clean_owl_reply(data), field, course_guide_text, course_guide_citation)
+
+
+def _ground_choices(answer, field, guide_text, citation):
+    """The owl's insertable choices held to the same rules as generation: a
+    curriculum field only gets the guide's own statements, a references field
+    only links that open. A choice with nothing left after that is dropped."""
+    if not _is_exact(field):
+        return answer
+    choices = []
+    key = field.field_key
+    for c in answer["choices"]:
+        if c["type"] == "use":
+            text = grounding.snap_to_guide({key: c["text"]}, [field], guide_text)[key]
+            text = grounding.keep_working_links({key: text}, [field], citation)[key]
+            if not text.strip():
+                continue
+            c = {**c, "text": text}
+        choices.append(c)
+    return {**answer, "choices": choices}
 
 
 def _clean_owl_reply(data) -> dict:

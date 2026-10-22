@@ -98,6 +98,8 @@ def _migrate_lesson_plan_columns():
         "setup_context": "TEXT",
         # The teacher's edits to the document body; see LessonPlan.doc_edits.
         "doc_edits": "TEXT",
+        # Save counter for the stale-device check; see LessonPlan.revision.
+        "revision": "INTEGER NOT NULL DEFAULT 0",
     }
 
     for col_name, col_type in new_columns.items():
@@ -157,6 +159,59 @@ def _migrate_format_columns():
     _add_column("lesson_plan_formats", "builtin_key", "VARCHAR(64)")
     _add_column("lesson_plan_formats", "description", "VARCHAR(255)")
     _add_unique_index("lesson_plan_formats", "uq_lesson_plan_formats_builtin_key", "builtin_key")
+
+
+def _backfill_guide_doc_types():
+    """Give a type to uploads from before the Budget of Work / Curriculum
+    Guide pickers, when the document says plainly what it is. Untyped rows
+    show in both pickers, so a Budget of Work uploaded back then would
+    otherwise keep turning up under Curriculum Guide too. Anything that doesn't
+    name itself stays untyped rather than being guessed into one picker."""
+    import re
+
+    from models.course_guide import CourseGuide
+
+    changed = False
+    for guide in CourseGuide.query.filter(CourseGuide.doc_type.is_(None)).all():
+        head = re.sub(r"\s+", " ", (guide.extracted_text or "")[:4000]).lower()
+        title = (guide.title or "").lower()
+        if "budget of work" in head or "budget of work" in title:
+            guide.doc_type = "budget_of_work"
+        elif ("curriculum guide" in head or "basic education curriculum" in head
+              or re.search(r"(?:^|[-_ ])cg(?:[-_ .]|$)", title)):
+            guide.doc_type = "curriculum_guide"
+        else:
+            continue
+        changed = True
+    if changed:
+        db.session.commit()
+
+
+def _widen_course_guide_text():
+    """course_guides.extracted_text as MEDIUMTEXT on MySQL.
+
+    Plain TEXT stops at 64 KB there, and the full MATATAG curriculum guide is
+    ~210,000 characters: text used to be cut at 20,000 characters, which is
+    why most of a long guide never reached the AI. SQLite has no such limit.
+    Re-running the MODIFY is harmless, so a worker that loses the race to
+    another one doing the same ALTER just moves on.
+    """
+    if db.engine.dialect.name != "mysql":
+        return
+    from sqlalchemy import text
+    from sqlalchemy.exc import DatabaseError
+
+    try:
+        with db.engine.begin() as conn:
+            kind = conn.execute(text(
+                "SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() "
+                "AND TABLE_NAME = 'course_guides' AND COLUMN_NAME = 'extracted_text'"
+            )).scalar()
+            if kind and kind.lower() == "text":
+                conn.execute(text("ALTER TABLE course_guides MODIFY extracted_text MEDIUMTEXT"))
+    except DatabaseError as exc:
+        if "concurrent ddl" not in str(exc).lower():
+            raise
 
 
 def _migrate_course_guide_builtin_columns():
@@ -307,6 +362,9 @@ def create_app():
         _migrate_format_field_columns()
         _migrate_announcement_columns()
         _migrate_section_columns()
+        # Before seeding, which writes the full built-in guide texts.
+        _widen_course_guide_text()
+        _backfill_guide_doc_types()
         _ensure_default_admin(app)
 
         from services.builtins import seed_builtins

@@ -68,6 +68,24 @@ def check_list_trimming():
     first = out.split("\n")[0]
     assert len(first.split()) <= 16, first  # 15 words, a trailing period may join the last
 
+    # Clipping never breaks a sentence off mid-thought (real Mistral output that
+    # used to come back as "...Mark Zuckerberg, or." and "...and how they.").
+    clip = ai_limits._clip_words
+    long_ref = ("Distribute case study handouts. Learners research one notable ICT entrepreneur "
+                "(Bill Gates, Mark Zuckerberg, or a local tech innovator) and list the qualities "
+                "that contributed to their success.")
+    assert clip(long_ref, 15) == "Distribute case study handouts. Learners research one notable ICT entrepreneur."
+    assert clip("Learners submit a written reflection listing three qualities from the case study "
+                "and how they would apply them in their own ICT business idea.", 15) == \
+        "Learners submit a written reflection listing three qualities from the case study."
+    # A sentence only a little over the cap is kept whole rather than cut.
+    nearly = "Present the six qualities: innovation, problem-solving, resilience, creativity, decision-making, and perseverance today."
+    assert clip(nearly, 12) == nearly
+    # No bracket left open, no doubled full stop.
+    assert "(" not in clip("Pairs receive ICT problem cards (e.g., cybersecurity breach, slow internet, "
+                           "no digital payments, lost files, unpaid bills) and must solve each one.", 10)
+    assert clip("Ends with a doubled stop..", 15) == "Ends with a doubled stop."
+
     # Bullet and number markers the model added are stripped, not shown.
     messy = "- Laptop\n* Whiteboard\n1. Printed handouts\n• Projector"
     out = ai_limits.clean_value(messy, "list", **CAPS)

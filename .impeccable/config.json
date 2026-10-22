@@ -24,8 +24,8 @@
         "files": [
           "frontend/generator.html"
         ],
-        "createdAt": "2026-10-21T23:24:51.834Z",
-        "reason": "assistant triage: .owl-dots is the pre-existing Guided-mode chat typing indicator in shared css/style.css, animated only while a reply is pending (live state); not added by the flow"
+        "createdAt": "2026-10-18T10:28:46.092Z",
+        "reason": "Claude triage: the only pulsing dot here is .owl-dots, Alan's typing indicator shown while a chat reply is actually pending (live state)"
       }
     ]
   }

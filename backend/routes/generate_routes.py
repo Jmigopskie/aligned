@@ -9,7 +9,7 @@ from models.lesson_plan import LessonPlan
 from models.course_guide import CourseGuide
 from models.section import Section, SectionMembership
 from routes.auth_routes import login_required, current_user
-from services import ai_service, docx_service
+from services import ai_service, docx_service, grounding
 from services.notify import notify
 
 generate_bp = Blueprint("generate", __name__)
@@ -30,28 +30,45 @@ def _can_access_plan(user, plan):
         return bool(section and section.teacher_id == user.id)
     return False
 
-def _resolve_course_guide(data):
-    course_guide_id = data.get("course_guide_id")
-    if not course_guide_id:
-        return None, None
+def _resolve_guides(data):
+    """The curriculum documents the page picked, Budget of Work first: it is
+    the one that names this week's competency, the Curriculum Guide the
+    standards around it. Either id may be missing; one that is sent but no
+    longer exists is an error rather than silently generating without it."""
+    guides = []
+    for key, label in (("budget_of_work_id", "Budget of Work"), ("course_guide_id", "Curriculum Guide")):
+        guide_id = data.get(key)
+        if not guide_id:
+            continue
+        guide = CourseGuide.query.get(guide_id)
+        if not guide:
+            return None, (jsonify({
+                "status": "error",
+                "message": f"That {label} couldn't be found. Try searching again.",
+            }), 404)
+        if all(g.id != guide.id for g in guides):
+            guides.append(guide)
+    return guides, None
 
-    guide = CourseGuide.query.get(course_guide_id)
-    if not guide:
-        return None, (jsonify({
-            "status": "error",
-            "message": "That course guide couldn't be found. Try searching again.",
-        }), 404)
-    return guide, None
-
-def _build_context(data, guide):
+def _build_context(data, guides):
     context = dict(data.get("context") or {})
     if data.get("teacher_name"):
         context["teacher_name"] = data["teacher_name"]
     if data.get("subject"):
         context["subject"] = data["subject"]
-    if guide:
-        context["course_guide_title"] = guide.title
+    if guides:
+        context["course_guide_title"] = "; ".join(g.title for g in guides)
     return context
+
+def _guide_sources(guides):
+    """(title, text) for each chosen document, the shape ai_service reads."""
+    return [(g.title, g.extracted_text or "") for g in guides]
+
+def _guide_citation(guides):
+    """APA references for the chosen documents, one per line; an upload with
+    no public link has none, since only references that open are kept."""
+    lines = [grounding.guide_citation(g.title, g.source_url, g.extracted_text or "") for g in guides]
+    return "\n".join(line for line in lines if line)
 
 def _include_keys(data, fmt):
     """The field_keys this request wants generated, or None for all of them.
@@ -74,16 +91,15 @@ def generate_full():
     data = request.get_json(silent=True) or {}
     fmt = LessonPlanFormat.query.get_or_404(data.get("format_id"))
 
-    guide, err = _resolve_course_guide(data)
+    guides, err = _resolve_guides(data)
     if err:
         return err
 
-    context = _build_context(data, guide)
-    course_guide_text = guide.extracted_text if guide else ""
+    context = _build_context(data, guides)
 
     field_values = ai_service.generate_full(
-        context, fmt.fields, course_guide_text=course_guide_text,
-        include_keys=_include_keys(data, fmt),
+        context, fmt.fields, course_guide_text=_guide_sources(guides),
+        include_keys=_include_keys(data, fmt), course_guide_citation=_guide_citation(guides),
     )
     return jsonify({"status": "ok", "field_values": field_values})
 
@@ -93,21 +109,23 @@ def generate_full_stream():
     data = request.get_json(silent=True) or {}
     fmt = LessonPlanFormat.query.get_or_404(data.get("format_id"))
 
-    guide, err = _resolve_course_guide(data)
+    guides, err = _resolve_guides(data)
     if err:
         return err
 
-    context = _build_context(data, guide)
-    course_guide_text = guide.extracted_text if guide else ""
+    context = _build_context(data, guides)
+    course_guide_text = _guide_sources(guides)
     fields = fmt.fields
     # Read here, not inside _stream(): the generator runs after the request
     # context is gone, so `request`/`data` can't be touched from inside it.
     include_keys = _include_keys(data, fmt)
+    citation = _guide_citation(guides)
 
     def _stream():
         try:
             for event in ai_service.generate_full_streaming(
                 context, fields, course_guide_text=course_guide_text, include_keys=include_keys,
+                course_guide_citation=citation,
             ):
                 yield json.dumps(event) + "\n"
         except Exception as exc:
@@ -136,7 +154,7 @@ def owl_chat():
     if not message:
         return jsonify({"status": "error", "message": "Type a question for the owl first."}), 400
 
-    guide, err = _resolve_course_guide(data)
+    guides, err = _resolve_guides(data)
     if err:
         return err
 
@@ -145,11 +163,11 @@ def owl_chat():
         for t in (data.get("history") or [])[-_CHAT_HISTORY_TURNS:]
         if isinstance(t, dict) and str(t.get("text") or "").strip()
     ]
-    context = _build_context(data, guide)
-    course_guide_text = guide.extracted_text if guide else ""
+    context = _build_context(data, guides)
     prior_values = data.get("prior_values") or {}
 
-    answer = ai_service.owl_chat(context, field, prior_values, course_guide_text, history, message)
+    answer = ai_service.owl_chat(context, field, prior_values, _guide_sources(guides), history, message,
+                                 course_guide_citation=_guide_citation(guides))
     return jsonify({"status": "ok", **answer})
 
 @generate_bp.get("/lesson-plans")
@@ -204,6 +222,35 @@ def update_lesson_plan(plan_id):
         }), 409
 
     data = request.get_json(silent=True) or {}
+
+    # The same account open on two devices: each autosave carries the whole
+    # plan, so whichever device saved last used to win, and a laptop tab left
+    # open with an older copy wiped what had just been written on a phone. The
+    # client now sends the revision it last saw; the conditional UPDATE claims
+    # the next one atomically (two workers can't both pass), and a stale device
+    # gets the current plan back instead of overwriting it. A request without
+    # base_revision (a page loaded before this shipped) keeps the old behaviour.
+    base = data.get("base_revision")
+    if base is not None:
+        try:
+            base = int(base)
+        except (TypeError, ValueError):
+            return jsonify({"status": "error", "message": "Invalid base_revision."}), 400
+        claimed = (
+            LessonPlan.query.filter_by(id=plan.id, revision=base)
+            .update({"revision": base + 1}, synchronize_session=False)
+        )
+        if not claimed:
+            db.session.rollback()
+            return jsonify({
+                "status": "error",
+                "code": "stale",
+                "message": "This plan was changed on another device or tab since this page loaded it.",
+                "lesson_plan": LessonPlan.query.get(plan_id).to_dict(),
+            }), 409
+        plan.revision = base + 1
+    else:
+        plan.revision = (plan.revision or 0) + 1
 
     # Only the fields actually present are touched, so an autosave carrying
     # just the field values can't blank out the title alongside them.

@@ -2,7 +2,7 @@
 
 The prompt in ai_service asks for short, specific, fully-answered fields. This
 module is what makes that true rather than hoped for: a model told "at most 5
-items of at most 15 words" will still sometimes write nine items of forty, and a
+items of at most N words" will still sometimes write nine items of twice that, and a
 model told "answer every field" will still sometimes return an empty string or
 "N/A". Both are the caller's problem to catch, because by the time the text
 reaches the page it is already being pasted into a teacher's form.
@@ -45,18 +45,63 @@ def _strip_markdown(text: str) -> str:
     return _MARKDOWN_EMPHASIS.sub(r"\1", text)
 
 
+# Words a cut must never end on: a list or clause that stops here reads as
+# broken off ("Bill Gates, Mark Zuckerberg, or.").
+_DANGLING = {"a", "an", "the", "and", "or", "but", "nor", "of", "to", "for", "with", "in", "on", "at", "by",
+             "from", "as", "how", "why", "what", "which", "that", "who", "they", "it", "is", "are", "e.g.",
+             "i.e.", "such", "like", "including", "via", "into", "its", "their", "your", "our"}
+_SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
+_CLAUSE_END = re.compile(r"[,;:]|\s[-–—]\s")
+
+
+def _finish(text: str) -> str:
+    """A clipped fragment made to end cleanly: no dangling connective, no
+    bracket left open, exactly one full stop."""
+    if text.count("(") > text.count(")"):
+        text = text[: text.rfind("(")]
+    words = text.split()
+    while len(words) > 1 and words[-1].strip(",;:-–—").lower() in _DANGLING:
+        words.pop()
+    text = " ".join(words).rstrip(" ,;:-–—")
+    return text if re.search(r"[.!?]$", text) else text + "."
+
+
 def _clip_words(text: str, max_words: int) -> str:
+    """Hold text to about max_words without breaking it mid-sentence.
+
+    In order of preference: let it run up to half again as long when that
+    finishes the sentence; cut at the last sentence end in that allowance;
+    cut at a clause boundary (comma, semicolon, dash) inside the limit; and
+    only then cut at the limit itself, trimmed so it doesn't end on "or",
+    "and", an open bracket and the like. A model that writes long (Mistral
+    did, routinely) used to come out as "...three qualities and how they."
+    """
+    text = re.sub(r"(?<!\.)\.\.(?!\.)", ".", text)
     words = text.split()
     if len(words) <= max_words:
         return text
-    # Cut at the last sentence end inside the budget when there is one, so the
-    # result reads as a finished sentence rather than breaking off mid-clause.
-    clipped = " ".join(words[:max_words])
-    for stop in (". ", "! ", "? "):
-        cut = clipped.rfind(stop)
-        if cut > len(clipped) // 2:
-            return clipped[: cut + 1].strip()
-    return clipped.rstrip(",;:") + "."
+    allowance = max_words + max_words // 2
+    if len(words) <= allowance and re.search(r"[.!?]$", text.strip()):
+        return text
+
+    window = " ".join(words[:allowance])
+    limit = len(" ".join(words[:max_words]))
+    ends = [m.end() for m in _SENTENCE_END.finditer(window)]
+    if ends:
+        # The last sentence end inside the limit, or failing that the first
+        # one past it (still within the allowance).
+        inside = [e for e in ends if e <= limit and e > limit // 3]
+        cut = inside[-1] if inside else ends[0]
+        if cut > limit // 3:
+            return window[:cut].strip()
+
+    head = " ".join(words[:max_words])
+    clauses = [m.start() for m in _CLAUSE_END.finditer(head) if m.start() > len(head) // 2]
+    for cut in reversed(clauses):
+        piece = head[:cut]
+        if piece.count("(") == piece.count(")"):
+            return _finish(piece)
+    return _finish(head)
 
 
 def _looks_listy(field_type: str, lines: list) -> bool:
@@ -120,7 +165,16 @@ def clean_value(value, field_type: str = "text", *, max_items: int, max_item_wor
         # stripped to bare lines the page would then bullet. Anything else stays
         # unmarked and the page applies its own bullets.
         if numbered:
-            return "\n".join(f"{i}. {item}" for i, item in enumerate(items, start=1))
+            # A lead-in line ("At the end of the lesson, the learners are
+            # expected to:") introduces the list; it is not item 1.
+            out, n = [], 0
+            for item in items:
+                if item.rstrip().endswith(":"):
+                    out.append(item)
+                else:
+                    n += 1
+                    out.append(f"{n}. {item}")
+            return "\n".join(out)
         return "\n".join(items)
 
     # Prose: cap the sentence count first, then the overall word count, so a

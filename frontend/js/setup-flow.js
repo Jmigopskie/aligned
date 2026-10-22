@@ -65,7 +65,7 @@ const COPY = {
   },
   guide: {
     q: "Which course guide should I follow?",
-    help: "A curriculum guide or a budget of work both work.",
+    help: "Pick a Budget of Work, a Curriculum Guide, or both.",
     say: "I'll follow this guide's scope and words closely.",
   },
   mode: {
@@ -461,11 +461,15 @@ const STEPS = {
 };
 
 // ---- the course guide ----
+// Two kinds, like the rest of the app: a Budget of Work and a Curriculum
+// Guide. At least one is needed; a student may pick both. Tapping a picked
+// card again takes it back.
 const GUIDES_SHOWN = 6;
+const GUIDE_KINDS = [["budget_of_work", "Budget of Work", "budgetOfWork"], ["curriculum_guide", "Curriculum Guide", "courseGuide"]];
 
 function guideCard(g, pressed, onPick) {
   const meta = g.is_builtin
-    ? `${g.doc_type === "curriculum_guide" ? "Curriculum Guide" : "Budget of Work"} · ${g.curriculum || "DepEd"}`
+    ? `${g.curriculum || "DepEd"}${g.grades ? ` · Grade ${g.grades}` : ""}`
     : `${g.subject} · uploaded by ${g.uploaded_by || "a teacher"}`;
   const text = twoLine(g.title, meta);
   if (g.is_builtin) {
@@ -477,38 +481,46 @@ function guideCard(g, pressed, onPick) {
   return btn;
 }
 
-async function paintGuides(wrap, showAll = false) {
+function paintGuides(wrap) {
+  wrap.replaceChildren(...GUIDE_KINDS.map(([kind, label, answerKey]) => {
+    const box = el("div", { class: "flow-guide-kind" });
+    paintGuideKind(box, kind, label, answerKey);
+    return box;
+  }));
+}
+
+async function paintGuideKind(box, kind, label, answerKey, showAll = false) {
   const a = G.getAnswers();
-  wrap.replaceChildren(el("p", { class: "flow-help" }, `Looking for ${a.subject || "your subject"} guides…`));
+  const heading = el("p", { class: "flow-label" }, label);
+  box.replaceChildren(heading, el("p", { class: "flow-help" }, `Looking for ${a.subject || "your subject"} ${label.toLowerCase()}s…`));
   let guides = [];
   try {
-    guides = await G.searchCourseGuides();
+    guides = await G.searchCourseGuides(kind);
   } catch (err) {
     showError(err.message);
   }
-  const current = G.getAnswers().courseGuide;
+  const current = G.getAnswers()[answerKey];
   if (current && !guides.some((g) => g.id === current.id)) guides.unshift(current);
 
-  const list = el("div", { class: "flow-choices flow-choices-stack flow-scroll", role: "group", "aria-labelledby": "flow-question" });
+  const list = el("div", { class: "flow-choices flow-choices-stack flow-scroll", role: "group", "aria-label": label });
   (showAll ? guides : guides.slice(0, GUIDES_SHOWN)).forEach((g) => {
-    list.append(guideCard(g, current && g.id === current.id, (btn) => {
-      list.querySelectorAll(".flow-format").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
-      G.selectCourseGuide(g);
+    list.append(guideCard(g, !!current && g.id === current.id, (btn) => {
+      const picking = btn.getAttribute("aria-pressed") !== "true";
+      list.querySelectorAll(".flow-format").forEach((b) => b.setAttribute("aria-pressed", String(picking && b === btn)));
+      G.selectCourseGuide(picking ? g : null, kind);
       refresh();
     }));
   });
-  const parts = guides.length
-    ? [list]
-    : [el("p", { class: "flow-help" }, "No course guide for this subject yet. Upload yours and I'll add it to the shared library.")];
+  const parts = [heading];
+  parts.push(guides.length ? list : el("p", { class: "flow-help" }, `No ${label} for this subject yet. Upload yours and I'll add it to the shared library.`));
   if (!showAll && guides.length > GUIDES_SHOWN) {
     const more = el("button", { type: "button", class: "flow-back flow-more" }, `Show all ${guides.length}`);
-    more.addEventListener("click", () => paintGuides(wrap, true));
+    more.addEventListener("click", () => paintGuideKind(box, kind, label, answerKey, true));
     parts.push(more);
   }
 
   const input = el("input", { type: "file", accept: ".docx,.dotx,.pdf", hidden: true });
-  const upload = el("button", { type: "button", class: "flow-drop" }, icon("upload"),
-    twoLine("Upload my own guide", ".docx, .dotx or .pdf · it joins the shared library"));
+  const upload = el("button", { type: "button", class: "flow-back flow-more flow-upload-link" }, icon("upload"), `Upload my own ${label}`);
   upload.addEventListener("click", () => input.click());
   input.addEventListener("change", async () => {
     const file = input.files[0];
@@ -521,16 +533,17 @@ async function paintGuides(wrap, showAll = false) {
     upload.disabled = true;
     say("Adding it to the library…", "loading");
     try {
-      await G.uploadCourseGuide(file);
+      await G.uploadCourseGuide(file, kind);
       say(COPY.guide.say, FLOW_POSES.guide);
-      paintGuides(wrap, showAll);
+      paintGuideKind(box, kind, label, answerKey, showAll);
     } catch (err) {
       showError(err.message);
       say(COPY.guide.say, FLOW_POSES.guide);
       upload.disabled = false;
     }
   });
-  wrap.replaceChildren(...parts, upload, input);
+  parts.push(upload, input);
+  box.replaceChildren(...parts);
   refresh();
 }
 
@@ -783,7 +796,7 @@ const DETAIL_ROWS = [
   ["prevTopic", "Previous topic", (a) => (a.firstLesson ? "This is the first lesson" : a.previousTopic)],
   ["topic", "Today's topic", (a) => a.topic],
   ["nextTopic", "Next topic", (a) => (a.nextUnsure ? "Not sure yet" : a.nextTopic)],
-  ["guide", "Course guide", (a) => (a.courseGuide ? a.courseGuide.title : "")],
+  ["guide", "Course guide", (a) => [a.budgetOfWork, a.courseGuide].filter(Boolean).map((g) => g.title).join(" + ")],
 ];
 
 function showDetails() {
