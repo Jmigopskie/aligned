@@ -1,12 +1,16 @@
 import os
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 from functools import wraps
+from html import escape
 
 from flask import Blueprint, request, jsonify, session, current_app, send_file
 from PIL import Image, UnidentifiedImageError
 
-from extensions import db
+from extensions import db, bcrypt
+from models.password_reset import PasswordReset
 from models.user import User
+from services import mail
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -108,6 +112,69 @@ def login():
 @auth_bp.post("/logout")
 def logout():
     session.pop("user_id", None)
+    return jsonify({"status": "ok"})
+
+# ---- Forgot password: a 6-digit code by email, then a new password ----
+_RESET_MINUTES = 15
+_RESET_TRIES = 5
+
+@auth_bp.post("/forgot-password")
+def forgot_password():
+    """Emails a reset code to an active account. The reply is the same
+    whether or not the email has an account, so it can't be used to find out."""
+    if not mail.configured():
+        return jsonify({"status": "error",
+                        "message": "Password reset by email isn't set up yet. Ask your admin to reset it."}), 503
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    reply = jsonify({"status": "ok", "message": "If that email has an AlignED account, a reset code is on its way."})
+    user = User.query.filter_by(email=email).first() if email else None
+    if not user or not user.is_active:
+        return reply
+
+    now = datetime.utcnow()
+    pending = PasswordReset.query.filter_by(user_id=user.id, used_at=None).all()
+    if any(p.created_at and now - p.created_at < timedelta(minutes=1) for p in pending):
+        return reply  # once a minute
+    for p in pending:
+        p.used_at = now  # only the newest code works
+    code = f"{secrets.randbelow(10**6):06d}"
+    db.session.add(PasswordReset(user_id=user.id, code_hash=bcrypt.generate_password_hash(code).decode("utf-8"),
+                                 expires_at=now + timedelta(minutes=_RESET_MINUTES), created_at=now))
+    db.session.commit()
+    text = (f"Hi {user.full_name},\n\nYour AlignED password reset code is {code}\n\n"
+            f"It works for {_RESET_MINUTES} minutes. If you didn't ask to reset your password, ignore this email.")
+    html = (f"<p>Hi {escape(user.full_name)},</p><p>Your AlignED password reset code is</p>"
+            f"<p style=\"font-size:28px;font-weight:700;letter-spacing:6px;\">{code}</p>"
+            f"<p>It works for {_RESET_MINUTES} minutes. If you didn't ask to reset your password, ignore this email.</p>")
+    try:
+        mail.send_email(user.email, "Your AlignED password reset code", text, html)
+    except mail.MailError:
+        current_app.logger.exception("Password reset email failed")
+    return reply
+
+@auth_bp.post("/reset-password")
+def reset_password():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    code = (data.get("code") or "").strip()
+    password = data.get("password") or ""
+    bad = jsonify({"status": "error", "message": "That code isn't right or has expired. Ask for a new one."}), 400
+
+    user = User.query.filter_by(email=email).first() if email else None
+    reset = user and PasswordReset.query.filter_by(user_id=user.id, used_at=None) \
+        .order_by(PasswordReset.id.desc()).first()
+    if not reset or reset.expires_at < datetime.utcnow() or reset.attempts >= _RESET_TRIES:
+        return bad
+    if not bcrypt.check_password_hash(reset.code_hash, code):
+        reset.attempts += 1
+        db.session.commit()
+        return bad
+    if len(password) < 8:
+        return jsonify({"status": "error", "message": "New password must be at least 8 characters."}), 400
+    user.set_password(password)
+    reset.used_at = datetime.utcnow()
+    db.session.commit()
     return jsonify({"status": "ok"})
 
 @auth_bp.get("/me")

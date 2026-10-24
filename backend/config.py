@@ -55,6 +55,11 @@ class Config:
 
     FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://127.0.0.1:5500")
 
+    # Password-reset codes are emailed through Resend; the sender's domain
+    # must be verified there.
+    RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+    MAIL_FROM = os.getenv("MAIL_FROM", "AlignED <noreply@align-ed.online>")
+
     # Bootstrap admin account, created automatically on first run if no
     # admin user exists yet. Change the password after first login.
     DEFAULT_ADMIN_NAME = os.getenv("DEFAULT_ADMIN_NAME", "System Administrator")

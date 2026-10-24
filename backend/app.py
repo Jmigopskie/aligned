@@ -370,7 +370,7 @@ def create_app():
         # including the newer sections / section_memberships / announcements /
         # notifications tables.
         from models import user, format, lesson_plan, course_guide, section, announcement, notification  # noqa: F401
-        from models import supplementary_source  # noqa: F401
+        from models import supplementary_source, password_reset  # noqa: F401
 
         _create_tables()
         _migrate_lesson_plan_columns()

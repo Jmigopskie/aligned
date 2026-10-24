@@ -73,6 +73,10 @@ const Api = {
   login: (payload) =>
     apiFetch("/api/login", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => apiFetch("/api/logout", { method: "POST" }),
+  forgotPassword: (email) =>
+    apiFetch("/api/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
+  resetPassword: (payload) =>
+    apiFetch("/api/reset-password", { method: "POST", body: JSON.stringify(payload) }),
   me: () => apiFetch("/api/me"),
   markOnboarded: () => apiFetch("/api/me/onboarded", { method: "POST" }),
   updateMe: (payload) =>

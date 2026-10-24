@@ -41,7 +41,7 @@
             <input type="checkbox" id="remember-me" />
             <span>Remember me</span>
           </label>
-          <a href="#" id="forgot-link">Forgot Password?</a>
+          <a href="forgot-password.html">Forgot Password?</a>
         </div>
 
         <button type="submit" id="submit-btn" class="btn btn-primary btn-block">Sign In</button>
@@ -66,11 +66,6 @@
         // not logged in — stay on this page
       }
     })();
-
-    document.getElementById("forgot-link").addEventListener("click", (e) => {
-      e.preventDefault();
-      showToast("Ask your admin to reset your password for now.");
-    });
 
     const form = document.getElementById("login-form");
     const errorBox = document.getElementById("form-error");
