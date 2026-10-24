@@ -54,7 +54,8 @@ function isStepAnswered(stepId, answers) {
     case "subject":
       return filled(a.subject) && Number.isInteger(a.durationMinutes) && a.durationMinutes >= 5 && a.durationMinutes <= 240;
     case "topics": return filled(a.mainTopic) && filled(a.topic); // previous and next are encouraged
-    case "sources": return (a.guides || []).length + (a.sources || []).length > 0; // at least one, any kind
+    case "sources": // at least one source of any kind, and the term and week
+      return (a.guides || []).length + (a.sources || []).length > 0 && filled(a.term) && filled(a.week);
     case "mode": return a.mode === "full" || a.mode === "step";
     default: return true;
   }
@@ -70,6 +71,8 @@ const PREFILL_LABELS = [
   [["student teacher", "teacher", "name of teacher", "name of teachers"], (a) => a.studentTeacher],
   [["learning area", "learning area(s)"], (a) => a.subject],
   [["grade level", "grade level & section"], classLabel],
+  [["term", "quarter", "term/quarter", "quarter/term", "grading period"], (a) => a.term],
+  [["week", "week no.", "week number"], (a) => (a.week ? `Week ${a.week}` : "")],
 ];
 
 // Answers given once (school, name, subject, class) go straight into the

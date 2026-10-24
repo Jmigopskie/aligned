@@ -207,6 +207,27 @@ def _backfill_guide_doc_types():
         db.session.commit()
 
 
+def _widen_course_guide_doc_type():
+    """course_guides.doc_type from VARCHAR(20) (two fixed keys) to VARCHAR(60),
+    for the types teachers name on upload. MySQL only; SQLite ignores lengths."""
+    if db.engine.dialect.name != "mysql":
+        return
+    from sqlalchemy import text
+    from sqlalchemy.exc import DatabaseError
+
+    try:
+        with db.engine.begin() as conn:
+            size = conn.execute(text(
+                "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() "
+                "AND TABLE_NAME = 'course_guides' AND COLUMN_NAME = 'doc_type'"
+            )).scalar()
+            if size and int(size) < 60:
+                conn.execute(text("ALTER TABLE course_guides MODIFY doc_type VARCHAR(60)"))
+    except DatabaseError as exc:
+        if "concurrent ddl" not in str(exc).lower():
+            raise
+
+
 def _widen_course_guide_text():
     """course_guides.extracted_text as MEDIUMTEXT on MySQL.
 
@@ -385,6 +406,7 @@ def create_app():
         _migrate_section_columns()
         # Before seeding, which writes the full built-in guide texts.
         _widen_course_guide_text()
+        _widen_course_guide_doc_type()
         _backfill_guide_doc_types()
         _ensure_default_admin(app)
 

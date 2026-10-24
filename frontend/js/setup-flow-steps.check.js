@@ -47,9 +47,12 @@ assert.strictEqual(answered("subject", { durationMinutes: 45 }), false);
 assert.strictEqual(answered("topics", { mainTopic: "Spreadsheets", topic: "Cell formulas" }), true);
 assert.strictEqual(answered("topics", { topic: "Cell formulas" }), false, "main topic is required");
 assert.strictEqual(answered("topics", { mainTopic: "Spreadsheets", topic: "  " }), false);
-assert.strictEqual(answered("sources", { guides: [{ id: 4 }, { id: 5 }] }), true);
-assert.strictEqual(answered("sources", { sources: [{ id: 9 }] }), true, "an own upload is enough");
-assert.strictEqual(answered("sources", { guides: [], sources: [] }), false, "at least one source");
+const when = { term: "2nd Term", week: "3" };
+assert.strictEqual(answered("sources", { guides: [{ id: 4 }, { id: 5 }], ...when }), true);
+assert.strictEqual(answered("sources", { sources: [{ id: 9 }], ...when }), true, "an own upload is enough");
+assert.strictEqual(answered("sources", { guides: [], sources: [], ...when }), false, "at least one source");
+assert.strictEqual(answered("sources", { guides: [{ id: 4 }], term: "2nd Term" }), false, "the week is needed");
+assert.strictEqual(answered("sources", { guides: [{ id: 4 }], week: "3" }), false, "the term is needed");
 assert.strictEqual(answered("mode", { mode: "step" }), true);
 assert.strictEqual(answered("mode", {}), false);
 
@@ -63,6 +66,8 @@ assert.ok(!("f0" in kept));
 const college = ctx.prefillFieldValues([{ field_key: "g", label: "Grade Level & Section" }],
   { levelType: "college", program: "BSIT", year: "2nd Year", section: "A" }, {});
 assert.strictEqual(college.g, "BSIT · 2nd Year · A");
+const termWeek = ctx.prefillFieldValues([{ field_key: "t", label: "Quarter" }, { field_key: "w", label: "Week" }], when, {});
+assert.deepStrictEqual({ ...termWeek }, { t: "2nd Term", w: "Week 3" });
 
 // Format groups: students see built-ins and their teachers' formats.
 const formats = [{ id: 1, is_builtin: true, owner_id: 9 }, { id: 2, is_builtin: false, owner_id: 5 }, { id: 3, is_builtin: false, owner_id: 7 }];

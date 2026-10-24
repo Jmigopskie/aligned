@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-10-06c" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-25a" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -79,6 +79,11 @@
               <label for="upload-title">Title</label>
               <input type="text" id="upload-title" placeholder="Defaults to the file name" />
             </div>
+            <div class="field">
+              <label for="upload-type">Type</label>
+              <input type="text" id="upload-type" list="upload-type-options" maxlength="60" autocomplete="off" placeholder="Pick one or type a new one, e.g. Learning Activity Sheet" />
+              <datalist id="upload-type-options"></datalist>
+            </div>
           </div>
           <div id="cg-dropzone" class="dropzone">
             <div>Drag a course guide here or <strong>browse</strong> (.docx, .dotx, .pdf)</div>
@@ -117,8 +122,6 @@
             <label for="type-filter">Type</label>
             <select id="type-filter">
               <option value="">All types</option>
-              <option value="budget_of_work">Budget of Work</option>
-              <option value="curriculum_guide">Curriculum Guide</option>
             </select>
           </div>
         </div>
@@ -147,8 +150,8 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-10-06c"></script>
+  <script src="js/api.js?v=2026-10-25a"></script>
   <script src="js/icons.js?v=2026-10-06c"></script>
-  <script src="js/course-guides.js"></script>
+  <script src="js/course-guides.js?v=2026-10-25a"></script>
 </body>
 </html>

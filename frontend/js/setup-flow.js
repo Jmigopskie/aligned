@@ -39,9 +39,9 @@ const COPY = {
     say: "Tell me where this lesson sits, so the recap and the assignment line up.",
   },
   sources: {
-    q: "Which sources should I read?",
-    help: "Pick any Curriculum Guides and Budgets of Work, and add your own files (only you see them).",
-    say: "I'll read every source you pick, so the plan follows them.",
+    q: "What should I read?",
+    help: "Pick from the library or upload your own files.",
+    say: "I'll read every source you pick. Files you upload stay private to you.",
   },
   mode: {
     q: "How do you want to write it?",
@@ -458,10 +458,23 @@ const STEPS = {
 };
 
 // ---- step 6: supplementary sources ----
-// Library documents come from one dropdown that takes several picks, listed
-// under Curriculum Guide and Budget of Work; the student's own files are
-// uploaded beside it and stay private. Every pick shows in one list below.
-const guideKind = (g) => (g.doc_type === "budget_of_work" ? "Budget of Work" : "Curriculum Guide");
+// Library documents sit in one folder per type (Curriculum Guide, Budget of
+// Work, and any type a teacher names on upload), with a search across all of
+// them; several can be picked. The student's own files are uploaded beside
+// them and stay private. Every pick shows in one list, then the term and week.
+const guideKind = (g) => g.type_label || (g.doc_type === "budget_of_work" ? "Budget of Work" : "Curriculum Guide");
+const FIRST_FOLDERS = ["Curriculum Guide", "Budget of Work"];
+const TERM_OPTIONS = [
+  { group: "Term", items: ["1st Term", "2nd Term", "3rd Term"].map((t) => ({ value: t, label: t })) },
+  { group: "Quarter", items: ["1st Quarter", "2nd Quarter", "3rd Quarter", "4th Quarter"].map((t) => ({ value: t, label: t })) },
+  { group: "Semester", items: ["1st Semester", "2nd Semester", "Summer"].map((t) => ({ value: t, label: t })) },
+];
+const WEEK_OPTIONS = Array.from({ length: 20 }, (_, i) => ({ value: String(i + 1), label: `Week ${i + 1}` }));
+
+function folderOrder(a, b) {
+  const rank = (k) => (FIRST_FOLDERS.includes(k) ? FIRST_FOLDERS.indexOf(k) : k === "Other" ? 99 : 2);
+  return rank(a) - rank(b) || a.localeCompare(b);
+}
 
 async function paintSources(box) {
   box.replaceChildren(el("p", { class: "flow-help" }, `Looking for ${G.getAnswers().subject || "your subject"} sources…`));
@@ -478,13 +491,15 @@ async function paintSources(box) {
 function drawSources(box, library) {
   const guides = () => G.getAnswers().guides || [];
   const own = () => G.getAnswers().sources || [];
-  const summary = el("summary", { class: "flow-multi-summary", id: "flow-library" });
-  const panel = el("div", { class: "flow-multi-panel", role: "group", "aria-labelledby": "flow-library-label" });
-  const drop = el("details", { class: "flow-multi" }, summary, panel);
-  const list = el("div", { class: "flow-sources" });
+  const folders = el("div", { class: "flow-folders", role: "group", "aria-labelledby": "flow-library-label" });
+  const noMatch = el("p", { class: "flow-help", hidden: true }, "No source matches that search.");
+  const list = el("div", { class: "flow-chips", "aria-label": "Picked sources" });
+  const counts = new Map(); // folder name -> its "n picked" badge
 
+  // One chip per pick, the type in its tooltip: the folders already show
+  // where each one came from, so the picks stay a compact line.
   function chosenRow(name, kind, onRemove) {
-    const remove = el("button", { type: "button", class: "flow-source-remove", "aria-label": `Remove ${name}` }, icon("x"));
+    const remove = el("button", { type: "button", class: "flow-chip-remove", "aria-label": `Remove ${name}` }, icon("x"));
     remove.addEventListener("click", async () => {
       remove.disabled = true;
       try {
@@ -494,14 +509,14 @@ function drawSources(box, library) {
         remove.disabled = false;
       }
     });
-    return el("div", { class: "flow-source" }, icon("file"), el("span", {}, name), el("small", { class: "flow-source-kind" }, kind), remove);
+    return el("span", { class: "flow-chip", title: `${name} (${kind})`, "data-kind": kind }, icon("file"), el("span", {}, name), remove);
   }
 
   function paintChosen() {
-    const n = guides().length;
-    summary.textContent = n === 0 ? "Choose Curriculum Guides or Budgets of Work…"
-      : n === 1 ? guides()[0].title : `${n} picked: ${guides().map((g) => g.title).join(", ")}`;
-    summary.classList.toggle("is-empty", n === 0);
+    counts.forEach((badge, kind) => {
+      const n = guides().filter((g) => guideKind(g) === kind).length;
+      badge.textContent = n ? `${n} picked` : "";
+    });
     list.replaceChildren(
       ...guides().map((g) => chosenRow(g.title, guideKind(g), async () => pick(g, false))),
       ...own().map((s) => chosenRow(s.name, "Your file", async () => {
@@ -516,38 +531,50 @@ function drawSources(box, library) {
   function pick(g, on) {
     const rest = guides().filter((x) => x.id !== g.id);
     G.setAnswers({ guides: on ? [...rest, g] : rest });
-    const check = panel.querySelector(`input[value="${g.id}"]`);
+    const check = folders.querySelector(`input[value="${g.id}"]`);
     if (check) check.checked = on;
     paintChosen();
   }
 
-  ["Curriculum Guide", "Budget of Work"].forEach((heading) => {
-    const items = library.filter((g) => guideKind(g) === heading);
-    if (!items.length) return;
-    panel.append(el("p", { class: "flow-multi-head" }, heading));
+  const byKind = new Map();
+  library.forEach((g) => byKind.set(guideKind(g), [...(byKind.get(guideKind(g)) || []), g]));
+  [...byKind.keys()].sort(folderOrder).forEach((kind) => {
+    const items = byKind.get(kind);
+    const badge = el("small", { class: "flow-folder-picked" });
+    counts.set(kind, badge);
+    const folder = el("details", { class: "flow-folder" },
+      el("summary", {}, icon("folder"), el("span", { class: "flow-folder-name" }, kind),
+        el("small", { class: "flow-folder-count" }, String(items.length)), badge));
+    folder.open = items.some((g) => guides().some((x) => x.id === g.id));
     items.forEach((g) => {
       const check = el("input", { type: "checkbox", value: String(g.id) });
       check.checked = guides().some((x) => x.id === g.id);
       check.addEventListener("change", () => pick(g, check.checked));
       const name = g.is_builtin ? g.title : `${g.title} (uploaded by ${g.uploaded_by || "a teacher"})`;
-      panel.append(el("label", { class: "flow-multi-item" }, check, el("span", {}, name)));
+      folder.append(el("label", { class: "flow-multi-item", "data-search": `${g.title} ${g.subject || ""} ${kind}`.toLowerCase() },
+        check, el("span", {}, name)));
     });
+    folders.append(folder);
   });
-  // Closes like a dropdown: a click outside it, or Escape.
-  drop.addEventListener("toggle", () => {
-    if (!drop.open) return;
-    const close = (e) => {
-      if (drop.contains(e.target)) return;
-      drop.open = false;
-      document.removeEventListener("pointerdown", close);
-    };
-    document.addEventListener("pointerdown", close);
-  });
-  drop.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && drop.open) {
-      drop.open = false;
-      summary.focus();
-    }
+
+  // The search looks through every folder and opens the ones with a match.
+  const search = el("input", { type: "search", id: "flow-source-search", placeholder: "Search sources…", autocomplete: "off",
+    "aria-label": "Search supplementary sources" });
+  search.addEventListener("input", () => {
+    const q = search.value.trim().toLowerCase();
+    let any = false;
+    folders.querySelectorAll(".flow-folder").forEach((folder) => {
+      let hits = 0;
+      folder.querySelectorAll(".flow-multi-item").forEach((item) => {
+        const show = !q || item.dataset.search.includes(q);
+        item.hidden = !show;
+        hits += show;
+      });
+      folder.hidden = !hits;
+      if (q) folder.open = hits > 0;
+      any = any || hits > 0;
+    });
+    noMatch.hidden = any;
   });
 
   const input = el("input", { type: "file", accept: ".docx,.dotx,.pdf", hidden: true });
@@ -574,11 +601,18 @@ function drawSources(box, library) {
     input.value = "";
   });
 
-  const label = el("p", { class: "flow-label", id: "flow-library-label" }, "Supplementary sources");
+  const a = G.getAnswers();
+  const when = row(
+    selectAnswer("flow-term", "Term", TERM_OPTIONS, a.term, (v) => G.setAnswers({ term: v }), { placeholder: "Choose a term…" }),
+    selectAnswer("flow-week", "Week", WEEK_OPTIONS, a.week, (v) => G.setAnswers({ week: v }), { placeholder: "Choose a week…" }),
+  );
+
+  const label = el("div", { class: "flow-sources-head" },
+    el("p", { class: "flow-label", id: "flow-library-label" }, "Supplementary sources"), upload);
   box.replaceChildren(label, ...(library.length
-    ? [el("div", { class: "flow-field" }, drop)]
-    : [el("p", { class: "flow-help" }, "No Curriculum Guide or Budget of Work for this subject yet. Upload your own file instead.")]),
-  upload, input, list);
+    ? [el("div", { class: "flow-field" }, search), folders, noMatch]
+    : [el("p", { class: "flow-help" }, "No library documents for this subject yet. Upload your own file instead.")]),
+  input, list, when);
   paintChosen();
 }
 
@@ -834,6 +868,7 @@ const DETAIL_ROWS = [
   ["topics", "Last topic", (a) => (a.firstLesson ? "This is the first lesson" : a.previousTopic)],
   ["topics", "Next topic", (a) => (a.nextUnsure ? "Not sure yet" : a.nextTopic)],
   ["sources", "Supplementary sources", (a) => [...(a.guides || []).map((g) => g.title), ...(a.sources || []).map((s) => s.name)].join(", ")],
+  ["sources", "Term and week", (a) => [a.term, a.week && `Week ${a.week}`].filter(Boolean).join(", ")],
 ];
 
 function showDetails() {

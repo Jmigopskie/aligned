@@ -18,7 +18,23 @@ const cgFileInput = document.getElementById("cg-file-input");
 
 document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("course-guides");
 
-const DOC_TYPE_LABELS = { budget_of_work: "Budget of Work", curriculum_guide: "Curriculum Guide" };
+const uploadType = document.getElementById("upload-type");
+const uploadTypeOptions = document.getElementById("upload-type-options");
+
+// Types are whatever the library holds, teachers' own included, so the filter
+// and the upload suggestions are filled from the server.
+async function loadTypes() {
+  let types = [];
+  try {
+    types = (await Api.courseGuideTypes()).types || [];
+  } catch (err) {
+    return;
+  }
+  const chosen = typeFilter.value;
+  typeFilter.replaceChildren(new Option("All types", ""), ...types.map((t) => new Option(t.label, t.value)));
+  typeFilter.value = types.some((t) => t.value === chosen) ? chosen : "";
+  uploadTypeOptions.replaceChildren(...types.map((t) => new Option(t.label)));
+}
 
 function showError(message) {
   errorBox.textContent = message;
@@ -61,8 +77,8 @@ function guideRow(g) {
   const row = document.createElement("article");
   row.className = `guide-card${g.is_builtin ? " is-official" : ""}`;
   const meta = g.is_builtin
-    ? [DOC_TYPE_LABELS[g.doc_type], gradesLabel(g.grades), g.curriculum, g.retrieved_at ? `Retrieved ${fmtDate(g.retrieved_at)}` : ""]
-    : [g.subject, `Shared by ${g.uploaded_by || "a teacher"}`, fmtDate(g.created_at)];
+    ? [g.type_label, gradesLabel(g.grades), g.curriculum, g.retrieved_at ? `Retrieved ${fmtDate(g.retrieved_at)}` : ""]
+    : [g.doc_type ? g.type_label : "", g.subject, `Shared by ${g.uploaded_by || "a teacher"}`, fmtDate(g.created_at)];
   row.innerHTML = `
     <span class="guide-icon" aria-hidden="true">${g.is_builtin ? Icons.shieldCheck : Icons.file}</span>
     <div class="guide-body">
@@ -170,13 +186,15 @@ async function handleUpload(file) {
   cgDropzone.style.opacity = "0.5";
   cgDropzone.style.pointerEvents = "none";
   try {
-    const res = await Api.uploadCourseGuide(file, subject, uploadTitle.value.trim() || file.name);
+    const res = await Api.uploadCourseGuide(file, subject, uploadTitle.value.trim() || file.name, uploadType.value.trim());
     showToast(res.duplicate ? "That guide is already in the library." : "Course guide added to the shared library.");
     searchInput.value = subject;
     uploadPanel.hidden = true;
     uploadToggleBtn.setAttribute("aria-expanded", "false");
     uploadSubject.value = "";
     uploadTitle.value = "";
+    uploadType.value = "";
+    loadTypes();
     runSearch();
   } catch (err) {
     showError(err.message);
@@ -190,6 +208,7 @@ async function init() {
   const user = await requireAuth();
   if (!user) return;
   wireTopbar(user);
+  loadTypes();
   runSearch();
 }
 

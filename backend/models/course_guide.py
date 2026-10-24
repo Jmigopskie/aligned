@@ -4,6 +4,24 @@ from sqlalchemy.dialects.mysql import MEDIUMTEXT
 
 from extensions import db, iso_utc
 
+TYPE_LABELS = {"budget_of_work": "Budget of Work", "curriculum_guide": "Curriculum Guide"}
+
+
+def type_label(doc_type):
+    """What a type is called on screen; an upload with no type is "Other"."""
+    return TYPE_LABELS.get(doc_type) or doc_type or "Other"
+
+
+def normalize_type(raw):
+    """A typed-in type, tidied: the two built-in names (any case) become their
+    keys, anything else is kept as written, collapsed and cut to the column."""
+    text = " ".join((raw or "").split())[:60]
+    for key, label in TYPE_LABELS.items():
+        if text.lower() in (key, label.lower()):
+            return key
+    return text or None
+
+
 class CourseGuide(db.Model):
 
     __tablename__ = "course_guides"
@@ -22,7 +40,9 @@ class CourseGuide(db.Model):
     # seeded on startup (services/builtins). Read-only, and listed first.
     is_builtin = db.Column(db.Boolean, nullable=False, default=False)
     builtin_key = db.Column(db.String(64))
-    doc_type = db.Column(db.String(20))  # "budget_of_work" or "curriculum_guide"
+    # "budget_of_work", "curriculum_guide", or any type a teacher names on
+    # upload ("Learning Activity Sheet"); step 6 shows one folder per type.
+    doc_type = db.Column(db.String(60))
     grade_band = db.Column(db.String(20))  # "4-6", "7-8", "9-10", "SHS", or several comma-separated
     grades = db.Column(db.String(20))  # the exact grades covered, e.g. "9-10"
     curriculum = db.Column(db.String(20))  # "MATATAG" or "K to 12"
@@ -40,6 +60,7 @@ class CourseGuide(db.Model):
             "created_at": iso_utc(self.created_at),
             "is_builtin": bool(self.is_builtin),
             "doc_type": self.doc_type,
+            "type_label": type_label(self.doc_type),
             "grade_band": self.grade_band,
             "grades": self.grades,
             "curriculum": self.curriculum,

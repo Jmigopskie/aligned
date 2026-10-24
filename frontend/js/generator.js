@@ -170,7 +170,7 @@ const mainTopicInput = document.getElementById("ctx-main-topic");
 // The flow's own state, saved with the setup so a refresh lands on the same step.
 // guides: the library documents picked in step 6, any number of either kind;
 // sources: the student's own private uploads.
-let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [], guides: [] };
+let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [], guides: [], term: "", week: "" };
 // One run = one pass through the flow; its draft is keyed by run, not by
 // format, so picking a format never silently brings back an older draft.
 let currentRunId = new URLSearchParams(window.location.search).get("run");
@@ -754,6 +754,9 @@ function getAdvancedContext() {
     duration_minutes: parseInt(durationInput.value, 10) || "",
     // The broader topic today's lesson sits under (the flow's step 5).
     main_topic: mainTopicInput.value.trim(),
+    // Step 6: which term and week of the Budget of Work this lesson is.
+    term: flowFlags.term || "",
+    week: flowFlags.week || "",
   };
   // Only when Alan actually asked (the plan went through the flow): then an
   // empty value means "first lesson" / "not sure yet" and the server grounds
@@ -3516,7 +3519,7 @@ const ANSWER_INPUTS = {
   section: sectionInput, previousTopic: prevTopicInput, topic: topicInput, nextTopic: nextTopicInput,
   mainTopic: mainTopicInput,
 };
-const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides"];
+const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "term", "week"];
 
 function getAnswers() {
   const answers = {};

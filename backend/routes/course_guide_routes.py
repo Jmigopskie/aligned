@@ -2,11 +2,11 @@ import hashlib
 import os
 
 from flask import Blueprint, request, jsonify, current_app, send_file
-from sqlalchemy import case, or_
+from sqlalchemy import case, func, or_
 from werkzeug.utils import secure_filename
 
 from extensions import db
-from models.course_guide import CourseGuide
+from models.course_guide import CourseGuide, TYPE_LABELS, normalize_type, type_label
 from models.supplementary_source import SupplementarySource
 import uuid
 from routes.auth_routes import login_required, current_user
@@ -77,10 +77,13 @@ def search_course_guides():
         query = query.filter(_matches(q))
     if grade_band in GRADE_BANDS:
         query = query.filter(CourseGuide.grade_band.like(f"%{grade_band}%"))
+    doc_type = normalize_type(doc_type)
     if doc_type in DOC_TYPES:
         # Uploads from before the Budget of Work / Curriculum Guide split carry
         # no type, so they stay findable from either picker.
         query = query.filter(or_(CourseGuide.doc_type == doc_type, CourseGuide.doc_type.is_(None)))
+    elif doc_type:
+        query = query.filter(func.lower(CourseGuide.doc_type) == doc_type.lower())
 
     order = [CourseGuide.is_builtin.desc()]
     if prefer in GRADE_BANDS:
@@ -98,6 +101,15 @@ def search_course_guides():
 
     guides = query.order_by(*order).limit(50).all()
     return jsonify({"status": "ok", "course_guides": [g.to_dict() for g in guides]})
+
+@course_guide_bp.get("/course-guides/types")
+@login_required
+def list_guide_types():
+    """Every type in the library, the built-in two first, for the upload
+    form's suggestions and the type filter."""
+    found = {t for (t,) in db.session.query(CourseGuide.doc_type).distinct() if t}
+    ordered = [t for t in TYPE_LABELS if t in found] + sorted(found - set(TYPE_LABELS), key=str.lower)
+    return jsonify({"status": "ok", "types": [{"value": t, "label": type_label(t)} for t in ordered]})
 
 @course_guide_bp.get("/course-guides/<int:guide_id>/file")
 @login_required
@@ -125,9 +137,8 @@ def upload_course_guide():
     file = request.files["file"]
     subject = (request.form.get("subject") or "").strip()
     title = (request.form.get("title") or "").strip() or file.filename
-    # Which picker it was dropped on: a Budget of Work or a Curriculum Guide.
-    doc_type = (request.form.get("doc_type") or "").strip()
-    doc_type = doc_type if doc_type in DOC_TYPES else None
+    # Budget of Work, Curriculum Guide, or any type the teacher names.
+    doc_type = normalize_type(request.form.get("doc_type"))
 
     if file.filename == "" or not _allowed(file.filename):
         return jsonify({"status": "error", "message": "Only .docx, .dotx, or .pdf files are allowed."}), 400
