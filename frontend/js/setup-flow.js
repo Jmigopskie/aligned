@@ -248,8 +248,7 @@ async function paintFormats(wrap) {
     upload.addEventListener("click", () => paintUpload(wrap));
     parts.push(upload);
   }
-  parts.push(...textAnswer("school", { label: "School", placeholder: "e.g. San Isidro National High School" }));
-  wrap.replaceChildren(...parts);
+  wrap.replaceChildren(row(parts, textAnswer("school", { label: "School", placeholder: "e.g. San Isidro National High School" })));
   refresh();
 }
 
@@ -355,13 +354,20 @@ function paintSave(wrap, scanned, filename) {
   name.focus();
 }
 
+// Fields side by side on a wide screen. Each cell is one field's parts; on a
+// phone (css: display: contents) the row and cells vanish and the fields
+// stack exactly as before.
+function row(...cells) {
+  return el("div", { class: "flow-row" }, cells.map((parts) => el("div", { class: "flow-cell" }, parts)));
+}
+
 // ---- answers per step ----
 const STEPS = {
   format: formatStep,
-  people: () => [
-    ...textAnswer("studentTeacher", { label: "Your name", placeholder: "e.g. Ana Cruz" }),
-    ...textAnswer("coop", { label: "Cooperating Teacher / Subject Teacher (optional)", placeholder: "e.g. Juan Dela Cruz" }),
-  ],
+  people: () => row(
+    textAnswer("studentTeacher", { label: "Your name", placeholder: "e.g. Ana Cruz" }),
+    textAnswer("coop", { label: "Cooperating Teacher / Subject Teacher (optional)", placeholder: "e.g. Juan Dela Cruz" }),
+  ),
   class: () => {
     const wrap = el("div", { class: "flow-answer" });
     const paint = () => {
@@ -375,9 +381,10 @@ const STEPS = {
           wrap.querySelector("#flow-grade").focus();
         }
       }, { placeholder: "Choose a grade level…" });
-      if (a.levelType === "college") parts.push(...textAnswer("program", { label: "Program", placeholder: "e.g. BS Information Technology" }));
-      parts.push(...textAnswer("section", { label: "Section (optional)", placeholder: "e.g. Sampaguita" }));
-      wrap.replaceChildren(...parts);
+      const cells = [parts];
+      if (a.levelType === "college") cells.push(textAnswer("program", { label: "Program", placeholder: "e.g. BS Information Technology" }));
+      cells.push(textAnswer("section", { label: "Section (optional)", placeholder: "e.g. Sampaguita" }));
+      wrap.replaceChildren(row(...cells));
     };
     paint();
     return wrap;
@@ -395,10 +402,10 @@ const STEPS = {
     });
     other.append(input);
     const durations = [...DURATION_CHOICES.map((m) => ({ value: m, label: `${m} minutes` })), { value: "other", label: "Other" }];
-    return [
-      ...selectAnswer("flow-subject", "Subject", optionsOf("ctx-subject"), a.subject,
+    return row(
+      selectAnswer("flow-subject", "Subject", optionsOf("ctx-subject"), a.subject,
         (v) => G.setAnswers({ subject: v }), { placeholder: "Choose a subject…" }),
-      ...selectAnswer("flow-duration", "Duration", durations, custom ? "other" : a.durationMinutes, (v) => {
+      [...selectAnswer("flow-duration", "Duration", durations, custom ? "other" : a.durationMinutes, (v) => {
         other.hidden = v !== "other";
         if (v === "other") {
           G.setAnswers({ durationMinutes: input.value });
@@ -406,31 +413,34 @@ const STEPS = {
         } else {
           G.setAnswers({ durationMinutes: v });
         }
-      }, { placeholder: "Choose a length…" }),
-      other,
-    ];
+      }, { placeholder: "Choose a length…" }), other],
+    );
   },
   topics: () => [
-    ...textAnswer("mainTopic", { label: "Main topic", placeholder: "e.g. Spreadsheets" }),
-    ...textAnswer("topic", { label: "Specific topic for today", placeholder: "e.g. Cell formulas" }),
-    ...textAnswer("previousTopic", {
-      label: "Last topic (previous meeting)", placeholder: "e.g. Basic cell formatting",
-      alt: { flag: "firstLesson", label: "This is the first lesson" },
-    }),
-    ...textAnswer("nextTopic", {
-      label: "Next topic", placeholder: "e.g. Making charts",
-      alt: { flag: "nextUnsure", label: "Not sure yet" },
-    }),
+    row(
+      textAnswer("mainTopic", { label: "Main topic", placeholder: "e.g. Spreadsheets" }),
+      textAnswer("topic", { label: "Specific topic for today", placeholder: "e.g. Cell formulas" }),
+    ),
+    row(
+      textAnswer("previousTopic", {
+        label: "Last topic (previous meeting)", placeholder: "e.g. Basic cell formatting",
+        alt: { flag: "firstLesson", label: "This is the first lesson" },
+      }),
+      textAnswer("nextTopic", {
+        label: "Next topic", placeholder: "e.g. Making charts",
+        alt: { flag: "nextUnsure", label: "Not sure yet" },
+      }),
+    ),
   ],
   sources: () => {
     const bow = el("div", { class: "flow-guide-kind" });
     paintGuideKind(bow, "budget_of_work", "Budget of Work", "budgetOfWork");
     const own = el("div", { class: "flow-guide-kind" });
     paintSources(own);
-    return el("div", { class: "flow-answer" }, bow, own);
+    return el("div", { class: "flow-answer" }, el("div", { class: "flow-row flow-row-sources" }, bow, own));
   },
   mode: () => {
-    const wrap = el("div", { class: "flow-choices flow-choices-stack", role: "group", "aria-labelledby": "flow-question" });
+    const wrap = el("div", { class: "flow-choices flow-choices-stack flow-mode-choices", role: "group", "aria-labelledby": "flow-question" });
     const current = G.getAnswers().mode;
     [
       { value: "full", title: "Building Proficiency", sub: "I write the whole plan; you review and edit it." },
@@ -451,7 +461,9 @@ const STEPS = {
 
 // ---- the Budget of Work ----
 // Tapping the picked card again takes it back.
-const GUIDES_SHOWN = 6;
+// A wide screen shows fewer cards so the list needs no scroll of its own;
+// a short one shows a single row so the whole step fits.
+const GUIDES_SHOWN = innerWidth > 860 ? (innerHeight < 900 ? 2 : 4) : 6;
 
 function guideCard(g, pressed, onPick) {
   const meta = g.is_builtin
@@ -478,7 +490,8 @@ async function paintGuideKind(box, kind, label, answerKey, showAll = false) {
     showError(err.message);
   }
   const current = G.getAnswers()[answerKey];
-  if (current && !guides.some((g) => g.id === current.id)) guides.unshift(current);
+  // The picked one leads, so it is never cut off by the short list.
+  if (current) guides = [guides.find((g) => g.id === current.id) || current, ...guides.filter((g) => g.id !== current.id)];
 
   const list = el("div", { class: "flow-choices flow-choices-stack flow-scroll", role: "group", "aria-label": label });
   (showAll ? guides : guides.slice(0, GUIDES_SHOWN)).forEach((g) => {
