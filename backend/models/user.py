@@ -1,6 +1,17 @@
+import os
 from datetime import datetime
 
 from extensions import db, bcrypt, iso_utc
+
+
+def _versioned(url, path):
+    """The picture's address plus the file's modified time: a new upload
+    overwrites the same file, and without a new address the browser keeps
+    showing its cached copy of the old picture."""
+    try:
+        return f"{url}?v={os.stat(path).st_mtime_ns}"
+    except OSError:
+        return url
 
 class User(db.Model):
     __tablename__ = "users"
@@ -51,8 +62,8 @@ class User(db.Model):
             "email": self.email,
             "role": self.role,
             "is_active": self.is_active,
-            "avatar_url": f"/api/avatars/{self.id}" if self.avatar_path else None,
-            "banner_url": f"/api/banners/{banner_owner.id}" if banner_owner else None,
+            "avatar_url": _versioned(f"/api/avatars/{self.id}", self.avatar_path) if self.avatar_path else None,
+            "banner_url": _versioned(f"/api/banners/{banner_owner.id}", banner_owner.banner_path) if banner_owner else None,
             "created_at": iso_utc(self.created_at),
             "onboarded": self.onboarded_at is not None,
         }
