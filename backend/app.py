@@ -14,6 +14,26 @@ _DDL_RETRIES = 3
 _DDL_RETRY_DELAY_SECONDS = 0.5
 
 
+def _create_tables():
+    """db.create_all(), safe when several gunicorn workers boot at once.
+
+    A worker that loses the race to create a brand-new table gets "already
+    exists" (MySQL 1050; sqlite says "table ... already exists"). The table is
+    there now, which is all this needed, so it tries again for any other new
+    tables instead of dying; that took the live site down on 2026-10-24 when
+    supplementary_sources was added. Any other error still raises."""
+    from sqlalchemy.exc import OperationalError
+
+    for attempt in range(5):
+        try:
+            db.create_all()
+            return
+        except OperationalError as exc:
+            if "already exists" not in str(exc) or attempt == 4:
+                raise
+            time.sleep(0.2)
+
+
 def _add_column(table: str, column: str, ddl_type: str):
     """ALTER TABLE ... ADD COLUMN, tolerating the column already being there.
 
@@ -352,7 +372,7 @@ def create_app():
         from models import user, format, lesson_plan, course_guide, section, announcement, notification  # noqa: F401
         from models import supplementary_source  # noqa: F401
 
-        db.create_all()
+        _create_tables()
         _migrate_lesson_plan_columns()
         _migrate_user_columns()
         # Before _migrate_course_guide_columns: its backfill queries the full

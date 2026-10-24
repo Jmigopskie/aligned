@@ -210,6 +210,40 @@ def check_boot_is_concurrent_safe():
     print("  concurrent create_app OK")
 
 
+def check_concurrent_create_tables():
+    """A brand-new table created by several workers at once: one creates it,
+    the others get "already exists" and must carry on. This took the live
+    site down on 2026-10-24 when supplementary_sources was added."""
+    from app import _create_tables
+    from models.supplementary_source import SupplementarySource
+
+    app = create_app()
+    with app.app_context():
+        SupplementarySource.__table__.drop(db.engine)
+    errors = []
+    barrier = threading.Barrier(6)
+
+    def worker():
+        try:
+            barrier.wait()
+            with app.app_context():
+                _create_tables()
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"concurrent create_all raised: {errors[:3]}"
+    with app.app_context():
+        assert inspect(db.engine).has_table("supplementary_sources")
+    print("  concurrent create tables OK")
+
+
+check_concurrent_create_tables()
 check_concurrent_add_column()
 check_idempotent()
 check_concurrent_ddl_is_retried()
