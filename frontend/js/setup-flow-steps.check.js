@@ -47,8 +47,9 @@ assert.strictEqual(answered("subject", { durationMinutes: 45 }), false);
 assert.strictEqual(answered("topics", { mainTopic: "Spreadsheets", topic: "Cell formulas" }), true);
 assert.strictEqual(answered("topics", { topic: "Cell formulas" }), false, "main topic is required");
 assert.strictEqual(answered("topics", { mainTopic: "Spreadsheets", topic: "  " }), false);
-assert.strictEqual(answered("sources", { budgetOfWorkId: 4 }), true);
-assert.strictEqual(answered("sources", { courseGuideId: 4 }), false, "a Budget of Work is required");
+assert.strictEqual(answered("sources", { guides: [{ id: 4 }, { id: 5 }] }), true);
+assert.strictEqual(answered("sources", { sources: [{ id: 9 }] }), true, "an own upload is enough");
+assert.strictEqual(answered("sources", { guides: [], sources: [] }), false, "at least one source");
 assert.strictEqual(answered("mode", { mode: "step" }), true);
 assert.strictEqual(answered("mode", {}), false);
 

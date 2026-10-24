@@ -32,23 +32,25 @@ def _can_access_plan(user, plan):
     return False
 
 def _resolve_guides(data):
-    """The curriculum documents the page picked, Budget of Work first: it is
-    the one that names this week's competency, the Curriculum Guide the
-    standards around it. Either id may be missing; one that is sent but no
-    longer exists is an error rather than silently generating without it."""
+    """The library documents the page picked, Budgets of Work first: they name
+    this week's competency, Curriculum Guides the standards around it. The
+    flow sends any number as guide_ids; plans saved before that send one of
+    each kind. Any may be missing; one that is sent but no longer exists is an
+    error rather than silently generating without it."""
+    ids = data.get("guide_ids")
+    ids = [i for i in ids if isinstance(i, int)] if isinstance(ids, list) else []
+    ids += [data[key] for key in ("budget_of_work_id", "course_guide_id") if data.get(key)]
     guides = []
-    for key, label in (("budget_of_work_id", "Budget of Work"), ("course_guide_id", "Curriculum Guide")):
-        guide_id = data.get(key)
-        if not guide_id:
-            continue
+    for guide_id in ids:
         guide = CourseGuide.query.get(guide_id)
         if not guide:
             return None, (jsonify({
                 "status": "error",
-                "message": f"That {label} couldn't be found. Try searching again.",
+                "message": "One of your supplementary sources couldn't be found. Pick it again.",
             }), 404)
         if all(g.id != guide.id for g in guides):
             guides.append(guide)
+    guides.sort(key=lambda g: g.doc_type != "budget_of_work")  # stable: picked order kept within each kind
     return guides, None
 
 def _build_context(data, guides):

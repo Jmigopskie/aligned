@@ -39,9 +39,9 @@ const COPY = {
     say: "Tell me where this lesson sits, so the recap and the assignment line up.",
   },
   sources: {
-    q: "Which Budget of Work should I follow?",
-    help: "Add your own supplementary sources too, if you have any. Only you and I see them.",
-    say: "I'll follow the Budget of Work closely, and read your sources too.",
+    q: "Which sources should I read?",
+    help: "Pick any Curriculum Guides and Budgets of Work, and add your own files (only you see them).",
+    say: "I'll read every source you pick, so the plan follows them.",
   },
   mode: {
     q: "How do you want to write it?",
@@ -433,11 +433,9 @@ const STEPS = {
     ),
   ],
   sources: () => {
-    const bow = el("div", { class: "flow-guide-kind" });
-    paintGuideKind(bow, "budget_of_work", "Budget of Work", "budgetOfWork");
-    const own = el("div", { class: "flow-guide-kind" });
-    paintSources(own);
-    return el("div", { class: "flow-answer" }, el("div", { class: "flow-row flow-row-sources" }, bow, own));
+    const box = el("div", { class: "flow-guide-kind" });
+    paintSources(box);
+    return el("div", { class: "flow-answer" }, box);
   },
   mode: () => {
     const wrap = el("div", { class: "flow-choices flow-choices-stack flow-mode-choices", role: "group", "aria-labelledby": "flow-question" });
@@ -459,81 +457,101 @@ const STEPS = {
   },
 };
 
-// ---- the Budget of Work: a dropdown, official DepEd ones first ----
-async function paintGuideKind(box, kind, label, answerKey) {
-  const a = G.getAnswers();
-  box.replaceChildren(el("p", { class: "flow-label" }, label),
-    el("p", { class: "flow-help" }, `Looking for ${a.subject || "your subject"} ${label.toLowerCase()}s…`));
-  let guides = [];
+// ---- step 6: supplementary sources ----
+// Library documents come from one dropdown that takes several picks, listed
+// under Curriculum Guide and Budget of Work; the student's own files are
+// uploaded beside it and stay private. Every pick shows in one list below.
+const guideKind = (g) => (g.doc_type === "budget_of_work" ? "Budget of Work" : "Curriculum Guide");
+
+async function paintSources(box) {
+  box.replaceChildren(el("p", { class: "flow-help" }, `Looking for ${G.getAnswers().subject || "your subject"} sources…`));
+  let library = [];
   try {
-    guides = await G.searchCourseGuides(kind);
+    library = await G.searchCourseGuides();
   } catch (err) {
     showError(err.message);
   }
-  const current = G.getAnswers()[answerKey];
-  if (current && !guides.some((g) => g.id === current.id)) guides.unshift(current);
-
-  const item = (g) => ({ value: g.id, label: g.is_builtin ? g.title : `${g.title} (uploaded by ${g.uploaded_by || "a teacher"})` });
-  const options = [
-    { group: "Official DepEd", items: guides.filter((g) => g.is_builtin).map(item) },
-    { group: "Uploaded by teachers", items: guides.filter((g) => !g.is_builtin).map(item) },
-  ].filter((o) => o.items.length);
-  const parts = guides.length
-    ? selectAnswer("flow-bow", label, options, current && current.id, (v) => {
-      G.selectCourseGuide(guides.find((g) => String(g.id) === v) || null, kind);
-    }, { placeholder: `Choose a ${label}…` })
-    : [el("p", { class: "flow-label" }, label),
-      el("p", { class: "flow-help" }, `No ${label} for this subject yet. Upload yours and I'll add it to the shared library.`)];
-
-  const input = el("input", { type: "file", accept: ".docx,.dotx,.pdf", hidden: true });
-  const upload = el("button", { type: "button", class: "flow-back flow-more flow-upload-link" }, icon("upload"), `Upload my own ${label}`);
-  upload.addEventListener("click", () => input.click());
-  input.addEventListener("change", async () => {
-    const file = input.files[0];
-    if (!file) return;
-    if (!/\.(docx|dotx|pdf)$/i.test(file.name)) {
-      showError("Only .docx, .dotx or .pdf files work here.");
-      return;
-    }
-    errorEl.hidden = true;
-    upload.disabled = true;
-    say("Adding it to the library…", "loading");
-    try {
-      await G.uploadCourseGuide(file, kind);
-      say(COPY.guide.say, FLOW_POSES.guide);
-      paintGuideKind(box, kind, label, answerKey);
-    } catch (err) {
-      showError(err.message);
-      say(COPY.guide.say, FLOW_POSES.guide);
-      upload.disabled = false;
-    }
-  });
-  parts.push(upload, input);
-  box.replaceChildren(...parts);
-  refresh();
+  (G.getAnswers().guides || []).forEach((p) => library.some((g) => g.id === p.id) || library.push(p));
+  drawSources(box, library);
 }
 
-// ---- supplementary sources: the student's own files, read by Alan ----
-function paintSources(box) {
-  const sources = G.getAnswers().sources || [];
+function drawSources(box, library) {
+  const guides = () => G.getAnswers().guides || [];
+  const own = () => G.getAnswers().sources || [];
+  const summary = el("summary", { class: "flow-multi-summary", id: "flow-library" });
+  const panel = el("div", { class: "flow-multi-panel", role: "group", "aria-labelledby": "flow-library-label" });
+  const drop = el("details", { class: "flow-multi" }, summary, panel);
   const list = el("div", { class: "flow-sources" });
-  sources.forEach((s) => {
-    const remove = el("button", { type: "button", class: "flow-source-remove", "aria-label": `Remove ${s.name}` }, icon("x"));
+
+  function chosenRow(name, kind, onRemove) {
+    const remove = el("button", { type: "button", class: "flow-source-remove", "aria-label": `Remove ${name}` }, icon("x"));
     remove.addEventListener("click", async () => {
       remove.disabled = true;
       try {
-        await G.removeSource(s.id);
-        paintSources(box);
+        await onRemove();
       } catch (err) {
         showError(err.message);
         remove.disabled = false;
       }
     });
-    list.append(el("div", { class: "flow-source" }, icon("file"), el("span", {}, s.name), remove));
+    return el("div", { class: "flow-source" }, icon("file"), el("span", {}, name), el("small", { class: "flow-source-kind" }, kind), remove);
+  }
+
+  function paintChosen() {
+    const n = guides().length;
+    summary.textContent = n === 0 ? "Choose Curriculum Guides or Budgets of Work…"
+      : n === 1 ? guides()[0].title : `${n} picked: ${guides().map((g) => g.title).join(", ")}`;
+    summary.classList.toggle("is-empty", n === 0);
+    list.replaceChildren(
+      ...guides().map((g) => chosenRow(g.title, guideKind(g), async () => pick(g, false))),
+      ...own().map((s) => chosenRow(s.name, "Your file", async () => {
+        await G.removeSource(s.id);
+        paintChosen();
+      })),
+    );
+    list.hidden = !list.children.length;
+    refresh();
+  }
+
+  function pick(g, on) {
+    const rest = guides().filter((x) => x.id !== g.id);
+    G.setAnswers({ guides: on ? [...rest, g] : rest });
+    const check = panel.querySelector(`input[value="${g.id}"]`);
+    if (check) check.checked = on;
+    paintChosen();
+  }
+
+  ["Curriculum Guide", "Budget of Work"].forEach((heading) => {
+    const items = library.filter((g) => guideKind(g) === heading);
+    if (!items.length) return;
+    panel.append(el("p", { class: "flow-multi-head" }, heading));
+    items.forEach((g) => {
+      const check = el("input", { type: "checkbox", value: String(g.id) });
+      check.checked = guides().some((x) => x.id === g.id);
+      check.addEventListener("change", () => pick(g, check.checked));
+      const name = g.is_builtin ? g.title : `${g.title} (uploaded by ${g.uploaded_by || "a teacher"})`;
+      panel.append(el("label", { class: "flow-multi-item" }, check, el("span", {}, name)));
+    });
   });
+  // Closes like a dropdown: a click outside it, or Escape.
+  drop.addEventListener("toggle", () => {
+    if (!drop.open) return;
+    const close = (e) => {
+      if (drop.contains(e.target)) return;
+      drop.open = false;
+      document.removeEventListener("pointerdown", close);
+    };
+    document.addEventListener("pointerdown", close);
+  });
+  drop.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && drop.open) {
+      drop.open = false;
+      summary.focus();
+    }
+  });
+
   const input = el("input", { type: "file", accept: ".docx,.dotx,.pdf", hidden: true });
-  const upload = el("button", { type: "button", class: "flow-back flow-more flow-upload-link" }, icon("upload"),
-    sources.length ? "Add another source" : "Upload a supplementary source");
+  const upload = el("button", { type: "button", class: "flow-back flow-more flow-upload-link" }, icon("upload"), "Upload my own file");
   upload.addEventListener("click", () => input.click());
   input.addEventListener("change", async () => {
     const file = input.files[0];
@@ -547,20 +565,21 @@ function paintSources(box) {
     say("Reading your source…", "loading");
     try {
       await G.uploadSource(file);
-      say(COPY.sources.say, FLOW_POSES.sources);
-      paintSources(box);
+      paintChosen();
     } catch (err) {
       showError(err.message);
-      say(COPY.sources.say, FLOW_POSES.sources);
-      upload.disabled = false;
     }
+    say(COPY.sources.say, FLOW_POSES.sources);
+    upload.disabled = false;
+    input.value = "";
   });
-  box.replaceChildren(
-    el("p", { class: "flow-label" }, "Supplementary sources (optional)"),
-    ...(sources.length ? [list] : [el("p", { class: "flow-help" }, "Notes, readings or worksheets you want me to use. .docx, .dotx or .pdf.")]),
-    upload,
-    input,
-  );
+
+  const label = el("p", { class: "flow-label", id: "flow-library-label" }, "Supplementary sources");
+  box.replaceChildren(label, ...(library.length
+    ? [el("div", { class: "flow-field" }, drop)]
+    : [el("p", { class: "flow-help" }, "No Curriculum Guide or Budget of Work for this subject yet. Upload your own file instead.")]),
+  upload, input, list);
+  paintChosen();
 }
 
 // ---- the shell ----
@@ -814,8 +833,7 @@ const DETAIL_ROWS = [
   ["topics", "Specific topic", (a) => a.topic],
   ["topics", "Last topic", (a) => (a.firstLesson ? "This is the first lesson" : a.previousTopic)],
   ["topics", "Next topic", (a) => (a.nextUnsure ? "Not sure yet" : a.nextTopic)],
-  ["sources", "Budget of Work", (a) => (a.budgetOfWork ? a.budgetOfWork.title : "")],
-  ["sources", "Supplementary sources", (a) => (a.sources || []).map((s) => s.name).join(", ")],
+  ["sources", "Supplementary sources", (a) => [...(a.guides || []).map((g) => g.title), ...(a.sources || []).map((s) => s.name)].join(", ")],
 ];
 
 function showDetails() {

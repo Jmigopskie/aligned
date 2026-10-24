@@ -17,8 +17,9 @@ import docx
 from app import create_app
 from extensions import db
 from models.user import User
+from models.course_guide import CourseGuide
 from models.supplementary_source import SupplementarySource
-from routes.generate_routes import _resolve_sources
+from routes.generate_routes import _resolve_guides, _resolve_sources
 
 
 def make_user(name, role):
@@ -80,6 +81,24 @@ def main():
         assert _resolve_sources({}, db.session.get(User, owner_id)) == []
         assert _resolve_sources({"source_ids": "nonsense"}, db.session.get(User, owner_id)) == []
         print("  only own sources resolved OK")
+
+        # --- Library sources: any number of Curriculum Guides and Budgets of
+        # Work, Budget of Work first; the old single-id keys still work ---
+        def guide(title, kind):
+            g = CourseGuide(uploader_id=owner_id, subject="ICT", title=title, file_path="x", doc_type=kind)
+            db.session.add(g)
+            db.session.commit()
+            return g.id
+        cg, bow1, bow2 = guide("ICT CG", "curriculum_guide"), guide("G7 BoW", "budget_of_work"), guide("G8 BoW", "budget_of_work")
+        with app.test_request_context():
+            got, err = _resolve_guides({"guide_ids": [cg, bow1, bow2, bow1, "junk"]})
+            assert err is None and [g.title for g in got] == ["G7 BoW", "G8 BoW", "ICT CG"], got
+            got, err = _resolve_guides({"budget_of_work_id": bow1, "course_guide_id": cg})
+            assert [g.title for g in got] == ["G7 BoW", "ICT CG"], got
+            assert _resolve_guides({}) == ([], None)
+            _, err = _resolve_guides({"guide_ids": [99999]})
+            assert err is not None and err[1] == 404
+        print("  several library sources OK")
 
         # --- Delete: owner only ---
         res = client.delete(f"/api/sources/{source['id']}")

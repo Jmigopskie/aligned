@@ -104,7 +104,8 @@ function inactiveModeHasWork() {
 const selectedGuides = { budget_of_work: null, curriculum_guide: null };
 
 function hasGuide() {
-  return !!(selectedGuides.budget_of_work || selectedGuides.curriculum_guide);
+  return !!(selectedGuides.budget_of_work || selectedGuides.curriculum_guide
+    || flowFlags.guides.length || flowFlags.sources.length);
 }
 let currentUser = null;
 
@@ -167,7 +168,9 @@ const prevTopicInput = document.getElementById("ctx-prev-topic");
 const nextTopicInput = document.getElementById("ctx-next-topic");
 const mainTopicInput = document.getElementById("ctx-main-topic");
 // The flow's own state, saved with the setup so a refresh lands on the same step.
-let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [] };
+// guides: the library documents picked in step 6, any number of either kind;
+// sources: the student's own private uploads.
+let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [], guides: [] };
 // One run = one pass through the flow; its draft is keyed by run, not by
 // format, so picking a format never silently brings back an older draft.
 let currentRunId = new URLSearchParams(window.location.search).get("run");
@@ -1042,16 +1045,6 @@ function makeGuidePicker(root) {
 document.querySelectorAll("[data-guide-kind]").forEach((root) => {
   guidePickers[root.dataset.guideKind] = makeGuidePicker(root);
 });
-
-// Puts a saved guide back in its own picker. A plan or draft saved before the
-// split kept one guide under courseGuide whatever its kind, so the kind comes
-// from the guide itself; an untyped upload lands in the Curriculum Guide slot,
-// which is what that single picker was called.
-function restoreGuide(guide, fallbackKind) {
-  if (!guide) return;
-  const picker = guidePickers[guide.doc_type] || guidePickers[fallbackKind];
-  picker.select(guide);
-}
 
 function buildSections(fields) {
   const map = new Map();
@@ -2107,12 +2100,13 @@ function applySetupContext(ctx) {
   if (setup.nextTopic) nextTopicInput.value = setup.nextTopic;
   if (setup.mainTopic) mainTopicInput.value = setup.mainTopic;
   if (setup.flow) flowFlags = { ...flowFlags, ...setup.flow };
+  // Saved before step 6 took several sources: its one guide of each kind
+  // becomes the picked list.
+  if (ctx && !(setup.flow && setup.flow.guides)) {
+    flowFlags.guides = [ctx.budgetOfWork, ctx.courseGuide].filter(Boolean);
+  }
   if (ctx && ctx.pageSize) pageSizeSelect.value = ctx.pageSize;
   updateLevelFields();
-  if (ctx) {
-    restoreGuide(ctx.courseGuide, "curriculum_guide");
-    restoreGuide(ctx.budgetOfWork, "budget_of_work");
-  }
 }
 
 function planPayload() {
@@ -2741,9 +2735,10 @@ function baseGenerationPayload() {
     subject: subjectInput.value.trim(),
     course_guide_id: selectedGuides.curriculum_guide ? selectedGuides.curriculum_guide.id : null,
     budget_of_work_id: selectedGuides.budget_of_work ? selectedGuides.budget_of_work.id : null,
+    // Step 6's supplementary sources: library documents and the student's own files.
+    guide_ids: flowFlags.guides.map((g) => g.id),
     context: getAdvancedContext(),
     include_keys: selectedGenerateKeys(),
-    // The student's own supplementary sources (the flow's step 6); Alan reads them too.
     source_ids: (flowFlags.sources || []).map((s) => s.id),
   };
 }
@@ -3521,7 +3516,7 @@ const ANSWER_INPUTS = {
   section: sectionInput, previousTopic: prevTopicInput, topic: topicInput, nextTopic: nextTopicInput,
   mainTopic: mainTopicInput,
 };
-const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources"];
+const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides"];
 
 function getAnswers() {
   const answers = {};
@@ -3530,12 +3525,6 @@ function getAnswers() {
   answers.durationMinutes = parseInt(durationInput.value, 10) || null;
   answers.formatId = fmt ? fmt.id : null;
   answers.formatName = flowFlags.formatName;
-  // Two kinds of guide, at least one needed: courseGuideId is whichever is set.
-  answers.courseGuide = selectedGuides.curriculum_guide;
-  answers.budgetOfWork = selectedGuides.budget_of_work;
-  const anyGuide = selectedGuides.curriculum_guide || selectedGuides.budget_of_work;
-  answers.courseGuideId = anyGuide ? anyGuide.id : null;
-  answers.budgetOfWorkId = selectedGuides.budget_of_work ? selectedGuides.budget_of_work.id : null;
   answers.sources = flowFlags.sources || [];
   return answers;
 }
@@ -3645,19 +3634,10 @@ window.Generator = {
   loadFormat,
   getAnswers,
   setAnswers,
-  // kind is "budget_of_work" or "curriculum_guide"; each kind has its own
-  // picker in the (hidden) setup panel, which keeps the choice and the gate.
-  searchCourseGuides: async (kind) => {
-    const data = await Api.searchCourseGuides({ subject: subjectInput.value.trim(), doc_type: kind, prefer_grade_band: gradeBandFor() });
+  // Both kinds of library document for the subject, official ones first.
+  searchCourseGuides: async () => {
+    const data = await Api.searchCourseGuides({ subject: subjectInput.value.trim(), prefer_grade_band: gradeBandFor() });
     return data.course_guides || [];
-  },
-  selectCourseGuide: (guide, kind) => (guidePickers[guide && guide.doc_type] || guidePickers[kind]).select(guide),
-  uploadCourseGuide: async (file, kind) => {
-    const data = await Api.uploadCourseGuide(file, subjectInput.value.trim(), file.name, kind);
-    const guide = data.course_guide;
-    // An upload goes where its own type says (the same file may already be filed as the other kind).
-    (guidePickers[guide.doc_type] || guidePickers[kind]).select(guide);
-    return guide;
   },
   // Supplementary sources: private to the student, read by Alan.
   uploadSource: async (file) => {

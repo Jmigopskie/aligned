@@ -4,7 +4,7 @@
 // so frontend/js/setup-flow-steps.check.js can run it under node.
 
 // Seven steps, a few fields each: format + school, people, class, subject +
-// duration, the four topics, Budget of Work + supplementary sources, mode.
+// duration, the four topics, supplementary sources, mode.
 const FLOW_STEP_IDS = ["format", "people", "class", "subject", "topics", "sources", "mode"];
 
 // Alan's pose for each step (keys from js/alan3d.js POSES).
@@ -54,7 +54,7 @@ function isStepAnswered(stepId, answers) {
     case "subject":
       return filled(a.subject) && Number.isInteger(a.durationMinutes) && a.durationMinutes >= 5 && a.durationMinutes <= 240;
     case "topics": return filled(a.mainTopic) && filled(a.topic); // previous and next are encouraged
-    case "sources": return filled(a.budgetOfWorkId); // supplementary sources are optional
+    case "sources": return (a.guides || []).length + (a.sources || []).length > 0; // at least one, any kind
     case "mode": return a.mode === "full" || a.mode === "step";
     default: return true;
   }
