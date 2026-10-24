@@ -360,9 +360,7 @@ const STEPS = {
   format: formatStep,
   people: () => [
     ...textAnswer("studentTeacher", { label: "Your name", placeholder: "e.g. Ana Cruz" }),
-    ...(user.role === "student"
-      ? textAnswer("coop", { label: "Cooperating Teacher / Subject Teacher (optional)", placeholder: "e.g. Juan Dela Cruz" })
-      : []),
+    ...textAnswer("coop", { label: "Cooperating Teacher / Subject Teacher (optional)", placeholder: "e.g. Juan Dela Cruz" }),
   ],
   class: () => {
     const wrap = el("div", { class: "flow-answer" });
@@ -816,11 +814,11 @@ function classText(a) {
   return parts.filter((p) => p && String(p).trim()).join(" · ");
 }
 
-// [step that holds the answer, label, value, shown to students only?]
+// [step that holds the answer, label, value]
 const DETAIL_ROWS = [
   ["format", "School", (a) => a.school],
   ["people", "Your name", (a) => a.studentTeacher],
-  ["people", "Cooperating / Subject Teacher", (a) => a.coop, true],
+  ["people", "Cooperating / Subject Teacher", (a) => a.coop],
   ["class", "Class", classText],
   ["subject", "Subject", (a) => a.subject],
   ["subject", "Discussion length", (a) => (a.durationMinutes ? `${a.durationMinutes} minutes` : "")],
@@ -847,7 +845,7 @@ function showDetails() {
       if (a.formatName) {
         list.append(el("div", { class: "flow-detail is-fixed" }, twoLine("Format", a.formatName)));
       }
-      DETAIL_ROWS.filter(([, , , studentsOnly]) => !studentsOnly || user.role === "student").forEach(([id, label, value]) => {
+      DETAIL_ROWS.forEach(([id, label, value]) => {
         const row = el("button", { type: "button", class: "flow-detail" }, twoLine(label, value(a) || "Not answered"), icon("edit"));
         row.addEventListener("click", () => {
           index = steps.indexOf(id);
