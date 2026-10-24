@@ -15,7 +15,7 @@ const FLOW_POSES = {
 
 const DURATION_CHOICES = [30, 45, 60, 90];
 
-// Teachers get the same steps; the people step hides their cooperating teacher.
+// Teachers get the same steps.
 function flowSteps(role) {
   return FLOW_STEP_IDS.slice();
 }
@@ -48,7 +48,7 @@ function isStepAnswered(stepId, answers) {
   const a = answers || {};
   switch (stepId) {
     case "format": return filled(a.formatId); // the school is encouraged, not required
-    case "people": return filled(a.studentTeacher);
+    case "people": return filled(a.studentTeacher) && filled(a.coop);
     case "class":
       return a.levelType === "college" ? filled(a.program) && filled(a.year) : filled(a.grade);
     case "subject":

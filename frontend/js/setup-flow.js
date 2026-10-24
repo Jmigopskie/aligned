@@ -366,7 +366,7 @@ const STEPS = {
   format: formatStep,
   people: () => row(
     textAnswer("studentTeacher", { label: "Your name", placeholder: "e.g. Ana Cruz" }),
-    textAnswer("coop", { label: "Cooperating Teacher / Subject Teacher (optional)", placeholder: "e.g. Juan Dela Cruz" }),
+    textAnswer("coop", { label: "Cooperating / Subject Teacher", placeholder: "e.g. Juan Dela Cruz" }),
   ),
   class: () => {
     const wrap = el("div", { class: "flow-answer" });
@@ -459,30 +459,11 @@ const STEPS = {
   },
 };
 
-// ---- the Budget of Work ----
-// Tapping the picked card again takes it back.
-// A wide screen shows fewer cards so the list needs no scroll of its own;
-// a short one shows a single row so the whole step fits.
-const GUIDES_SHOWN = innerWidth > 860 ? (innerHeight < 900 ? 2 : 4) : 6;
-
-function guideCard(g, pressed, onPick) {
-  const meta = g.is_builtin
-    ? `${g.curriculum || "DepEd"}${g.grades ? ` · Grade ${g.grades}` : ""}`
-    : `${g.subject} · uploaded by ${g.uploaded_by || "a teacher"}`;
-  const text = twoLine(g.title, meta);
-  if (g.is_builtin) {
-    const badge = el("span", { class: "flow-badge" }, icon("shieldCheck"), "Official DepEd");
-    text.prepend(badge);
-  }
-  const btn = el("button", { type: "button", class: "flow-choice flow-format", "aria-pressed": String(pressed) }, text, tick());
-  btn.addEventListener("click", () => onPick(btn));
-  return btn;
-}
-
-async function paintGuideKind(box, kind, label, answerKey, showAll = false) {
+// ---- the Budget of Work: a dropdown, official DepEd ones first ----
+async function paintGuideKind(box, kind, label, answerKey) {
   const a = G.getAnswers();
-  const heading = el("p", { class: "flow-label" }, label);
-  box.replaceChildren(heading, el("p", { class: "flow-help" }, `Looking for ${a.subject || "your subject"} ${label.toLowerCase()}s…`));
+  box.replaceChildren(el("p", { class: "flow-label" }, label),
+    el("p", { class: "flow-help" }, `Looking for ${a.subject || "your subject"} ${label.toLowerCase()}s…`));
   let guides = [];
   try {
     guides = await G.searchCourseGuides(kind);
@@ -490,25 +471,19 @@ async function paintGuideKind(box, kind, label, answerKey, showAll = false) {
     showError(err.message);
   }
   const current = G.getAnswers()[answerKey];
-  // The picked one leads, so it is never cut off by the short list.
-  if (current) guides = [guides.find((g) => g.id === current.id) || current, ...guides.filter((g) => g.id !== current.id)];
+  if (current && !guides.some((g) => g.id === current.id)) guides.unshift(current);
 
-  const list = el("div", { class: "flow-choices flow-choices-stack flow-scroll", role: "group", "aria-label": label });
-  (showAll ? guides : guides.slice(0, GUIDES_SHOWN)).forEach((g) => {
-    list.append(guideCard(g, !!current && g.id === current.id, (btn) => {
-      const picking = btn.getAttribute("aria-pressed") !== "true";
-      list.querySelectorAll(".flow-format").forEach((b) => b.setAttribute("aria-pressed", String(picking && b === btn)));
-      G.selectCourseGuide(picking ? g : null, kind);
-      refresh();
-    }));
-  });
-  const parts = [heading];
-  parts.push(guides.length ? list : el("p", { class: "flow-help" }, `No ${label} for this subject yet. Upload yours and I'll add it to the shared library.`));
-  if (!showAll && guides.length > GUIDES_SHOWN) {
-    const more = el("button", { type: "button", class: "flow-back flow-more" }, `Show all ${guides.length}`);
-    more.addEventListener("click", () => paintGuideKind(box, kind, label, answerKey, true));
-    parts.push(more);
-  }
+  const item = (g) => ({ value: g.id, label: g.is_builtin ? g.title : `${g.title} (uploaded by ${g.uploaded_by || "a teacher"})` });
+  const options = [
+    { group: "Official DepEd", items: guides.filter((g) => g.is_builtin).map(item) },
+    { group: "Uploaded by teachers", items: guides.filter((g) => !g.is_builtin).map(item) },
+  ].filter((o) => o.items.length);
+  const parts = guides.length
+    ? selectAnswer("flow-bow", label, options, current && current.id, (v) => {
+      G.selectCourseGuide(guides.find((g) => String(g.id) === v) || null, kind);
+    }, { placeholder: `Choose a ${label}…` })
+    : [el("p", { class: "flow-label" }, label),
+      el("p", { class: "flow-help" }, `No ${label} for this subject yet. Upload yours and I'll add it to the shared library.`)];
 
   const input = el("input", { type: "file", accept: ".docx,.dotx,.pdf", hidden: true });
   const upload = el("button", { type: "button", class: "flow-back flow-more flow-upload-link" }, icon("upload"), `Upload my own ${label}`);
@@ -526,7 +501,7 @@ async function paintGuideKind(box, kind, label, answerKey, showAll = false) {
     try {
       await G.uploadCourseGuide(file, kind);
       say(COPY.guide.say, FLOW_POSES.guide);
-      paintGuideKind(box, kind, label, answerKey, showAll);
+      paintGuideKind(box, kind, label, answerKey);
     } catch (err) {
       showError(err.message);
       say(COPY.guide.say, FLOW_POSES.guide);

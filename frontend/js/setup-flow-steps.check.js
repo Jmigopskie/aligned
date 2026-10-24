@@ -9,8 +9,7 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, "setup-flow-steps.js"), "utf8"), ctx);
 const get = (name) => vm.runInContext(name, ctx);
 
-// Seven steps, several fields each; teachers get the same steps (their
-// cooperating-teacher field is hidden on the people step instead).
+// Seven steps, several fields each; teachers get the same steps.
 const ids = ["format", "people", "class", "subject", "topics", "sources", "mode"];
 assert.deepStrictEqual(Array.from(ctx.flowSteps("student")), ids);
 assert.deepStrictEqual(Array.from(ctx.flowSteps("teacher")), ids);
@@ -35,7 +34,8 @@ assert.deepStrictEqual(Array.from(get("DURATION_CHOICES")), [30, 45, 60, 90]);
 const answered = ctx.isStepAnswered;
 assert.strictEqual(answered("format", { formatId: 3 }), true);
 assert.strictEqual(answered("format", { school: "SNHS" }), false);
-assert.strictEqual(answered("people", { studentTeacher: "Ana" }), true);
+assert.strictEqual(answered("people", { studentTeacher: "Ana", coop: "Juan" }), true);
+assert.strictEqual(answered("people", { studentTeacher: "Ana", coop: " " }), false, "the subject teacher is required");
 assert.strictEqual(answered("people", { coop: "Juan" }), false);
 assert.strictEqual(answered("class", { levelType: "k12", grade: "Grade 7" }), true);
 assert.strictEqual(answered("class", { levelType: "college", year: "2nd Year" }), false, "college needs a program");
