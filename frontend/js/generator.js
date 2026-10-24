@@ -165,8 +165,9 @@ const studentTeacherInput = document.getElementById("ctx-student-teacher");
 const durationInput = document.getElementById("ctx-duration");
 const prevTopicInput = document.getElementById("ctx-prev-topic");
 const nextTopicInput = document.getElementById("ctx-next-topic");
+const mainTopicInput = document.getElementById("ctx-main-topic");
 // The flow's own state, saved with the setup so a refresh lands on the same step.
-let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null };
+let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [] };
 // One run = one pass through the flow; its draft is keyed by run, not by
 // format, so picking a format never silently brings back an older draft.
 let currentRunId = new URLSearchParams(window.location.search).get("run");
@@ -748,6 +749,8 @@ function getAdvancedContext() {
     school: schoolInput.value.trim(),
     student_teacher: studentTeacherInput.value.trim(),
     duration_minutes: parseInt(durationInput.value, 10) || "",
+    // The broader topic today's lesson sits under (the flow's step 5).
+    main_topic: mainTopicInput.value.trim(),
   };
   // Only when Alan actually asked (the plan went through the flow): then an
   // empty value means "first lesson" / "not sure yet" and the server grounds
@@ -821,7 +824,7 @@ subjectInput.addEventListener("change", () => {
 // same way the fields are. markDirty() covers everything in the generate tab.
 [teacherNameInput, subjectInput, topicInput, levelTypeSelect, collegeProgramInput,
  collegeYearSelect, k12GradeSelect, sectionInput, schoolInput, studentTeacherInput,
- durationInput, prevTopicInput, nextTopicInput].forEach((el) => {
+ durationInput, prevTopicInput, nextTopicInput, mainTopicInput].forEach((el) => {
   el.addEventListener("input", saveDraft);
   el.addEventListener("change", saveDraft);
 });
@@ -2069,6 +2072,7 @@ function setupContext() {
       durationMinutes: durationInput.value,
       previousTopic: prevTopicInput.value,
       nextTopic: nextTopicInput.value,
+      mainTopic: mainTopicInput.value,
       runId: currentRunId,
       formatId: fmt ? fmt.id : null,
       flow: { ...flowFlags },
@@ -2101,6 +2105,7 @@ function applySetupContext(ctx) {
   if (setup.durationMinutes) durationInput.value = setup.durationMinutes;
   if (setup.previousTopic) prevTopicInput.value = setup.previousTopic;
   if (setup.nextTopic) nextTopicInput.value = setup.nextTopic;
+  if (setup.mainTopic) mainTopicInput.value = setup.mainTopic;
   if (setup.flow) flowFlags = { ...flowFlags, ...setup.flow };
   if (ctx && ctx.pageSize) pageSizeSelect.value = ctx.pageSize;
   updateLevelFields();
@@ -2738,6 +2743,8 @@ function baseGenerationPayload() {
     budget_of_work_id: selectedGuides.budget_of_work ? selectedGuides.budget_of_work.id : null,
     context: getAdvancedContext(),
     include_keys: selectedGenerateKeys(),
+    // The student's own supplementary sources (the flow's step 6); Alan reads them too.
+    source_ids: (flowFlags.sources || []).map((s) => s.id),
   };
 }
 
@@ -3512,8 +3519,9 @@ const ANSWER_INPUTS = {
   subject: subjectInput, durationMinutes: durationInput, levelType: levelTypeSelect,
   grade: k12GradeSelect, program: collegeProgramInput, year: collegeYearSelect,
   section: sectionInput, previousTopic: prevTopicInput, topic: topicInput, nextTopic: nextTopicInput,
+  mainTopic: mainTopicInput,
 };
-const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode"];
+const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources"];
 
 function getAnswers() {
   const answers = {};
@@ -3527,6 +3535,8 @@ function getAnswers() {
   answers.budgetOfWork = selectedGuides.budget_of_work;
   const anyGuide = selectedGuides.curriculum_guide || selectedGuides.budget_of_work;
   answers.courseGuideId = anyGuide ? anyGuide.id : null;
+  answers.budgetOfWorkId = selectedGuides.budget_of_work ? selectedGuides.budget_of_work.id : null;
+  answers.sources = flowFlags.sources || [];
   return answers;
 }
 
@@ -3648,6 +3658,16 @@ window.Generator = {
     // An upload goes where its own type says (the same file may already be filed as the other kind).
     (guidePickers[guide.doc_type] || guidePickers[kind]).select(guide);
     return guide;
+  },
+  // Supplementary sources: private to the student, read by Alan.
+  uploadSource: async (file) => {
+    const { source } = await Api.uploadSource(file);
+    setAnswers({ sources: [...(flowFlags.sources || []), source] });
+    return source;
+  },
+  removeSource: async (id) => {
+    await Api.deleteSource(id);
+    setAnswers({ sources: (flowFlags.sources || []).filter((s) => s.id !== id) });
   },
   applyPrefill,
   useMode,

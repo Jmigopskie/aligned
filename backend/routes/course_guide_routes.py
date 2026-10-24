@@ -7,6 +7,8 @@ from werkzeug.utils import secure_filename
 
 from extensions import db
 from models.course_guide import CourseGuide
+from models.supplementary_source import SupplementarySource
+import uuid
 from routes.auth_routes import login_required, current_user
 from services import text_extract
 
@@ -166,3 +168,57 @@ def upload_course_guide():
     db.session.commit()
 
     return jsonify({"status": "ok", "course_guide": guide.to_dict(), "duplicate": False}), 201
+
+
+# ---- Supplementary sources: a student's own files beside the Budget of Work.
+# Private to the uploader (never in the shared library); Alan reads their text.
+
+def _sources_dir():
+    path = os.path.join(current_app.config["UPLOAD_FOLDER"], "sources")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+@course_guide_bp.post("/sources")
+@login_required
+def upload_source():
+    user = current_user()
+    file = request.files.get("file")
+    if not file or file.filename == "" or not _allowed(file.filename):
+        return jsonify({"status": "error", "message": "Only .docx, .dotx, or .pdf files are allowed."}), 400
+
+    ext = file.filename.rsplit(".", 1)[1].lower()
+    save_path = os.path.join(_sources_dir(), f"{user.id}_{uuid.uuid4().hex}.{ext}")
+    file.save(save_path)
+    try:
+        extracted = text_extract.extract_text(save_path)
+    except Exception as exc:
+        current_app.logger.warning("Supplementary source text extraction failed: %s", exc)
+        extracted = ""
+    if not (extracted or "").strip():
+        os.remove(save_path)
+        return jsonify({
+            "status": "error",
+            "message": "I couldn't read any text in that file. If it's a scanned PDF, save it from Word as a .docx instead.",
+        }), 400
+
+    source = SupplementarySource(owner_id=user.id, filename=secure_filename(file.filename) or file.filename,
+                                 file_path=save_path, extracted_text=extracted)
+    db.session.add(source)
+    db.session.commit()
+    return jsonify({"status": "ok", "source": source.to_dict()}), 201
+
+
+@course_guide_bp.delete("/sources/<int:source_id>")
+@login_required
+def delete_source(source_id):
+    source = SupplementarySource.query.filter_by(id=source_id, owner_id=current_user().id).first()
+    if not source:
+        return jsonify({"status": "error", "message": "That source couldn't be found."}), 404
+    try:
+        os.remove(source.file_path)
+    except OSError:
+        pass
+    db.session.delete(source)
+    db.session.commit()
+    return jsonify({"status": "ok"})

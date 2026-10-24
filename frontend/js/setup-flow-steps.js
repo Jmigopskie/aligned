@@ -3,19 +3,41 @@
 // blanks from the answers, and which formats an account may pick. No DOM here,
 // so frontend/js/setup-flow-steps.check.js can run it under node.
 
-const FLOW_STEP_IDS = ["format", "school", "name", "coop", "subject", "duration", "class",
-  "prevTopic", "topic", "nextTopic", "guide", "mode"];
+// Seven steps, a few fields each: format + school, people, class, subject +
+// duration, the four topics, Budget of Work + supplementary sources, mode.
+const FLOW_STEP_IDS = ["format", "people", "class", "subject", "topics", "sources", "mode"];
 
-// Alan's pose for each question (keys from js/alan3d.js POSES).
+// Alan's pose for each step (keys from js/alan3d.js POSES).
 const FLOW_POSES = {
-  format: "hi", school: "present", name: "present", coop: "present", subject: "point",
-  duration: "check", class: "present", prevTopic: "think", topic: "think", nextTopic: "think",
-  guide: "reading", mode: "idea",
+  format: "hi", people: "present", class: "present", subject: "point",
+  topics: "think", sources: "reading", mode: "idea",
 };
 
-// A teacher writing their own plan has no cooperating teacher to name.
+const DURATION_CHOICES = [30, 45, 60, 90];
+
+// Teachers get the same steps; the people step hides their cooperating teacher.
 function flowSteps(role) {
-  return role === "teacher" ? FLOW_STEP_IDS.filter((id) => id !== "coop") : FLOW_STEP_IDS.slice();
+  return FLOW_STEP_IDS.slice();
+}
+
+// One grade dropdown: Grade 4-12, then the four college years, kept on the
+// page as the K-12 grade or the college year it always stored.
+const COLLEGE_YEARS = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
+
+function gradeOptions() {
+  const k12 = [4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => `Grade ${n}`);
+  return [...k12, ...COLLEGE_YEARS.map((y) => `${y} College`)].map((v) => ({ value: v, label: v }));
+}
+
+function answersForGrade(value) {
+  return /College$/.test(value)
+    ? { levelType: "college", year: value.replace(/ College$/, "") }
+    : { levelType: "k12", grade: value };
+}
+
+function gradeValue(a) {
+  if (a.levelType === "college") return a.year ? `${a.year} College` : "";
+  return a.grade || "";
 }
 
 function filled(value) {
@@ -25,17 +47,16 @@ function filled(value) {
 function isStepAnswered(stepId, answers) {
   const a = answers || {};
   switch (stepId) {
-    case "format": return filled(a.formatId);
-    case "name": return filled(a.studentTeacher);
-    case "subject": return filled(a.subject);
-    case "duration":
-      return Number.isInteger(a.durationMinutes) && a.durationMinutes >= 5 && a.durationMinutes <= 240;
+    case "format": return filled(a.formatId); // the school is encouraged, not required
+    case "people": return filled(a.studentTeacher);
     case "class":
       return a.levelType === "college" ? filled(a.program) && filled(a.year) : filled(a.grade);
-    case "topic": return filled(a.topic);
-    case "guide": return filled(a.courseGuideId);
+    case "subject":
+      return filled(a.subject) && Number.isInteger(a.durationMinutes) && a.durationMinutes >= 5 && a.durationMinutes <= 240;
+    case "topics": return filled(a.mainTopic) && filled(a.topic); // previous and next are encouraged
+    case "sources": return filled(a.budgetOfWorkId); // supplementary sources are optional
     case "mode": return a.mode === "full" || a.mode === "step";
-    default: return true; // school, coop, prevTopic, nextTopic are encouraged, not required
+    default: return true;
   }
 }
 

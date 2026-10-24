@@ -145,6 +145,12 @@ const Api = {
     if (docType) form.append("doc_type", docType);
     return apiFetch("/api/course-guides", { method: "POST", body: form });
   },
+  uploadSource: (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiFetch("/api/sources", { method: "POST", body: form });
+  },
+  deleteSource: (sourceId) => apiFetch(`/api/sources/${sourceId}`, { method: "DELETE" }),
 
   generateFull: (payload) =>
     apiFetch("/api/generate/full", {

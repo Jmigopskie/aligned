@@ -14,59 +14,34 @@ const PNG_FOR_POSE = {
 
 const COPY = {
   format: {
-    q: "Which lesson plan format does your school use?",
-    help: "Pick a built-in format, or one your teacher uploaded.",
-    say: "Hi! I'm Alan. Let's build your lesson plan together, one question at a time.",
+    q: "Which lesson plan format, and which school?",
+    help: "Pick the format your school uses, then type the school's name.",
+    say: "Hi! I'm Alan. Let's build your lesson plan together, a few questions at a time.",
   },
-  school: {
-    q: "What school are you teaching in?",
-    help: "It goes into your plan's header. Leave it blank if your format doesn't ask for it.",
-    say: "First, the basics. I'll fill these into your plan for you.",
-  },
-  name: {
-    q: "What's your name?",
-    help: "As it should appear on the plan.",
-    say: "I'll put your name wherever the format asks for the teacher.",
-  },
-  coop: {
-    q: "Who is your cooperating teacher?",
-    help: "You can leave this blank.",
-    say: "Good to know who's guiding you.",
-  },
-  subject: {
-    q: "What subject is this for?",
-    help: "",
-    say: "Pick the subject, and I'll look for its course guide later.",
-  },
-  duration: {
-    q: "How long is the discussion?",
-    help: "Most discussions run 45 minutes.",
-    say: "I'll make the times in your procedure add up to this.",
+  people: {
+    q: "Who's teaching this lesson?",
+    help: "As the names should appear on the plan.",
+    say: "I'll put these names wherever the format asks for them.",
   },
   class: {
     q: "Which class is this for?",
     help: "",
     say: "Knowing the class helps me pitch the activities right.",
   },
-  prevTopic: {
-    q: "What did your class learn last meeting?",
-    help: "I'll use it to write the review of the previous lesson.",
-    say: "Tell me what came before, so the recap connects to it.",
+  subject: {
+    q: "What subject, and how long is the discussion?",
+    help: "Most discussions run 45 minutes.",
+    say: "I'll make the times in your procedure add up to this.",
   },
-  topic: {
-    q: "What's today's topic?",
-    help: "Be specific: “Cell formulas” tells me more than “Spreadsheets”.",
-    say: "Now the main event. What are you teaching?",
+  topics: {
+    q: "What's the lesson about?",
+    help: "The last and next topics help me connect the recap and the assignment.",
+    say: "Tell me where this lesson sits, so the recap and the assignment line up.",
   },
-  nextTopic: {
-    q: "What comes next after this lesson?",
-    help: "I'll point the assignment toward it.",
-    say: "Last topic question. What comes after?",
-  },
-  guide: {
-    q: "Which course guide should I follow?",
-    help: "Pick a Budget of Work, a Curriculum Guide, or both.",
-    say: "I'll follow this guide's scope and words closely.",
+  sources: {
+    q: "Which Budget of Work should I follow?",
+    help: "Add your own supplementary sources too, if you have any. Only you and I see them.",
+    say: "I'll follow the Budget of Work closely, and read your sources too.",
   },
   mode: {
     q: "How do you want to write it?",
@@ -169,6 +144,25 @@ function optionsOf(selectId) {
     .map((o) => ({ value: o.value, label: o.textContent.trim() }));
 }
 
+// A dropdown in the same tray as the text fields. `options` are {value, label},
+// or {group, items: [{value, label}]} for an optgroup.
+function selectAnswer(id, label, options, current, onChange, { placeholder = "Choose…", disabled = false } = {}) {
+  const select = el("select", { id, disabled });
+  select.append(el("option", { value: "", disabled: true }, placeholder));
+  const option = (o) => el("option", { value: String(o.value) }, o.label);
+  options.forEach((o) => {
+    if (o.group) select.append(el("optgroup", { label: o.group }, o.items.map(option)));
+    else select.append(option(o));
+  });
+  select.value = current == null ? "" : String(current);
+  if (select.selectedIndex < 0) select.selectedIndex = 0;
+  select.addEventListener("change", () => {
+    onChange(select.value);
+    refresh();
+  });
+  return [el("label", { class: "flow-label", for: id }, label), el("div", { class: "flow-field flow-select" }, select)];
+}
+
 // ---- step 1: the format ----
 // A card is only chosen here; Next opens it (G.loadFormat).
 let pendingFormatId = null;
@@ -236,33 +230,25 @@ async function paintFormats(wrap) {
     return;
   }
   const groups = formatGroups(formats, user);
-  const card = (f, sub) => {
-    const btn = el("button", { type: "button", class: "flow-choice flow-format", "aria-pressed": String(f.id === pendingFormatId) },
-      twoLine(f.name, sub), tick());
-    btn.addEventListener("click", () => {
-      wrap.querySelectorAll(".flow-format").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
-      pendingFormatId = f.id;
-      refresh();
-    });
-    return btn;
-  };
-  const group = (title, items) => [
-    el("p", { class: "flow-label" }, title),
-    el("div", { class: "flow-choices flow-choices-formats", role: "group", "aria-label": title }, items),
-  ];
-  const parts = group("Built-in", groups.builtin.map((f) => card(f, f.description)));
+  const item = (f, by) => ({ value: f.id, label: by && f.owner_name ? `${f.name} (${f.owner_name})` : f.name });
+  const options = [{ group: "Built-in", items: groups.builtin.map((f) => item(f)) }];
   if (user.role === "student") {
-    if (groups.teacher.length) {
-      parts.push(...group("From your teacher", groups.teacher.map((f) => card(f, f.owner_name ? `From ${f.owner_name}` : ""))));
-    } else {
-      say("Join your teacher's class to see the formats they uploaded.", "hi");
-    }
-  } else {
-    const upload = el("button", { type: "button", class: "flow-choice flow-format flow-upload" },
-      twoLine("Upload my school's format", ".docx, .dotx or .pdf"), icon("upload"));
-    upload.addEventListener("click", () => paintUpload(wrap));
-    parts.push(...group("Uploaded by you", [...groups.mine.map((f) => card(f, "")), upload]));
+    if (groups.teacher.length) options.push({ group: "From your teacher", items: groups.teacher.map((f) => item(f, true)) });
+    else say("Join your teacher's class to see the formats they uploaded.", "hi");
+  } else if (groups.mine.length) {
+    options.push({ group: "Uploaded by you", items: groups.mine.map((f) => item(f)) });
   }
+  // In Lesson details the format stays as it is: changing it would reload
+  // the plan onto another template.
+  const parts = selectAnswer("flow-format", "Lesson plan format", options, pendingFormatId, (v) => {
+    pendingFormatId = Number(v);
+  }, { placeholder: "Choose a format…", disabled: detailsMode });
+  if (user.role !== "student" && !detailsMode) {
+    const upload = el("button", { type: "button", class: "flow-back flow-more flow-upload-link" }, icon("upload"), "Upload my school's format");
+    upload.addEventListener("click", () => paintUpload(wrap));
+    parts.push(upload);
+  }
+  parts.push(...textAnswer("school", { label: "School", placeholder: "e.g. San Isidro National High School" }));
   wrap.replaceChildren(...parts);
   refresh();
 }
@@ -372,73 +358,78 @@ function paintSave(wrap, scanned, filename) {
 // ---- answers per step ----
 const STEPS = {
   format: formatStep,
-  school: () => textAnswer("school", { placeholder: "e.g. San Isidro National High School" }),
-  name: () => textAnswer("studentTeacher", { placeholder: "e.g. Ana Cruz" }),
-  coop: () => textAnswer("coop", { placeholder: "e.g. Juan Dela Cruz" }),
-  subject: () => choiceAnswer(optionsOf("ctx-subject"), G.getAnswers().subject, (v) => G.setAnswers({ subject: v })),
-  duration: () => {
-    const minutes = G.getAnswers().durationMinutes;
-    const quick = [30, 45, 60, 90];
-    const custom = minutes && !quick.includes(minutes);
+  people: () => [
+    ...textAnswer("studentTeacher", { label: "Your name", placeholder: "e.g. Ana Cruz" }),
+    ...(user.role === "student"
+      ? textAnswer("coop", { label: "Cooperating Teacher / Subject Teacher (optional)", placeholder: "e.g. Juan Dela Cruz" })
+      : []),
+  ],
+  class: () => {
+    const wrap = el("div", { class: "flow-answer" });
+    const paint = () => {
+      const a = G.getAnswers();
+      const parts = selectAnswer("flow-grade", "Grade level", gradeOptions(), gradeValue(a), (v) => {
+        const wasCollege = G.getAnswers().levelType === "college";
+        G.setAnswers(answersForGrade(v));
+        // Only college asks for a program, so repaint when that changes.
+        if (wasCollege !== (G.getAnswers().levelType === "college")) {
+          paint();
+          wrap.querySelector("#flow-grade").focus();
+        }
+      }, { placeholder: "Choose a grade level…" });
+      if (a.levelType === "college") parts.push(...textAnswer("program", { label: "Program", placeholder: "e.g. BS Information Technology" }));
+      parts.push(...textAnswer("section", { label: "Section (optional)", placeholder: "e.g. Sampaguita" }));
+      wrap.replaceChildren(...parts);
+    };
+    paint();
+    return wrap;
+  },
+  subject: () => {
+    const a = G.getAnswers();
+    const custom = a.durationMinutes && !DURATION_CHOICES.includes(a.durationMinutes);
     const other = el("div", { class: "flow-field", hidden: !custom });
     const input = el("input", { type: "number", min: "5", max: "240", step: "1", inputmode: "numeric",
       placeholder: "Minutes, e.g. 50", "aria-label": "Minutes" });
-    if (custom) input.value = minutes;
+    if (custom) input.value = a.durationMinutes;
     input.addEventListener("input", () => {
       G.setAnswers({ durationMinutes: input.value });
       refresh();
     });
     other.append(input);
-    const options = [...quick.map((m) => ({ value: m, label: `${m} minutes` })), { value: "other", label: "Other" }];
-    const group = choiceAnswer(options, custom ? "other" : minutes, (v) => {
-      other.hidden = v !== "other";
-      if (v === "other") {
-        G.setAnswers({ durationMinutes: input.value });
-        input.focus();
-      } else {
-        G.setAnswers({ durationMinutes: v });
-      }
-    });
-    return [group, other];
+    const durations = [...DURATION_CHOICES.map((m) => ({ value: m, label: `${m} minutes` })), { value: "other", label: "Other" }];
+    return [
+      ...selectAnswer("flow-subject", "Subject", optionsOf("ctx-subject"), a.subject,
+        (v) => G.setAnswers({ subject: v }), { placeholder: "Choose a subject…" }),
+      ...selectAnswer("flow-duration", "Duration", durations, custom ? "other" : a.durationMinutes, (v) => {
+        other.hidden = v !== "other";
+        if (v === "other") {
+          G.setAnswers({ durationMinutes: input.value });
+          input.focus();
+        } else {
+          G.setAnswers({ durationMinutes: v });
+        }
+      }, { placeholder: "Choose a length…" }),
+      other,
+    ];
   },
-  class: () => {
-    const a = G.getAnswers();
-    const wrap = el("div", { class: "flow-answer" });
-    const paint = () => {
-      const now = G.getAnswers();
-      const detail = now.levelType === "college"
-        ? [
-          ...textAnswer("program", { label: "Program", placeholder: "e.g. BS Information Technology" }),
-          el("p", { class: "flow-label", id: "flow-year-label" }, "Year"),
-          choiceAnswer(optionsOf("ctx-college-year"), now.year, (v) => G.setAnswers({ year: v }), "Year"),
-        ]
-        : [
-          el("p", { class: "flow-label" }, "Grade"),
-          choiceAnswer(optionsOf("ctx-k12-grade"), now.grade, (v) => G.setAnswers({ grade: v }), "Grade"),
-        ];
-      wrap.replaceChildren(...detail, ...textAnswer("section", { label: "Section (optional)", placeholder: "e.g. Sampaguita" }));
-    };
-    const level = choiceAnswer([{ value: "k12", label: "K-12" }, { value: "college", label: "College" }],
-      a.levelType || "k12", (v) => {
-        G.setAnswers({ levelType: v });
-        paint();
-      }, "Level");
-    paint();
-    return [level, wrap];
-  },
-  prevTopic: () => textAnswer("previousTopic", {
-    placeholder: "e.g. Basic cell formatting",
-    alt: { flag: "firstLesson", label: "This is the first lesson" },
-  }),
-  topic: () => textAnswer("topic", { placeholder: "e.g. Cell formulas" }),
-  nextTopic: () => textAnswer("nextTopic", {
-    placeholder: "e.g. Making charts",
-    alt: { flag: "nextUnsure", label: "Not sure yet" },
-  }),
-  guide: () => {
-    const wrap = el("div", { class: "flow-answer" });
-    paintGuides(wrap);
-    return wrap;
+  topics: () => [
+    ...textAnswer("mainTopic", { label: "Main topic", placeholder: "e.g. Spreadsheets" }),
+    ...textAnswer("topic", { label: "Specific topic for today", placeholder: "e.g. Cell formulas" }),
+    ...textAnswer("previousTopic", {
+      label: "Last topic (previous meeting)", placeholder: "e.g. Basic cell formatting",
+      alt: { flag: "firstLesson", label: "This is the first lesson" },
+    }),
+    ...textAnswer("nextTopic", {
+      label: "Next topic", placeholder: "e.g. Making charts",
+      alt: { flag: "nextUnsure", label: "Not sure yet" },
+    }),
+  ],
+  sources: () => {
+    const bow = el("div", { class: "flow-guide-kind" });
+    paintGuideKind(bow, "budget_of_work", "Budget of Work", "budgetOfWork");
+    const own = el("div", { class: "flow-guide-kind" });
+    paintSources(own);
+    return el("div", { class: "flow-answer" }, bow, own);
   },
   mode: () => {
     const wrap = el("div", { class: "flow-choices flow-choices-stack", role: "group", "aria-labelledby": "flow-question" });
@@ -460,12 +451,9 @@ const STEPS = {
   },
 };
 
-// ---- the course guide ----
-// Two kinds, like the rest of the app: a Budget of Work and a Curriculum
-// Guide. At least one is needed; a student may pick both. Tapping a picked
-// card again takes it back.
+// ---- the Budget of Work ----
+// Tapping the picked card again takes it back.
 const GUIDES_SHOWN = 6;
-const GUIDE_KINDS = [["budget_of_work", "Budget of Work", "budgetOfWork"], ["curriculum_guide", "Curriculum Guide", "courseGuide"]];
 
 function guideCard(g, pressed, onPick) {
   const meta = g.is_builtin
@@ -479,14 +467,6 @@ function guideCard(g, pressed, onPick) {
   const btn = el("button", { type: "button", class: "flow-choice flow-format", "aria-pressed": String(pressed) }, text, tick());
   btn.addEventListener("click", () => onPick(btn));
   return btn;
-}
-
-function paintGuides(wrap) {
-  wrap.replaceChildren(...GUIDE_KINDS.map(([kind, label, answerKey]) => {
-    const box = el("div", { class: "flow-guide-kind" });
-    paintGuideKind(box, kind, label, answerKey);
-    return box;
-  }));
 }
 
 async function paintGuideKind(box, kind, label, answerKey, showAll = false) {
@@ -545,6 +525,56 @@ async function paintGuideKind(box, kind, label, answerKey, showAll = false) {
   parts.push(upload, input);
   box.replaceChildren(...parts);
   refresh();
+}
+
+// ---- supplementary sources: the student's own files, read by Alan ----
+function paintSources(box) {
+  const sources = G.getAnswers().sources || [];
+  const list = el("div", { class: "flow-sources" });
+  sources.forEach((s) => {
+    const remove = el("button", { type: "button", class: "flow-source-remove", "aria-label": `Remove ${s.name}` }, icon("x"));
+    remove.addEventListener("click", async () => {
+      remove.disabled = true;
+      try {
+        await G.removeSource(s.id);
+        paintSources(box);
+      } catch (err) {
+        showError(err.message);
+        remove.disabled = false;
+      }
+    });
+    list.append(el("div", { class: "flow-source" }, icon("file"), el("span", {}, s.name), remove));
+  });
+  const input = el("input", { type: "file", accept: ".docx,.dotx,.pdf", hidden: true });
+  const upload = el("button", { type: "button", class: "flow-back flow-more flow-upload-link" }, icon("upload"),
+    sources.length ? "Add another source" : "Upload a supplementary source");
+  upload.addEventListener("click", () => input.click());
+  input.addEventListener("change", async () => {
+    const file = input.files[0];
+    if (!file) return;
+    if (!/\.(docx|dotx|pdf)$/i.test(file.name)) {
+      showError("Only .docx, .dotx or .pdf files work here.");
+      return;
+    }
+    errorEl.hidden = true;
+    upload.disabled = true;
+    say("Reading your source…", "loading");
+    try {
+      await G.uploadSource(file);
+      say(COPY.sources.say, FLOW_POSES.sources);
+      paintSources(box);
+    } catch (err) {
+      showError(err.message);
+      say(COPY.sources.say, FLOW_POSES.sources);
+      upload.disabled = false;
+    }
+  });
+  box.replaceChildren(
+    el("p", { class: "flow-label" }, "Supplementary sources (optional)"),
+    ...(sources.length ? [list] : [el("p", { class: "flow-help" }, "Notes, readings or worksheets you want me to use. .docx, .dotx or .pdf.")]),
+    upload,
+    input,
+  );
 }
 
 // ---- the shell ----
@@ -677,7 +707,7 @@ async function go(delta) {
   } else if (delta > 0 && !isStepAnswered(id, G.getAnswers())) {
     return;
   }
-  if (delta > 0 && ["school", "name", "coop"].includes(id)) remember();
+  if (delta > 0 && ["format", "people"].includes(id)) remember();
   if (detailsMode) return showDetails();
   if (delta > 0 && id === "mode") return finish();
   const next = index + delta;
@@ -786,17 +816,20 @@ function classText(a) {
   return parts.filter((p) => p && String(p).trim()).join(" · ");
 }
 
+// [step that holds the answer, label, value, shown to students only?]
 const DETAIL_ROWS = [
-  ["school", "School", (a) => a.school],
-  ["name", "Your name", (a) => a.studentTeacher],
-  ["coop", "Cooperating teacher", (a) => a.coop],
-  ["subject", "Subject", (a) => a.subject],
-  ["duration", "Discussion length", (a) => (a.durationMinutes ? `${a.durationMinutes} minutes` : "")],
+  ["format", "School", (a) => a.school],
+  ["people", "Your name", (a) => a.studentTeacher],
+  ["people", "Cooperating / Subject Teacher", (a) => a.coop, true],
   ["class", "Class", classText],
-  ["prevTopic", "Previous topic", (a) => (a.firstLesson ? "This is the first lesson" : a.previousTopic)],
-  ["topic", "Today's topic", (a) => a.topic],
-  ["nextTopic", "Next topic", (a) => (a.nextUnsure ? "Not sure yet" : a.nextTopic)],
-  ["guide", "Course guide", (a) => [a.budgetOfWork, a.courseGuide].filter(Boolean).map((g) => g.title).join(" + ")],
+  ["subject", "Subject", (a) => a.subject],
+  ["subject", "Discussion length", (a) => (a.durationMinutes ? `${a.durationMinutes} minutes` : "")],
+  ["topics", "Main topic", (a) => a.mainTopic],
+  ["topics", "Specific topic", (a) => a.topic],
+  ["topics", "Last topic", (a) => (a.firstLesson ? "This is the first lesson" : a.previousTopic)],
+  ["topics", "Next topic", (a) => (a.nextUnsure ? "Not sure yet" : a.nextTopic)],
+  ["sources", "Budget of Work", (a) => (a.budgetOfWork ? a.budgetOfWork.title : "")],
+  ["sources", "Supplementary sources", (a) => (a.sources || []).map((s) => s.name).join(", ")],
 ];
 
 function showDetails() {
@@ -814,7 +847,7 @@ function showDetails() {
       if (a.formatName) {
         list.append(el("div", { class: "flow-detail is-fixed" }, twoLine("Format", a.formatName)));
       }
-      DETAIL_ROWS.filter(([id]) => steps.includes(id)).forEach(([id, label, value]) => {
+      DETAIL_ROWS.filter(([, , , studentsOnly]) => !studentsOnly || user.role === "student").forEach(([id, label, value]) => {
         const row = el("button", { type: "button", class: "flow-detail" }, twoLine(label, value(a) || "Not answered"), icon("edit"));
         row.addEventListener("click", () => {
           index = steps.indexOf(id);
@@ -881,7 +914,8 @@ async function mountAlan(host) {
       const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
       // Phones favour Alan's size over the margin for a held-out clipboard.
       const width = innerWidth <= 860 ? 2.5 : 3.0;
-      const dist = Math.max(3.3 / 2 / t, width / 2 / (t * camera.aspect));
+      // 1.18: Alan a little smaller than edge-to-edge, still centred in his half.
+      const dist = 1.18 * Math.max(3.3 / 2 / t, width / 2 / (t * camera.aspect));
       camera.position.set(target.x, target.y + 0.35, target.z + dist);
       camera.lookAt(target.x, target.y + 0.2, target.z);
       camera.updateProjectionMatrix();

@@ -9,28 +9,48 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, "setup-flow-steps.js"), "utf8"), ctx);
 const get = (name) => vm.runInContext(name, ctx);
 
-// Order: students get 12 steps; teachers skip the cooperating teacher.
-const student = ctx.flowSteps("student");
-assert.deepStrictEqual(Array.from(student), Array.from(get("FLOW_STEP_IDS")));
-assert.strictEqual(student.length, 12);
-const teacher = ctx.flowSteps("teacher");
-assert.strictEqual(teacher.length, 11);
-assert.ok(!teacher.includes("coop"));
-assert.strictEqual(get("FLOW_POSES").prevTopic, "think");
+// Seven steps, several fields each; teachers get the same steps (their
+// cooperating-teacher field is hidden on the people step instead).
+const ids = ["format", "people", "class", "subject", "topics", "sources", "mode"];
+assert.deepStrictEqual(Array.from(ctx.flowSteps("student")), ids);
+assert.deepStrictEqual(Array.from(ctx.flowSteps("teacher")), ids);
+assert.deepStrictEqual(Array.from(get("FLOW_STEP_IDS")), ids);
+assert.strictEqual(get("FLOW_POSES").topics, "think");
 assert.strictEqual(get("FLOW_POSES").format, "hi");
 
-// Required answers.
+// Grade dropdown: Grade 4-12 then the four college years, mapped onto the
+// K-12 / college answers the page already keeps.
+const grades = Array.from(ctx.gradeOptions()).map((o) => o.value);
+assert.strictEqual(grades.length, 13);
+assert.strictEqual(grades[0], "Grade 4");
+assert.strictEqual(grades[12], "4th Year College");
+assert.deepStrictEqual({ ...ctx.answersForGrade("Grade 7") }, { levelType: "k12", grade: "Grade 7" });
+assert.deepStrictEqual({ ...ctx.answersForGrade("2nd Year College") }, { levelType: "college", year: "2nd Year" });
+assert.strictEqual(ctx.gradeValue({ levelType: "college", year: "2nd Year" }), "2nd Year College");
+assert.strictEqual(ctx.gradeValue({ levelType: "k12", grade: "Grade 9" }), "Grade 9");
+assert.strictEqual(ctx.gradeValue({}), "");
+assert.deepStrictEqual(Array.from(get("DURATION_CHOICES")), [30, 45, 60, 90]);
+
+// Required answers per step.
 const answered = ctx.isStepAnswered;
-assert.strictEqual(answered("duration", { durationMinutes: 45 }), true);
-assert.strictEqual(answered("duration", { durationMinutes: 4 }), false);
-assert.strictEqual(answered("duration", { durationMinutes: 241 }), false);
-assert.strictEqual(answered("duration", { durationMinutes: "45" }), false);
-assert.strictEqual(answered("class", { levelType: "college", program: "BSIT" }), false);
-assert.strictEqual(answered("class", { levelType: "college", program: "BSIT", year: "2nd Year" }), true);
-assert.strictEqual(answered("class", { levelType: "k12", grade: "Grade 7" }), true);
-assert.strictEqual(answered("prevTopic", {}), true);
-assert.strictEqual(answered("topic", { topic: "  " }), false);
 assert.strictEqual(answered("format", { formatId: 3 }), true);
+assert.strictEqual(answered("format", { school: "SNHS" }), false);
+assert.strictEqual(answered("people", { studentTeacher: "Ana" }), true);
+assert.strictEqual(answered("people", { coop: "Juan" }), false);
+assert.strictEqual(answered("class", { levelType: "k12", grade: "Grade 7" }), true);
+assert.strictEqual(answered("class", { levelType: "college", year: "2nd Year" }), false, "college needs a program");
+assert.strictEqual(answered("class", { levelType: "college", year: "2nd Year", program: "BSIT" }), true);
+assert.strictEqual(answered("subject", { subject: "ICT", durationMinutes: 45 }), true);
+assert.strictEqual(answered("subject", { subject: "ICT", durationMinutes: 4 }), false);
+assert.strictEqual(answered("subject", { subject: "ICT", durationMinutes: "45" }), false);
+assert.strictEqual(answered("subject", { durationMinutes: 45 }), false);
+assert.strictEqual(answered("topics", { mainTopic: "Spreadsheets", topic: "Cell formulas" }), true);
+assert.strictEqual(answered("topics", { topic: "Cell formulas" }), false, "main topic is required");
+assert.strictEqual(answered("topics", { mainTopic: "Spreadsheets", topic: "  " }), false);
+assert.strictEqual(answered("sources", { budgetOfWorkId: 4 }), true);
+assert.strictEqual(answered("sources", { courseGuideId: 4 }), false, "a Budget of Work is required");
+assert.strictEqual(answered("mode", { mode: "step" }), true);
+assert.strictEqual(answered("mode", {}), false);
 
 // Prefill the format's own blanks, never over something already written.
 const fields = ["School", "Student Teacher", "Learning Area", "Grade Level"].map((label, i) => ({ field_key: `f${i}`, label }));

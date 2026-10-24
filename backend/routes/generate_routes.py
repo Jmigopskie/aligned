@@ -7,6 +7,7 @@ from extensions import db
 from models.format import LessonPlanFormat
 from models.lesson_plan import LessonPlan
 from models.course_guide import CourseGuide
+from models.supplementary_source import SupplementarySource
 from models.section import Section, SectionMembership
 from routes.auth_routes import login_required, current_user
 from services import ai_service, docx_service, grounding
@@ -64,6 +65,19 @@ def _guide_sources(guides):
     """(title, text) for each chosen document, the shape ai_service reads."""
     return [(g.title, g.extracted_text or "") for g in guides]
 
+def _resolve_sources(data, user):
+    """(title, text) for the supplementary sources this request names, only
+    the requester's own; anything else (another user's id, junk) is skipped."""
+    ids = data.get("source_ids")
+    if not isinstance(ids, list):
+        return []
+    ids = [i for i in ids if isinstance(i, int)]
+    if not ids:
+        return []
+    rows = SupplementarySource.query.filter(SupplementarySource.id.in_(ids),
+                                            SupplementarySource.owner_id == user.id).all()
+    return [(f"Supplementary source: {s.filename}", s.extracted_text or "") for s in rows]
+
 def _guide_citation(guides):
     """APA references for the chosen documents, one per line; an upload with
     no public link has none, since only references that open are kept."""
@@ -98,7 +112,7 @@ def generate_full():
     context = _build_context(data, guides)
 
     field_values = ai_service.generate_full(
-        context, fmt.fields, course_guide_text=_guide_sources(guides),
+        context, fmt.fields, course_guide_text=_guide_sources(guides) + _resolve_sources(data, current_user()),
         include_keys=_include_keys(data, fmt), course_guide_citation=_guide_citation(guides),
     )
     return jsonify({"status": "ok", "field_values": field_values})
@@ -114,7 +128,7 @@ def generate_full_stream():
         return err
 
     context = _build_context(data, guides)
-    course_guide_text = _guide_sources(guides)
+    course_guide_text = _guide_sources(guides) + _resolve_sources(data, current_user())
     fields = fmt.fields
     # Read here, not inside _stream(): the generator runs after the request
     # context is gone, so `request`/`data` can't be touched from inside it.
@@ -166,7 +180,8 @@ def owl_chat():
     context = _build_context(data, guides)
     prior_values = data.get("prior_values") or {}
 
-    answer = ai_service.owl_chat(context, field, prior_values, _guide_sources(guides), history, message,
+    answer = ai_service.owl_chat(context, field, prior_values,
+                                 _guide_sources(guides) + _resolve_sources(data, current_user()), history, message,
                                  course_guide_citation=_guide_citation(guides))
     return jsonify({"status": "ok", **answer})
 
