@@ -22,6 +22,16 @@
         "rule": "pulsing-dot",
         "value": "*",
         "files": [
+          "frontend/index.html",
+          "frontend/forgot-password.html"
+        ],
+        "createdAt": "2026-10-24T09:20:00.000Z",
+        "reason": "assistant triage: finding is .owl-dots in shared css/style.css (Guided-mode chat typing indicator, live state); the login and reset pages have no dots"
+      },
+      {
+        "rule": "pulsing-dot",
+        "value": "*",
+        "files": [
           "frontend/generator.html"
         ],
         "createdAt": "2026-10-18T10:28:46.092Z",
