@@ -44,7 +44,9 @@ values = {
     "proc": "Anything goes here",
 }
 out = grounding.snap_to_guide(values, [content, competency, objectives, procedure], GUIDE)
-assert out["content_standard"].split("\n") == [CONTENT, PERFORMANCE], out["content_standard"]
+# One statement only: the performance standard the model ran into it belongs
+# in its own field, so it is dropped here rather than copied along.
+assert out["content_standard"] == CONTENT, out["content_standard"]
 assert out["lc"] == COMPETENCY, out["lc"]
 assert out["obj"][0] == "At the end of the lesson, the learners are expected to:\n" + COMPETENCY, out["obj"]
 assert out["obj"][1] == ""

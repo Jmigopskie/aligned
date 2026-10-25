@@ -2,6 +2,7 @@ from datetime import datetime
 
 from flask import Blueprint, request, jsonify, send_file, Response, stream_with_context, current_app
 import json
+import re
 
 from extensions import db
 from models.format import LessonPlanFormat
@@ -61,7 +62,24 @@ def _build_context(data, guides):
         context["subject"] = data["subject"]
     if guides:
         context["course_guide_title"] = "; ".join(g.title for g in guides)
+    # A finished sample plan from setup: what goes in each part, never what to say.
+    context.pop("sample_plan", None)
+    sample = _resolve_sample(data)
+    if sample:
+        context["sample_plan"] = sample
     return context
+
+_SAMPLE_CHARS = 9000
+
+def _resolve_sample(data):
+    """The text of the sample lesson plan this request names, if it is the
+    requester's own upload, flattened and cut to fit beside the guide."""
+    sample_id = data.get("sample_id")
+    if not isinstance(sample_id, int):
+        return ""
+    row = SupplementarySource.query.filter_by(id=sample_id, owner_id=current_user().id).first()
+    text = re.sub(r"[ \t]+", " ", (row.extracted_text or "") if row else "")
+    return re.sub(r"\n\s*\n+", "\n", text).strip()[:_SAMPLE_CHARS]
 
 def _guide_sources(guides):
     """(title, text) for each chosen document, the shape ai_service reads."""

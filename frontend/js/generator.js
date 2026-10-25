@@ -222,7 +222,7 @@ const mainTopicInput = document.getElementById("ctx-main-topic");
 // The flow's own state, saved with the setup so a refresh lands on the same step.
 // guides: the library documents picked in step 6, any number of either kind;
 // sources: the student's own private uploads.
-let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [], guides: [], term: "", week: "", guidedAt: "part" };
+let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [], guides: [], term: "", week: "", sample: null, guidedAt: "part" };
 // One run = one pass through the flow; its draft is keyed by run, not by
 // format, so picking a format never silently brings back an older draft.
 let currentRunId = new URLSearchParams(window.location.search).get("run");
@@ -2777,6 +2777,8 @@ function baseGenerationPayload() {
     context: getAdvancedContext(),
     include_keys: selectedGenerateKeys(),
     source_ids: (flowFlags.sources || []).map((s) => s.id),
+    // A finished sample plan: shows Alan what goes in each part.
+    sample_id: flowFlags.sample ? flowFlags.sample.id : null,
   };
 }
 
@@ -3566,7 +3568,7 @@ const ANSWER_INPUTS = {
   section: sectionInput, previousTopic: prevTopicInput, topic: topicInput, nextTopic: nextTopicInput,
   mainTopic: mainTopicInput,
 };
-const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "term", "week", "guidedAt"];
+const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "term", "week", "sample", "guidedAt"];
 
 function getAnswers() {
   const answers = {};
@@ -3753,6 +3755,18 @@ window.Generator = {
   removeSource: async (id) => {
     await Api.deleteSource(id);
     setAnswers({ sources: (flowFlags.sources || []).filter((s) => s.id !== id) });
+  },
+  // The sample lesson plan: one private file, stored like a source but read
+  // as an example of the layout, never as a source of content.
+  uploadSample: async (file) => {
+    const { source } = await Api.uploadSource(file);
+    if (flowFlags.sample) Api.deleteSource(flowFlags.sample.id).catch(() => {});
+    setAnswers({ sample: source });
+    return source;
+  },
+  removeSample: async () => {
+    if (flowFlags.sample) await Api.deleteSource(flowFlags.sample.id);
+    setAnswers({ sample: null });
   },
   applyPrefill,
   useMode,

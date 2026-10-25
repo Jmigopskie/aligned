@@ -166,6 +166,29 @@ def check_owl_options_explained():
     print("  owl options explained OK")
 
 
+def check_one_statement_and_sample():
+    """A standard or competency is ONE statement even when the model copies
+    two; a sample plan shapes the prompt but is never lesson details, never a
+    source for the school or the standards."""
+    from services import grounding
+    guide = ("Content Standard The learners demonstrate an understanding of spreadsheet formulas. "
+             "The learners demonstrate an understanding of charts and graphs.")
+    cs = Field("cs", "Content Standard")
+    two = "The learners demonstrate an understanding of spreadsheet formulas.\nThe learners demonstrate an understanding of charts and graphs."
+    got = grounding.snap_to_guide({"cs": two}, [cs], guide)["cs"]
+    assert got == "The learners demonstrate an understanding of spreadsheet formulas.", got
+
+    ctx = {"topic": "Formulas", "sample_plan": "SAMPLE PLAN Rizal High School Motivation: a picture puzzle"}
+    block = ai_service._lesson_block(ctx, "", "")
+    assert "--- SAMPLE ---" in block and "SAMPLE PLAN Rizal" in block.split("--- SAMPLE ---")[1], block
+    assert "Rizal" not in ai_service._context_block(ctx), ai_service._context_block(ctx)
+    school = Field("school", "School", "text")
+    kept = grounding.keep_given_logistics({"school": "Rizal High School"}, [school], ctx)
+    assert kept["school"] == "", kept
+    print("  one statement, sample plan OK")
+
+
+check_one_statement_and_sample()
 check_owl_options_explained()
 check_standards_only_from_a_guide()
 check_subset_only()

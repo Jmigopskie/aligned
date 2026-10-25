@@ -66,7 +66,9 @@ def keep_given_logistics(values: dict, fields, context: dict) -> dict:
     blanked for the teacher to fill in."""
     # Word by word, so "Grade 7 - Campos" stands when the grade and the
     # section were each given, even though setup never wrote them together.
-    given = set(re.findall(r"[a-z0-9]+", " ".join(str(v) for v in (context or {}).values() if v).lower()))
+    # A sample plan's school and dates are someone else's, never this lesson's.
+    given = set(re.findall(r"[a-z0-9]+", " ".join(
+        str(v) for k, v in (context or {}).items() if v and k != "sample_plan").lower()))
     out = dict(values)
 
     def entered(text):
@@ -230,7 +232,9 @@ def snap_to_guide(values: dict, fields, guide_text: str) -> dict:
         if re.search(r"objective", _haystack(f), re.I):
             snap = _snap_competency_line if re.search(r"competenc", _haystack(f), re.I) else (lambda v, g: v)
         else:
-            snap = snap_text
+            # A standard or competency is the ONE statement for this lesson:
+            # extra statements the model copied along with it are dropped.
+            snap = lambda v, g: snap_text(v, g).split("\n")[0]
         if isinstance(value, list):
             out[f.field_key] = [snap(v, guide_text) for v in value]
         else:

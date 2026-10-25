@@ -423,6 +423,14 @@ def _field_directive(field):
             "the procedure for) ONLY when the lesson has a real hands-on skill; never force a "
             "psychomotor objective. Order them from lower to higher thinking."
         )
+    if grounding.is_copy_only_field(field):
+        return (
+            " Copy exactly ONE statement from the course guide / budget of work above, WORD FOR "
+            "WORD: the single one for this lesson's term, week and topic. Only that statement: no "
+            "second statement, no heading, code or week number, nothing reworded, shortened or "
+            "added. The length limits do not apply to this field. A line not found in the guide is "
+            "removed, and only the first statement is kept."
+        )
     if grounding.is_verbatim_field(field):
         return (
             " Copy the matching statement(s) from the course guide / budget of work above "
@@ -570,7 +578,7 @@ def _schema_block(fields, context=None):
 
 
 def _context_block(context: dict):
-    return ", ".join(f"{k}: {v}" for k, v in context.items() if v)
+    return ", ".join(f"{k}: {v}" for k, v in context.items() if v and k != "sample_plan")
 
 
 def _lesson_block(context: dict, guide_text: str, citation: str = "") -> str:
@@ -603,6 +611,18 @@ and assess exactly what it names, and the topic, term and dates agree with it:
 """
     if citation:
         block += f"\nAPA citation of the curriculum documents above (list them first in References):\n{citation}\n"
+    sample = context.get("sample_plan")
+    if sample:
+        block += f"""
+A SAMPLE of a finished lesson plan, uploaded by the writer, most likely on another topic.
+Use it only as a model of what goes in each part: the kind of content, how much, how
+detailed, and how it is laid out (what its motivation, discussion or evaluation actually
+contain). Never copy its topic, facts, examples or wording, and never take standards,
+competencies or objectives from it: those come only from the course guide above.
+--- SAMPLE ---
+{sample}
+--- END SAMPLE ---
+"""
     return block
 
 

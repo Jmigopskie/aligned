@@ -10,7 +10,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, "setup-flow-steps.js"), "ut
 const get = (name) => vm.runInContext(name, ctx);
 
 // Seven steps, several fields each; teachers get the same steps.
-const ids = ["format", "people", "class", "subject", "topics", "sources", "mode"];
+const ids = ["format", "people", "class", "subject", "topics", "sources", "sample", "mode"];
 assert.deepStrictEqual(Array.from(ctx.flowSteps("student")), ids);
 assert.deepStrictEqual(Array.from(ctx.flowSteps("teacher")), ids);
 assert.deepStrictEqual(Array.from(get("FLOW_STEP_IDS")), ids);
@@ -53,6 +53,7 @@ assert.strictEqual(answered("sources", { sources: [{ id: 9 }], ...when }), true,
 assert.strictEqual(answered("sources", { guides: [], sources: [], ...when }), false, "at least one source");
 assert.strictEqual(answered("sources", { guides: [{ id: 4 }], term: "2nd Term" }), false, "the week is needed");
 assert.strictEqual(answered("sources", { guides: [{ id: 4 }], week: "3" }), false, "the term is needed");
+assert.strictEqual(answered("sample", {}), true, "the sample plan is optional");
 assert.strictEqual(answered("mode", { mode: "step" }), true);
 assert.strictEqual(answered("mode", {}), false);
 

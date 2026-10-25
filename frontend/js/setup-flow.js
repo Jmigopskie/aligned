@@ -45,6 +45,11 @@ const COPY = {
     help: "Pick from the library or upload your own files.",
     say: "I'll read every source you pick. Files you upload stay private to you.",
   },
+  sample: {
+    q: "Do you have a sample lesson plan?",
+    help: "Optional. Upload a finished plan with its content filled in, on any topic. I'll follow what goes in each part and how much, never its topic.",
+    say: "A filled-in sample shows me what goes where. You can skip this one.",
+  },
   mode: {
     q: "How do you want to write it?",
     help: "",
@@ -438,6 +443,53 @@ const STEPS = {
     const box = el("div", { class: "flow-guide-kind" });
     paintSources(box);
     return el("div", { class: "flow-answer" }, box);
+  },
+  sample: () => {
+    const input = el("input", { type: "file", accept: ".docx,.dotx,.pdf", hidden: true });
+    const upload = el("button", { type: "button", class: "flow-back flow-more flow-upload-link" }, icon("upload"), "Upload a sample plan");
+    const chips = el("div", { class: "flow-chips", "aria-label": "Your sample plan" });
+    const paint = () => {
+      const sample = G.getAnswers().sample;
+      upload.lastChild.textContent = sample ? "Use a different sample" : "Upload a sample plan";
+      const remove = el("button", { type: "button", class: "flow-chip-remove", "aria-label": "Remove the sample plan" }, icon("x"));
+      remove.addEventListener("click", async () => {
+        remove.disabled = true;
+        try {
+          await G.removeSample();
+          paint();
+        } catch (err) {
+          showError(err.message);
+          remove.disabled = false;
+        }
+      });
+      chips.replaceChildren(...(sample ? [el("span", { class: "flow-chip", title: sample.name }, icon("file"), el("span", {}, sample.name), remove)] : []));
+      chips.hidden = !sample;
+      refresh();
+    };
+    upload.addEventListener("click", () => input.click());
+    input.addEventListener("change", async () => {
+      const file = input.files[0];
+      if (!file) return;
+      if (!/\.(docx|dotx|pdf)$/i.test(file.name)) {
+        showError("Only .docx, .dotx or .pdf files work here.");
+        return;
+      }
+      errorEl.hidden = true;
+      upload.disabled = true;
+      say("Reading your sample…", "loading");
+      try {
+        await G.uploadSample(file);
+        paint();
+        say("Got it. I'll follow how your sample fills each part.", "check");
+      } catch (err) {
+        showError(err.message);
+        say(COPY.sample.say, FLOW_POSES.sample);
+      }
+      upload.disabled = false;
+      input.value = "";
+    });
+    paint();
+    return el("div", { class: "flow-answer" }, el("div", { class: "flow-sources-head" }, upload), input, chips);
   },
   mode: () => {
     const wrap = el("div", { class: "flow-choices flow-choices-stack flow-mode-choices", role: "group", "aria-labelledby": "flow-question" });
@@ -882,6 +934,7 @@ const DETAIL_ROWS = [
   ["topics", "Next topic", (a) => (a.nextUnsure ? "Not sure yet" : a.nextTopic)],
   ["sources", "Supplementary sources", (a) => [...(a.guides || []).map((g) => g.title), ...(a.sources || []).map((s) => s.name)].join(", ")],
   ["sources", "Term and week", (a) => [a.term, weekLabel(a.week)].filter(Boolean).join(", ")],
+  ["sample", "Sample lesson plan", (a) => (a.sample ? a.sample.name : "None")],
 ];
 
 function showDetails() {
