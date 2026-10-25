@@ -88,7 +88,6 @@ function renderSidebarNav(active) {
     { key: "formats", href: "lesson-plan.html", icon: Icons.files, label: "Formats", role: "teacher" },
     { key: "lesson-plan-list", href: "lesson-plan-list.html", icon: Icons.list, label: "List of Lesson Plan", role: "!admin" },
     { key: "sections", href: "sections.html", icon: Icons.users, label: "My Sections", role: "teacher" },
-    { key: "submissions", href: "submissions.html", icon: Icons.inbox, label: "Submissions", role: "teacher" },
     { key: "my-classes", href: "my-classes.html", icon: Icons.users, label: "My Classes", role: "student" },
     { key: "course-guides", href: "course-guides.html", icon: Icons.bookOpen, label: "Curriculum/Course Guide", role: "!admin" },
     { key: "announcements", href: "announcements.html", icon: Icons.megaphone, label: "Announcements", role: "!admin" },

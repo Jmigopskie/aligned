@@ -3855,6 +3855,22 @@ async function init() {
   // a refresh.
   const params = new URLSearchParams(window.location.search);
   const requestedPlanId = params.get("plan_id");
+
+  // Students make lesson plans for a class, so they join one first (the server
+  // refuses too). A plan they already have still opens below.
+  if (user.role === "student" && user.enrolled === false && !requestedPlanId) {
+    loadingState.hidden = true;
+    flowEl.hidden = false;
+    flowEl.innerHTML = `
+      <div class="enroll-gate">
+        <img src="img/owl/alan-wave.png" alt="" />
+        <h1>Join your class first</h1>
+        <p>You can make lesson plans once you're in your teacher's class. Ask them for the class code, then join in My Classes.</p>
+        <a class="btn btn-primary" href="my-classes.html">Go to My Classes</a>
+      </div>`;
+    readyResolve({ user, kind: "blocked" });
+    return;
+  }
   if (requestedPlanId) {
     // A reopened plan came from the list, so that is where Back goes.
     const back = document.querySelector(".back-link");

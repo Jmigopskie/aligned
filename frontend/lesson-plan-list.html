@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-10-26b" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-26f" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -69,8 +69,44 @@
         <div class="mode-switch" id="plans-tab-switch" style="margin-bottom:18px;">
           <button type="button" class="active" data-tab="mine">My Lesson Plans</button>
           <button type="button" data-tab="public">Public Lesson Plans</button>
+          <button type="button" data-tab="submissions" id="submissions-tab" hidden>Student Submissions</button>
         </div>
 
+        <!-- Teachers: what their students submitted, reviewed and scored here
+             (this used to be its own Submissions page). -->
+        <div id="submissions-panel" hidden>
+          <div class="filter-bar">
+            <div class="field field-wide">
+              <label for="sub-section-select">Section</label>
+              <select id="sub-section-select"></select>
+            </div>
+            <div class="field">
+              <label for="sub-status-select">Status</label>
+              <select id="sub-status-select">
+                <option value="">All</option>
+                <option value="submitted">Pending review</option>
+                <option value="reviewed">Reviewed</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="sub-sort-select">Sort by</label>
+              <select id="sub-sort-select">
+                <option value="date">Date (newest first)</option>
+                <option value="name">Name (A&ndash;Z)</option>
+                <option value="score">Score (highest first)</option>
+              </select>
+            </div>
+          </div>
+          <div id="sub-error-box" class="alert alert-error" hidden></div>
+          <div id="no-sections-state" class="empty-state" hidden>
+            <h2>No sections yet</h2>
+            <p>Create a section first so students can join and submit lesson plans.</p>
+            <a class="btn btn-primary" href="sections.html">Go to My Sections</a>
+          </div>
+          <div id="submissions-list"></div>
+        </div>
+
+        <div id="plans-panel">
         <div class="filter-bar">
           <div class="field field-wide">
             <label for="search-input">Search</label>
@@ -118,7 +154,18 @@
             </table>
           </div>
         </div>
+        </div>
       </main>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="review-overlay" hidden>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="review-title">
+      <div class="modal-header">
+        <h2 id="review-title">Lesson plan</h2>
+        <button type="button" class="modal-close" id="review-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body" id="review-body"></div>
     </div>
   </div>
 
@@ -151,8 +198,9 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-10-26b"></script>
-  <script src="js/icons.js?v=2026-10-06c"></script>
-  <script src="js/lesson-plan-list.js?v=2026-10-26b"></script>
+  <script src="js/api.js?v=2026-10-26f"></script>
+  <script src="js/icons.js?v=2026-10-26f"></script>
+  <script src="js/submissions.js?v=2026-10-26f"></script>
+  <script src="js/lesson-plan-list.js?v=2026-10-26f"></script>
 </body>
 </html>

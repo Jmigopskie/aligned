@@ -6767,6 +6767,23 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
 .flow-hint { font-size: var(--text-sm); color: var(--text-body); }
 .flow-error { margin: 0; font-size: var(--text-sm); color: var(--danger); }
 
+/* A student not in a class yet: Alan points them to My Classes. */
+.enroll-gate {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: calc(100dvh - var(--topbar-h) - 40px);
+  padding: 32px 16px;
+  text-align: center;
+}
+.enroll-gate img { width: 160px; height: auto; }
+.enroll-gate h1 { margin: 0; font-family: var(--font-display); font-size: clamp(28px, 3vw, 40px); color: var(--text-heading); }
+.enroll-gate p { max-width: 46ch; margin: 0; font-size: 18px; line-height: 1.5; color: var(--text-body); }
+.enroll-gate .btn { margin-top: 6px; }
+
 .flow-stage {
   position: relative;
   display: flex;

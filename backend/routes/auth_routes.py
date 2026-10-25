@@ -62,6 +62,21 @@ def staff_required(view_func):
         return view_func(*args, **kwargs)
     return wrapper
 
+def enrollment_required(view_func):
+    """A student makes lesson plans (and spends generation on them) only once
+    enrolled in a section; teachers and admins are not affected."""
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        user = current_user()
+        if user and user.role == "student" and not user.is_enrolled():
+            return jsonify({
+                "status": "error",
+                "code": "not_enrolled",
+                "message": "Join your teacher's class in My Classes first, then you can make lesson plans.",
+            }), 403
+        return view_func(*args, **kwargs)
+    return wrapper
+
 def current_user():
     user_id = session.get("user_id")
     return User.query.get(user_id) if user_id else None

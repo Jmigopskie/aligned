@@ -54,6 +54,11 @@ class User(db.Model):
 
         return None
 
+    def is_enrolled(self):
+        """A student in at least one active section. Only students need one:
+        they make lesson plans for a class, so they join it first."""
+        return any(m.section and m.section.is_active for m in self.section_memberships)
+
     def to_dict(self):
         banner_owner = self.effective_banner()
         return {
@@ -66,4 +71,6 @@ class User(db.Model):
             "banner_url": _versioned(f"/api/banners/{banner_owner.id}", banner_owner.banner_path) if banner_owner else None,
             "created_at": iso_utc(self.created_at),
             "onboarded": self.onboarded_at is not None,
+            # Students only: whether they may make lesson plans yet.
+            "enrolled": self.is_enrolled() if self.role == "student" else True,
         }

@@ -435,12 +435,23 @@ async function loadActiveTab() {
   }
 }
 
+const plansPanel = document.getElementById("plans-panel");
+const submissionsPanel = document.getElementById("submissions-panel");
+
+function selectTab(tab) {
+  activeTab = tab;
+  tabSwitch.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  // Student submissions (teachers) share this page with the plan lists.
+  const submissions = tab === "submissions";
+  plansPanel.hidden = submissions;
+  submissionsPanel.hidden = !submissions;
+  if (submissions) Submissions.show();
+  else loadActiveTab();
+}
+
 tabSwitch.querySelectorAll("button").forEach((btn) => {
   btn.addEventListener("click", () => {
-    if (btn.dataset.tab === activeTab) return;
-    activeTab = btn.dataset.tab;
-    tabSwitch.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
-    loadActiveTab();
+    if (btn.dataset.tab !== activeTab) selectTab(btn.dataset.tab);
   });
 });
 
@@ -449,7 +460,11 @@ async function init() {
   if (!user) return;
   currentUser = user;
   wireTopbar(user);
-  await loadActiveTab();
+  const teacher = user.role === "teacher";
+  document.getElementById("submissions-tab").hidden = !teacher;
+  // ?tab=submissions: where a submission notification (and the old page) lands.
+  const wanted = new URLSearchParams(location.search).get("tab");
+  selectTab(teacher && wanted === "submissions" ? "submissions" : "mine");
 }
 
 init();

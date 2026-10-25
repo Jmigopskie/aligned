@@ -1,7 +1,11 @@
-const errorBox = document.getElementById("error-box");
-const sectionSelect = document.getElementById("section-select");
-const statusSelect = document.getElementById("status-select");
-const sortSelect = document.getElementById("sort-select");
+// Student submissions: a tab of the List of Lesson Plans page for teachers
+// (it used to be its own page). Kept to itself so its names never clash with
+// the list page's; the page opens it with Submissions.show().
+(() => {
+const errorBox = document.getElementById("sub-error-box");
+const sectionSelect = document.getElementById("sub-section-select");
+const statusSelect = document.getElementById("sub-status-select");
+const sortSelect = document.getElementById("sub-sort-select");
 const noSectionsState = document.getElementById("no-sections-state");
 const submissionsList = document.getElementById("submissions-list");
 
@@ -9,8 +13,6 @@ const reviewOverlay = document.getElementById("review-overlay");
 const reviewTitle = document.getElementById("review-title");
 const reviewBody = document.getElementById("review-body");
 const reviewClose = document.getElementById("review-close");
-
-document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("submissions");
 
 const formatCache = {};
 
@@ -248,22 +250,19 @@ sectionSelect.addEventListener("change", loadSubmissions);
 statusSelect.addEventListener("change", loadSubmissions);
 sortSelect.addEventListener("change", () => renderSubmissions(sortPlans(currentPlans, sortSelect.value)));
 
-async function init() {
-  const user = await requireAuth();
-  if (!user) return;
-  if (user.role !== "teacher") {
-    window.location.href = homeForRole(user.role);
-    return;
-  }
-  wireTopbar(user);
-
+let loaded = false;
+async function show() {
+  if (loaded) return;
+  loaded = true;
   try {
     const sections = await loadSectionOptions();
     if (sections) loadSubmissions();
   } catch (err) {
+    loaded = false;
     errorBox.textContent = err.message;
     errorBox.hidden = false;
   }
 }
 
-init();
+window.Submissions = { show };
+})();

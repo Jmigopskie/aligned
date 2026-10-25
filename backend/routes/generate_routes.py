@@ -9,7 +9,7 @@ from models.lesson_plan import LessonPlan
 from models.course_guide import CourseGuide
 from models.supplementary_source import SupplementarySource
 from models.section import Section, SectionMembership
-from routes.auth_routes import login_required, current_user
+from routes.auth_routes import login_required, enrollment_required, current_user
 from services import ai_service, docx_service, grounding
 from services.notify import notify
 
@@ -113,6 +113,7 @@ def _generatable_keys(include_keys, fmt):
 
 @generate_bp.post("/generate/full")
 @login_required
+@enrollment_required
 def generate_full():
     data = request.get_json(silent=True) or {}
     fmt = LessonPlanFormat.query.get_or_404(data.get("format_id"))
@@ -131,6 +132,7 @@ def generate_full():
 
 @generate_bp.post("/generate/full-stream")
 @login_required
+@enrollment_required
 def generate_full_stream():
     data = request.get_json(silent=True) or {}
     fmt = LessonPlanFormat.query.get_or_404(data.get("format_id"))
@@ -166,6 +168,7 @@ _CHAT_TEXT_LIMIT = 600
 
 @generate_bp.post("/generate/chat")
 @login_required
+@enrollment_required
 def owl_chat():
     """Guided mode: one turn of the teacher's chat with the owl about the
     field they're currently writing. The owl answers briefly and offers
@@ -309,6 +312,7 @@ def update_lesson_plan(plan_id):
 
 @generate_bp.post("/lesson-plans")
 @login_required
+@enrollment_required
 def save_lesson_plan():
     user = current_user()
     data = request.get_json(silent=True) or {}
@@ -440,7 +444,7 @@ def submit_lesson_plan(plan_id):
             "submission",
             "New submission",
             f"{user.full_name} submitted \"{plan.title}\" to {section.name}.",
-            link="submissions.html",
+            link="lesson-plan-list.html?tab=submissions",
         )
 
     db.session.commit()

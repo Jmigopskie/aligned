@@ -778,7 +778,7 @@ function loadTourIfDue(user) {
     return;
   }
   const script = document.createElement("script");
-  script.src = "js/owl-tour.js?v=2026-10-05e";
+  script.src = "js/owl-tour.js?v=2026-10-26f";
   script.onload = () => OwlTour.run(user);
   document.body.appendChild(script);
 }
