@@ -420,11 +420,16 @@ def check_guide_text_is_precomputed(app):
     assert cached.extracted_text == "PRECOMPUTED TEXT", cached.extracted_text
     assert "cached.docx" not in calls, calls
     assert calls.count("scanned.docx") == 1, calls
-    # Every shipped official guide has its text beside it.
+    # Every shipped official guide has its text beside it, and every value fits
+    # its column: MySQL refuses one that is too long, where SQLite here won't.
     folder = os.path.join(builtins.BUILTIN_DIR, "course_guides")
+    cols = {c.name: c.type.length for c in CourseGuide.__table__.columns if getattr(c.type, "length", None)}
     for entry in json.load(open(os.path.join(folder, "guides.json"), encoding="utf-8")):
         txt = os.path.join(folder, os.path.splitext(entry["file"])[0] + ".txt")
         assert os.path.isfile(txt) and os.path.getsize(txt) > 1000, txt
+        for name, value in {**entry, "builtin_key": entry["key"]}.items():
+            if name in cols:
+                assert len(str(value)) <= cols[name], (entry["key"], name, len(str(value)), cols[name])
     print("  guide text precomputed OK")
 
 

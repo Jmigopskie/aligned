@@ -75,7 +75,7 @@ matatag-epp-tle-cg-grades-4-10.pdf (same file), so it wasn't added twice.
 | tesda-ict-programming-oracle-database-nc-iii.pdf | ICT - Programming (Oracle Database) (NC III) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Programming-Oracle-Database-NC-III-CG.pdf |
 | tesda-ict-technical-drafting-nc-ii.pdf | ICT - Technical Drafting (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Technical-Drafting-NC-II-CG.pdf |
 | tesda-ict-telecom-osp-installation-fiber-optic-cable-nc-ii.pdf | ICT - Telecom OSP Installation (Fiber Optic Cable) (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Telecom-OSP-Installation-Fiber-Optic-Cable-NC-II-CG.pdf |
-| tesda-ict-telecom-osp-and-subscriber-line-installation-copper-cable-pots-and-dsl-nc-ii.pdf | ICT - Telecom OSP and Subscriber Line Installation (Copper Cable / POTS and DSL) (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Telecom-OSP-and-Subscriber-Line-Installation-Copper-Cable-POTS-and-DSL-NC-II-CG.pdf |
+| tesda-ict-telecom-osp-subscriber-line-copper-pots-dsl-nc-ii.pdf | ICT - Telecom OSP and Subscriber Line Installation (Copper Cable / POTS and DSL) (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Telecom-OSP-and-Subscriber-Line-Installation-Copper-Cable-POTS-and-DSL-NC-II-CG.pdf |
 
 ## Not included
 
