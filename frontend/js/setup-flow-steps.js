@@ -72,8 +72,15 @@ const PREFILL_LABELS = [
   [["learning area", "learning area(s)"], (a) => a.subject],
   [["grade level", "grade level & section"], classLabel],
   [["term", "quarter", "term/quarter", "quarter/term", "grading period"], (a) => a.term],
-  [["week", "week no.", "week number"], (a) => (a.week ? `Week ${a.week}` : "")],
+  [["week", "week no.", "week number"], (a) => weekLabel(a.week)],
 ];
+
+// The week is typed by hand: a bare number reads as "Week 3", anything else
+// ("Week 4", "Weeks 3-4") stays as written.
+function weekLabel(week) {
+  const w = String(week || "").trim();
+  return /^\d+$/.test(w) ? `Week ${w}` : w;
+}
 
 // Answers given once (school, name, subject, class) go straight into the
 // format's matching blanks, but never over something already written.

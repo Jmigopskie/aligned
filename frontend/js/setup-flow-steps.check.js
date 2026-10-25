@@ -68,6 +68,11 @@ const college = ctx.prefillFieldValues([{ field_key: "g", label: "Grade Level & 
 assert.strictEqual(college.g, "BSIT · 2nd Year · A");
 const termWeek = ctx.prefillFieldValues([{ field_key: "t", label: "Quarter" }, { field_key: "w", label: "Week" }], when, {});
 assert.deepStrictEqual({ ...termWeek }, { t: "2nd Term", w: "Week 3" });
+// Typed by hand: "Week 4" stays as it is, a bare number gets "Week" in front.
+assert.strictEqual(ctx.weekLabel(" Week 4 "), "Week 4");
+assert.strictEqual(ctx.weekLabel("4"), "Week 4");
+assert.strictEqual(ctx.weekLabel("Weeks 3-4"), "Weeks 3-4");
+assert.strictEqual(ctx.weekLabel(""), "");
 
 // Format groups: students see built-ins and their teachers' formats.
 const formats = [{ id: 1, is_builtin: true, owner_id: 9 }, { id: 2, is_builtin: false, owner_id: 5 }, { id: 3, is_builtin: false, owner_id: 7 }];

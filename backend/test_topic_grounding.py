@@ -90,6 +90,8 @@ def main():
     block = _lesson_block({"topic": "Cell formulas", "term": "2nd Term", "week": "3"}, "Week 3 ... competency")
     assert "2nd Term, Week 3" in block and "that term and week" in block, block[:300]
     assert "that term and week" not in _lesson_block({"topic": "Cell formulas"}, "guide text")
+    typed = _lesson_block({"topic": "Cell formulas", "term": "2nd Term", "week": "Week 4"}, "guide")
+    assert "2nd Term, Week 4." in typed and "Week Week" not in typed, typed[:300]
     print("  term and week OK")
 
     print("grounding OK")

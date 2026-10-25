@@ -464,12 +464,6 @@ const STEPS = {
 // them and stay private. Every pick shows in one list, then the term and week.
 const guideKind = (g) => g.type_label || (g.doc_type === "budget_of_work" ? "Budget of Work" : "Curriculum Guide");
 const FIRST_FOLDERS = ["Curriculum Guide", "Budget of Work"];
-const TERM_OPTIONS = [
-  { group: "Term", items: ["1st Term", "2nd Term", "3rd Term"].map((t) => ({ value: t, label: t })) },
-  { group: "Quarter", items: ["1st Quarter", "2nd Quarter", "3rd Quarter", "4th Quarter"].map((t) => ({ value: t, label: t })) },
-  { group: "Semester", items: ["1st Semester", "2nd Semester", "Summer"].map((t) => ({ value: t, label: t })) },
-];
-const WEEK_OPTIONS = Array.from({ length: 20 }, (_, i) => ({ value: String(i + 1), label: `Week ${i + 1}` }));
 
 function folderOrder(a, b) {
   const rank = (k) => (FIRST_FOLDERS.includes(k) ? FIRST_FOLDERS.indexOf(k) : k === "Other" ? 99 : 2);
@@ -492,6 +486,7 @@ function drawSources(box, library) {
   const guides = () => G.getAnswers().guides || [];
   const own = () => G.getAnswers().sources || [];
   const folders = el("div", { class: "flow-folders", role: "group", "aria-labelledby": "flow-library-label" });
+  const results = el("div", { class: "flow-folders flow-results", role: "group", "aria-label": "Search results", hidden: true });
   const noMatch = el("p", { class: "flow-help", hidden: true }, "No source matches that search.");
   const list = el("div", { class: "flow-chips", "aria-label": "Picked sources" });
   const counts = new Map(); // folder name -> its "n picked" badge
@@ -531,9 +526,18 @@ function drawSources(box, library) {
   function pick(g, on) {
     const rest = guides().filter((x) => x.id !== g.id);
     G.setAnswers({ guides: on ? [...rest, g] : rest });
-    const check = folders.querySelector(`input[value="${g.id}"]`);
-    if (check) check.checked = on;
+    // The same document can be on screen twice (its folder and the search results).
+    box.querySelectorAll(`input[type="checkbox"][value="${g.id}"]`).forEach((c) => { c.checked = on; });
     paintChosen();
+  }
+
+  function sourceItem(g, withKind) {
+    const check = el("input", { type: "checkbox", value: String(g.id) });
+    check.checked = guides().some((x) => x.id === g.id);
+    check.addEventListener("change", () => pick(g, check.checked));
+    const name = g.is_builtin ? g.title : `${g.title} (uploaded by ${g.uploaded_by || "a teacher"})`;
+    return el("label", { class: "flow-multi-item" }, check, el("span", {}, name),
+      withKind ? el("small", { class: "flow-source-kind" }, guideKind(g)) : "");
   }
 
   const byKind = new Map();
@@ -546,35 +550,21 @@ function drawSources(box, library) {
       el("summary", {}, icon("folder"), el("span", { class: "flow-folder-name" }, kind),
         el("small", { class: "flow-folder-count" }, String(items.length)), badge));
     folder.open = items.some((g) => guides().some((x) => x.id === g.id));
-    items.forEach((g) => {
-      const check = el("input", { type: "checkbox", value: String(g.id) });
-      check.checked = guides().some((x) => x.id === g.id);
-      check.addEventListener("change", () => pick(g, check.checked));
-      const name = g.is_builtin ? g.title : `${g.title} (uploaded by ${g.uploaded_by || "a teacher"})`;
-      folder.append(el("label", { class: "flow-multi-item", "data-search": `${g.title} ${g.subject || ""} ${kind}`.toLowerCase() },
-        check, el("span", {}, name)));
-    });
+    items.forEach((g) => folder.append(sourceItem(g, false)));
     folders.append(folder);
   });
 
-  // The search looks through every folder and opens the ones with a match.
+  // While searching, the folders step aside for one flat list of what matches,
+  // each with its type; clearing the search brings the folders back as they were.
   const search = el("input", { type: "search", id: "flow-source-search", placeholder: "Search sources…", autocomplete: "off",
     "aria-label": "Search supplementary sources" });
   search.addEventListener("input", () => {
     const q = search.value.trim().toLowerCase();
-    let any = false;
-    folders.querySelectorAll(".flow-folder").forEach((folder) => {
-      let hits = 0;
-      folder.querySelectorAll(".flow-multi-item").forEach((item) => {
-        const show = !q || item.dataset.search.includes(q);
-        item.hidden = !show;
-        hits += show;
-      });
-      folder.hidden = !hits;
-      if (q) folder.open = hits > 0;
-      any = any || hits > 0;
-    });
-    noMatch.hidden = any;
+    const hits = q ? library.filter((g) => `${g.title} ${g.subject || ""} ${guideKind(g)}`.toLowerCase().includes(q)) : [];
+    folders.hidden = !!q;
+    results.hidden = !hits.length;
+    results.replaceChildren(...hits.map((g) => sourceItem(g, true)));
+    noMatch.hidden = !q || hits.length > 0;
   });
 
   const input = el("input", { type: "file", accept: ".docx,.dotx,.pdf", hidden: true });
@@ -601,16 +591,15 @@ function drawSources(box, library) {
     input.value = "";
   });
 
-  const a = G.getAnswers();
   const when = row(
-    selectAnswer("flow-term", "Term", TERM_OPTIONS, a.term, (v) => G.setAnswers({ term: v }), { placeholder: "Choose a term…" }),
-    selectAnswer("flow-week", "Week", WEEK_OPTIONS, a.week, (v) => G.setAnswers({ week: v }), { placeholder: "Choose a week…" }),
+    textAnswer("term", { label: "Term", placeholder: "e.g. 2nd Term" }),
+    textAnswer("week", { label: "Week", placeholder: "e.g. Week 3" }),
   );
 
   const label = el("div", { class: "flow-sources-head" },
     el("p", { class: "flow-label", id: "flow-library-label" }, "Supplementary sources"), upload);
   box.replaceChildren(label, ...(library.length
-    ? [el("div", { class: "flow-field" }, search), folders, noMatch]
+    ? [el("div", { class: "flow-field" }, search), folders, results, noMatch]
     : [el("p", { class: "flow-help" }, "No library documents for this subject yet. Upload your own file instead.")]),
   input, list, when);
   paintChosen();
@@ -868,7 +857,7 @@ const DETAIL_ROWS = [
   ["topics", "Last topic", (a) => (a.firstLesson ? "This is the first lesson" : a.previousTopic)],
   ["topics", "Next topic", (a) => (a.nextUnsure ? "Not sure yet" : a.nextTopic)],
   ["sources", "Supplementary sources", (a) => [...(a.guides || []).map((g) => g.title), ...(a.sources || []).map((s) => s.name)].join(", ")],
-  ["sources", "Term and week", (a) => [a.term, a.week && `Week ${a.week}`].filter(Boolean).join(", ")],
+  ["sources", "Term and week", (a) => [a.term, weekLabel(a.week)].filter(Boolean).join(", ")],
 ];
 
 function showDetails() {

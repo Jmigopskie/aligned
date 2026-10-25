@@ -575,7 +575,10 @@ def _lesson_block(context: dict, guide_text: str, citation: str = "") -> str:
     """The part of every generation and chat request that stays the same for a
     lesson, sent first so it can be served from the provider's prompt cache."""
     block = f"Lesson details: {_context_block(context)}\n"
-    when = ", ".join(p for p in (context.get("term") or "", f"Week {context['week']}" if context.get("week") else "") if p)
+    # Typed by hand: "3" reads as "Week 3", "Week 4" stays as written.
+    week = str(context.get("week") or "").strip()
+    week = f"Week {week}" if week.isdigit() else week
+    when = ", ".join(p for p in (str(context.get("term") or "").strip(), week) if p)
     if when and guide_text:
         block += (f"\nThis lesson is for {when}. Take its competency, content and standards from that term "
                   f"and week in the Budget of Work below; if a document has no such row, use the row that "

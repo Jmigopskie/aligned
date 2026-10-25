@@ -6374,6 +6374,10 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
   cursor: pointer;
 }
 .flow-multi-item:hover { background: rgba(28, 92, 78, 0.05); }
+/* Search results: one flat list, each with its type on the right. */
+.flow-results .flow-multi-item { padding-left: 14px; border-bottom: 1px solid var(--border); }
+.flow-results .flow-multi-item:last-child { border-bottom: 0; }
+.flow-results .flow-multi-item > span { flex: 1; min-width: 0; }
 .flow-multi-item input {
   flex: none;
   width: 20px;
