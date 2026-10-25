@@ -256,8 +256,8 @@ function owlPoseSrc(state) {
 
 // ---- Guided mode: a chat with the owl about the field being written. The
 // owl answers in a sentence or two and offers choices: "use" choices are
-// ready content that goes straight into the field, "ask" choices send a
-// follow-up question. ----
+// example content with a line on why it fits, to read (never inserted), and
+// "ask" choices send a follow-up question. ----
 const owlChat = document.getElementById("owl-chat");
 const owlChatLog = document.getElementById("owl-chat-log");
 const owlChatForm = document.getElementById("owl-chat-form");
@@ -313,9 +313,9 @@ function threadFor(key) {
   return chat.threads[key];
 }
 
-function recordTurn(key, role, text) {
+function recordTurn(key, role, text, options = []) {
   const thread = threadFor(key);
-  thread.push({ role, text, at: Date.now() });
+  thread.push({ role, text, at: Date.now(), ...(options.length ? { options } : {}) });
   // Keep a lid on it: a very long conversation about one field would
   // otherwise grow the stored blob without limit.
   if (thread.length > CHAT_MAX_TURNS_PER_FIELD) thread.splice(0, thread.length - CHAT_MAX_TURNS_PER_FIELD);
@@ -368,9 +368,9 @@ function addOwlTyping() {
 }
 
 function addOwlMessage(text, choices = [], { error = false, unread = true } = {}) {
-  // Only the latest set of choices stays tappable, so an old suggestion
-  // isn't applied to a field it was never written for.
-  owlChatLog.querySelectorAll(".owl-choice:not(.is-used)").forEach((b) => { b.disabled = true; });
+  // Only the latest follow-up questions stay tappable, so an old one isn't
+  // asked about a field it was never written for.
+  owlChatLog.querySelectorAll("button.owl-choice").forEach((b) => { b.disabled = true; });
   const { row, body } = owlRow(error ? "alert" : "guide");
   if (error) row.classList.add("is-error");
   const bubble = document.createElement("div");
@@ -382,25 +382,32 @@ function addOwlMessage(text, choices = [], { error = false, unread = true } = {}
     const list = document.createElement("div");
     list.className = "owl-choices";
     choices.forEach((choice) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = `owl-choice owl-choice-${choice.type}`;
+      // An option is something to read and learn from: its content and why
+      // it fits. The student writes the part themselves, so it fills nothing.
       if (choice.type === "use") {
+        const card = document.createElement("div");
+        card.className = "owl-choice owl-choice-use";
         const label = document.createElement("span");
         label.className = "owl-choice-label";
         label.textContent = choice.label;
-        const preview = document.createElement("span");
-        preview.className = "owl-choice-text";
-        preview.textContent = choice.text;
-        const action = document.createElement("span");
-        action.className = "owl-choice-action";
-        action.textContent = "Use this";
-        btn.append(label, preview, action);
-        btn.title = "Add this to the field";
-      } else {
-        btn.textContent = choice.label;
+        const text = document.createElement("span");
+        text.className = "owl-choice-text";
+        text.textContent = choice.text;
+        card.append(label, text);
+        if (choice.why) {
+          const why = document.createElement("span");
+          why.className = "owl-choice-why";
+          why.textContent = choice.why;
+          card.append(why);
+        }
+        list.appendChild(card);
+        return;
       }
-      btn.addEventListener("click", () => pickOwlChoice(choice, btn));
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `owl-choice owl-choice-${choice.type}`;
+      btn.textContent = choice.label;
+      btn.addEventListener("click", () => pickOwlChoice(choice));
       list.appendChild(btn);
     });
     body.appendChild(list);
@@ -411,9 +418,8 @@ function addOwlMessage(text, choices = [], { error = false, unread = true } = {}
   if (unread && !owlChat.hidden && owlChat.classList.contains("is-collapsed")) setChatUnread(true);
 }
 
-// Draw a saved thread back into the log. Restored owl turns carry no choice
-// buttons: a "use this" suggestion was written for the field as it stood at
-// the time, and re-offering it later would paste stale content.
+// Draw a saved thread back into the log. Restored owl turns keep their
+// options (read-only) but not their follow-up questions.
 function renderThread(key, note) {
   owlChatLog.innerHTML = "";
   const thread = chat.threads[key] || [];
@@ -421,7 +427,7 @@ function renderThread(key, note) {
   if (note && thread.length) addChatNote(note);
   thread.forEach((turn) => {
     if (turn.role === "teacher") addTeacherMessage(turn.text);
-    else addOwlMessage(turn.text, [], { unread: false });
+    else addOwlMessage(turn.text, turn.options || [], { unread: false });
   });
   return thread.length;
 }
@@ -475,7 +481,7 @@ async function sendToOwl(text) {
     });
     typing.remove();
     recordTurn(key, "teacher", text);
-    recordTurn(key, "owl", data.reply);
+    recordTurn(key, "owl", data.reply, (data.choices || []).filter((c) => c.type === "use"));
     addOwlMessage(data.reply, data.choices || []);
   } catch (err) {
     typing.remove();
@@ -488,62 +494,9 @@ async function sendToOwl(text) {
   }
 }
 
-function insertIntoActiveField(text) {
-  const key = stepFieldKeys[stepIndex];
-  const field = fieldByKey(key);
-  if (!field) return;
-  syncActiveStepValue();
-  const addition = field.field_type === "text" ? text.replace(/\s*\n\s*/g, " ").trim() : formatGeneratedValue(text);
-  const root = docTemplateData ? liveDocWrap.querySelector(".lp-doc") : resultsEl;
-  const slots = slotsFor(key, root);
-
-  // A weekly field takes a suggestion one day at a time: into the day the
-  // teacher is on, else the first day still empty, else Monday.
-  let target = slots[0] || null;
-  if (partCount(key) && slots.length) {
-    const focused = slots.find((el) => el === document.activeElement || el.contains(document.activeElement));
-    // On the Guided screens the day being written is the one last typed in.
-    const onScreen = guidedPart !== null ? slots.find((el) => slotPart(el) === guidedPart) : null;
-    target = focused || onScreen || slots.find((el) => !valueForSlot(el).trim()) || slots[0];
-  }
-
-  const current = target ? valueForSlot(target).trim() : String(fieldValues[key] || "").trim();
-  // A short text field is replaced; a multi-line field keeps what the
-  // teacher already wrote and gains the new lines below it.
-  const value = field.field_type !== "text" && current ? `${current}\n${addition}` : addition;
-
-  if (target) {
-    storeSlot(target, value);
-    if (Array.isArray(fieldRichValues[key])) fieldRichValues[key][slotPart(target)] = "";
-    else delete fieldRichValues[key];
-    if (docTemplateData) {
-      target.textContent = value;
-      target.classList.add("lp-filled");
-      target.scrollIntoView({ behavior: "smooth", block: "center" });
-    } else {
-      target.value = value;
-    }
-  } else {
-    fieldValues[key] = value;
-  }
-  markDirty();
-  renderStepFieldNav();
-  generationEvents.dispatchEvent(new CustomEvent("field", { detail: { key } }));
-  return field.label;
-}
-
-function pickOwlChoice(choice, btn) {
-  if (choice.type === "ask") {
-    sendToOwl(choice.text);
-    return;
-  }
-  const label = insertIntoActiveField(choice.text);
-  if (!label) return;
-  btn.classList.add("is-used");
-  btn.disabled = true;
-  const action = btn.querySelector(".owl-choice-action");
-  if (action) action.textContent = "Added";
-  addChatNote(`Added to "${label}". You can still change it.`);
+// Only follow-up questions are tappable; options are read, not inserted.
+function pickOwlChoice(choice) {
+  sendToOwl(choice.text);
 }
 
 function updateChatRoom() {

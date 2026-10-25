@@ -39,13 +39,6 @@ export function createGuided(ui) {
     else if (!open && showing) say(`${ASK} any time you want ideas.`, "write");
   });
 
-  // A suggestion from the chat landed in this part: show it in the boxes.
-  G.generationEvents.addEventListener("field", (e) => {
-    if (!active || !showing || e.detail.key !== showing.key) return;
-    showing.sync();
-    ui.refresh();
-  });
-
   function enter() {
     if (active) return;
     active = true;

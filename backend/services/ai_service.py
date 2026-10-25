@@ -155,12 +155,14 @@ _OWL_SYSTEM_INSTRUCTION = (
     "Rules (follow strictly):\n"
     "- Reply in at most 2 short sentences and no more than 35 words. No greetings, no "
     "praise, no filler, no markdown, no lists. Answer exactly what was asked.\n"
-    "- Always give 2 to 4 choices the teacher can tap.\n"
-    "- A \"use\" choice is finished content for the current field that the teacher can "
-    "insert as is: classroom-ready, in DepEd K-12 terminology, grounded in the lesson's "
+    "- Always give 2 to 4 choices.\n"
+    "- A \"use\" choice is an example of finished content for the current field, shown as "
+    "an option to read and learn from (it is never inserted; the writer writes the field "
+    "in their own words): classroom-ready, in DepEd K-12 terminology, grounded in the lesson's "
     "topic, subject and course guide. Fit the field: one line for a short text field; for "
     f"a list, one item per line and at most {_MAX_LIST_ITEMS} complete items. Its label names the option in at most "
-    "6 words.\n"
+    "6 words. Its \"why\" explains that option in one short sentence (at most 25 words): "
+    "why it fits this field and lesson, or what it does for the learners.\n"
     "- An \"ask\" choice is a follow-up question the teacher may want to ask next, at most "
     "8 words; its label and text are that question.\n"
     "- When the teacher wants content, suggestions or examples, give mostly \"use\" "
@@ -168,7 +170,7 @@ _OWL_SYSTEM_INSTRUCTION = (
     "- Never repeat content already written in other fields. If asked about something "
     "unrelated to the lesson plan, say so in one sentence and offer lesson-related choices.\n\n"
     "Return strict JSON: {\"reply\": \"...\", \"choices\": [{\"type\": \"use\" or \"ask\", "
-    "\"label\": \"...\", \"text\": \"...\"}]}"
+    "\"label\": \"...\", \"text\": \"...\", \"why\": \"...\" (\"use\" only)}]}"
 )
 
 
@@ -1144,7 +1146,7 @@ _MAX_CHOICES = 4
 def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
              history: list, message: str, course_guide_citation: str = "") -> dict:
     """One turn of the Guided mode chat about `field`. Returns
-    {"reply": str, "choices": [{"type": "use"|"ask", "label": str, "text": str}]}."""
+    {"reply": str, "choices": [{"type": "use"|"ask", "label": str, "text": str, "why": str ("use" only)}]}."""
     excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
     lesson = _lesson_block(context, excerpt, course_guide_citation)
     written = {k: v for k, v in (prior_values or {}).items() if v and k != field.field_key}
@@ -1218,7 +1220,11 @@ def _clean_owl_reply(data) -> dict:
         label = str(c.get("label") or text).strip()
         if not text:
             continue
-        choices.append({"type": kind, "label": label[:80], "text": text[:1500]})
+        choice = {"type": kind, "label": label[:80], "text": text[:1500]}
+        why = str(c.get("why") or "").strip()
+        if kind == "use" and why:
+            choice["why"] = why[:240]  # the option's explanation, shown under it
+        choices.append(choice)
         if len(choices) == _MAX_CHOICES:
             break
     return {"reply": reply[:400] or "Here are some options for this field.", "choices": choices}

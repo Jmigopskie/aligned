@@ -1,0 +1,2094 @@
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 1 of 32  
+These are the specializations and their pre -requisites.  These lists should be used as reference for curriculum maps.  
+ 
+AGRI -FISHERY ARTS  
+ Specialization  Number of Hours  Pre-requisite  
+1.  Agricultural Crop s Production (NC I) 320 hours   
+2.  Agricultural Crops Production (NC II) 
+updated based on TESDA Training Regulations published December 28, 2013  640 hours   
+3.  Agricultural Crop s Production (NC III)  640 hours  Agricultural Crop s Production (NC II)  
+4.  
+Animal Health Care Management (NC III)  320 hours  Animal Production (Poultry -Chicken) (NC II)  or 
+Animal Production (Ruminants) (NC II) or  
+Animal Production (Swine) (NC II)  
+5.  Animal Production (Poultry -Chicken) (NC II) 
+updated based on TESDA Training Regulations published December 28, 2013  320 hours   
+6.  Animal Pro duction ( Large Ruminants) (NC II) 
+updated based on TESDA Training Regulations published December 28, 2013  320 hours   
+7.  Animal Production (Swine) (NC II) 
+updated based on TESDA Training Regulations published December 28, 2013  320 hours   
+8.  Aquaculture (NC II) 640 hours   
+9.  Artificial Insemination (Large Ruminants) (NC II)  160 hours  Animal Production (Large Ruminants) (NC II)  
+10.  Artificial Insemination (Swine) (NC II)  160 hours  Animal Production (Swine) (NC II)  
+11.  Fish Capture (NC II)  640 hours   
+12.  Fishing Gear  Repair and Maintenance (NC III)  320 hours   
+13.  Fish-Products Packaging (NC II)  320 hours   
+14.  Fish Wharf Operation (NC I)  160 hours   
+15.  Food Processing (NC II)  640 hours   
+16.  Horticulture (NC III)  640 hours  Agricultural Crops Production  (NC II)  
+17.  Landscape Installation and Maintenance (NC II)  320 hours   
+18.  Organic Agriculture (NC II)  320 hours   
+19.  Pest Management (NC II)  320 hours   
+20.  Rice Machinery Operations (NC II)  320 hours   
+21.  Rubber Processing (NC II)  320 hours   
+22.  Rubber Production (NC I I) 320 hours   
+23.  Slaughtering Operations (Hog/Swine/Pig) (NC II)  160 hours
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 2 of 32  
+HOME ECONOMICS  
+ Specialization  Number of 
+Hours  Pre-requisite  
+1.  Attractions and Theme Parks Operations with Ecotourism (NC 
+II) 160 hours   
+2.  Barbering (NC II)  320 hours   
+3.  Bartending (NC II)  320 hours   
+4.  Beauty/Nail Care (NC II)  160 hours   
+5.  Bread and Pastry Production (NC II)  160 hours   
+6.  Caregiving (NC II)  640 hours   
+7.  Commercial Cooking (NC III)  320 hours  Cookery (NC II)  
+8.  Cookery (NC II)  320 hours   
+9.  Dressmaking (NC II)  320 hours   
+10.  Event s Management Services (NC III)  320 hours   
+11.  Fashion Design (Apparel) (NC III)  640 hours  Dressmaking (NC II) or Tailoring (NC II)  
+12.  Food and Beverage Services (NC II)  
+updated based on TESDA Training Regulations published December 28, 2013  160 hours   
+13.  Front Office Services (NC II)  160 hours   
+14.  Hairdressing (NC II)  320 hours   
+15.  Hairdressing (NC III)  640 hours  Hairdressing (NC II)  
+16.  Handicraft (Basketry, Macrame) (Non -NC) 160 hours   
+17.  Handicraft (Fashion Accessories, Paper Craft) (Non -NC) 160 hours   
+18.  Handicraft (Needlecraft) (Non -NC) 160 hours   
+19.  Handicraft (Woodcraft, Leathercraft) (Non -NC) 160 hours   
+20.  Housekeeping (NC II)  
+updated based on TESDA Training Regulations published December 28, 2013  160 hours   
+21.  Local Guiding Services (NC II)  160 hours   
+22.  Tailoring (NC II)  320 hours   
+23.  Tourism Promotion Services (NC II)  160 hours   
+24.  Travel Services (NC II)  160 hours   
+25.  Wellness Massage (NC II)  160 hours
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 3 of 32  
+INDUSTRIAL ARTS  
+ Specialization  Number of 
+Hours  Pre-requisite  
+1.  Automotive Servicing (NC I)  
+updated based on TESDA Training Regulations published December 28, 2013  640 hours   
+2.  Automotive Servicing (NC II)  640 hours  Automotive Servicing (NC I)  
+3.  Carpentry (NC II)  640 hours   
+4.  Carpentry (NC III)  320 hours  Carpentry (NC II)  
+5.  Construction Painting (NC II)  160 hours   
+6.  Domestic Refrigeration and Air -conditioning (DOMRAC) Servicing (NC 
+II) 640 hours   
+7.  Driving (NC II)  160 hours   
+8.  Electrical Installation and Maintenance (NC II)  640 hours   
+9.  Electric Power Distribution Line Construction (NC II)  320 hours  Electrical Installation and Maintenance (NC II)  
+10.  Electronic Products Assembly and Servicing (NC II)  
+updated based on TESDA Training Regulations published December 28, 2013  640 hours   
+11.  Furniture Making (Finishing) (NC II)  640 hours   
+12.  Instrumentation and Control Servicing (NC II)  320 hours  Electronic Products Assembly and Servicing (EPAS) (NC II)  
+13.  Gas Metal Arc Welding (GMAW) (NC II)  320 hours  Shielded Metal Arc Welding (SMAW) (NC II)  
+14.  Gas Tungsten Arc Welding (GTAW) (NC II)  320 hours  Shielded Metal Arc Welding (GMAW) (NC II)  
+15.  Machining (NC I)  640 hours   
+16.  Machining (NC II)  640 hours  Machining (NC I)  
+17.  Masonry (NC II)  320 hours   
+18.  Mechatronics Servicing (NC II)  320 hours  Electronic Products Assembly and Servicing (EPAS) (NC II)  
+19.  Motorcycle/Small Engine Servicing (NC II)  320 hours   
+20.  Plumbing (NC I)  320 hours   
+21.  Plumbing (NC II)  320 hours  Plumbing (NC I)  
+22.  Refrigeration and Air -Conditioning (Packaged Air -Conditioning Unit 
+[PACU]/Commercial Refrigeration Equipment [CRE]) Servicing (NC III)  640 hours  Domestic Refrigeration and Air -conditioning (DOMRAC) 
+Servicing (NC II)  
+23.  Shielded Metal Arc Welding (NC I)  320 hours   
+24.  Shielded Metal Arc Welding (NC II)  320 hours  Shielded Metal Arc Welding (NC I)  
+25.  Tile Setting (NC II)  320 hours   
+26.  Transmission Line Installation and Maintenance (NC II)  640 hours  Electrical Installation and Maintenance (NC II)
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 4 of 32  
+INFORMATION, COMMUNICATIONS AND TECHNOLOGY (ICT)  
+ 
+ Specialization  Number of 
+Hours  Pre-requisite  
+1.  Animation (NC II)  320 hours   
+2.  Broadband  Installation (Fixed Wireless Systems) (NC II)  160 hours  Computer Systems Servicing (NC II)  
+3.  Computer Programming (.Net Technology) (NC III)  
+updated based on TESDA Training Regulations published December 28, 2013 320 hours   
+4.  Computer Programming (Java) (NC III)  
+updated based on TESDA Training Regulations published December 28, 2013 320 hours   
+5.  Computer Programming (Oracle Database) (NC III)  
+updated based on TESDA Training Regulations published December 28, 2013 320 hours   
+6.  Computer System s Servicing (NC II)  
+updated based on TESDA Training Regulations published December 28, 2007  640 hours   
+7.  Contact Center Services (NC II)  320 hours   
+8.  Illustration (NC II)  320 hours   
+9.  Medical Transcription (NC II)  320 hours   
+10.  Technical Drafting (NC II)  320 hours   
+11.  Telecom OSP and Subscriber Line Installation  
+(Copper Cable/POTS and DSL) (NC II)  320 hours  Computer Systems Servicing (NC II)  
+12.  Telecom OSP Installation (Fiber Optic Cable) (NC II)  160 hours  Computer Systems Servicing (NC II)
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 5 of 32  
+Course Description:              
+This is a specialization course that leads to a Programming (Oracle Database) National Certificate Level  III (NC III). It discusses three (3) core competencies that a SHS 
+Technical -Vocational Education (TVE) student ought to possess, namely, for them to:  1) write SQL Queries to access stored data in an oracle database and customize output, 
+set user -access level, and use scalar and correlated subqueries,2) use and apply PL/SQL Programming Language, and 3) design and tune P L/SQL  Language.  
+ 
+CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+Introduction  
+1. Relevance of the course  
+2. Concepts and core competencies 
+in Computer Programming   
+The learners demonstrate 
+an understanding of key 
+concepts, underlying 
+principles, and core 
+competencies in Computer 
+Programming   
+The learners shall be able to 
+independently create/provide 
+quality and marketable product 
+and / or service in Computer 
+Programming, as prescribed by 
+TESDA Training Regulations   
+The learners… 
+1. Discuss the relevance of the course  
+2. Explain key concepts of common 
+competencies  
+3. Explain core competencies of Computer 
+Programming   
+BASIC COMPETENCIES  
+LESSON 1 : LEADING WORKPLACE COMMUNICATION (LWC)  
+ Organization requirements for 
+written and electronic 
+communication methods  
+ Effective verbal communication 
+methods  
+ Organize information  
+ Understand and convey intended 
+meaning  
+ Participate in various workplace 
+discussions  
+ Comply with organization  
+requirements for the use of 
+written and electronic 
+communication methods  The learners demonstrate 
+an understanding of the 
+principles and concepts in  
+leading in the dissemination 
+and discussion of ideas, 
+information, and issues in 
+the workplace  The learners  independently 
+lead in the dissemination 
+and discussion of ideas, 
+information, and issues in 
+the workplace  based on 
+TESDA Training Regulations  LO 1. Communicate information about 
+workplace processes  
+1.1 Select appropriate communication method  
+1.2 Communicate multiple operations involving 
+several topics are as accordingly  
+1.3 Use questions to gain extra information  
+1.4 Identify correct sources of information  
+1.5 Select and organize information correctly  
+1.6 Undertake verbal and written reporting 
+when required  
+1.7 Maintain communication skills in all 
+situations  TVL_ICTORCL
+11-12LWC-Ia-
+1 
+ Effective verbal communication 
+methods in the workplace  
+ Understanding and conveying 
+intended meaning  
+ Participation in various  workplace 
+discussions  
+ Compliance with organization  
+requirements for the use of 
+written and electronic 
+communication methods    LO 2. Lead workplace discussions  
+2.1 Seek responses to workplace issues  
+2.2 Respond immediately to workplace issues  
+2.3 Make constructive contributions to 
+workplace discussions on such issues as 
+production, quality, and safety  
+2.4 Communicate goals/objectives and action 
+plan undertaken in the workplace.  TVL_ICTORCL
+11-12LWC -Ia-
+2
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 6 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ Effective verbal communication 
+methods  
+ Organizing information  
+ Understand and convey intended 
+meaning  
+ Participate in variety of workplace 
+discussions  
+ Comply with organization  
+requirements for the use of 
+written and electronic 
+communication methods    LO 3. Identify and communicate 
+workplace issues  
+3.1 Identify issues and problems as they arise.  
+3.2 Organize information regarding problems 
+and issues coherently to ensure clear and 
+effective communication  
+3.3 Initiate dialogue with appropriate personnel  
+3.4 Deal with communication problems and 
+issues as they arise  TVL_ICTORCL
+11-12LWC -Ia-
+3 
+LESSON  2: LEADING SMALL TEAMS  (LST)  
+ Company policies and procedures  
+ Relevant legal requirements  
+ How performance expectations 
+are set  
+ Methods of monitoring 
+performance  
+ Client expectations  
+ Team member’s duties and 
+responsibilities  
+ Communication skills required for 
+leading teams  
+ Informal performance counseling 
+skills 
+ Team -building skills  
+ Negotiating skills  
+ The learners demonstrate 
+an understanding of the 
+principles and concepts in  
+leading small teams, 
+including setting and 
+maintaining team and 
+individual performance 
+standards  The learners  independently 
+lead small teams, including 
+setting and maintaining 
+team and individual 
+performance standards  
+based on TESDA Training 
+Regulations  LO 1. Provide team leadership  
+1.1 Identify and present work requirements to 
+team members  
+1.2 Communicate reasons for instructions and 
+requirements to team members  
+1.3 Recognize, discuss, an d deal with team 
+members’ queries and concerns  TVL_ICTORCL
+11-12LST-Ia-4 
+ 
+ How performance expectations 
+are set  
+ Methods of monitoring 
+performance  
+ Client expectations  
+ Team member’s duties and 
+responsibilities  
+ Communication skills required for 
+leading teams  
+ Informal performance counseling 
+skills   LO 2. Assign responsibilities among 
+members  
+2.1 Allocate duties and responsibilities with 
+regard to skills, knowledge, and aptitude 
+required to properly undertake the 
+assigned task and according to company 
+policy  
+2.2 Allocate duties with regard to individual 
+preference, and domestic and personal 
+considerations, whenever possible.  TVL_ICTORCL
+11-12LST-Ib-5
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 7 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ 
+ How performance expectations 
+are set  
+ Methods of monitoring 
+performance  
+ Client expectations  
+ Team member’s duties and 
+responsibilities  
+ Informal performance counseling 
+skills     
+LO 3. Set performance expectation for 
+team members  
+3.1 Establish performance expectations based 
+on client needs and according to 
+assignment requirements  
+3.2 Base performance expectations on 
+individual team member’s duties and area 
+of responsibility  
+3.3 Discuss performance expectations and 
+disseminate to individual team members  
+  
+TVL_ICTORCL
+11-12LST-Ib-6 
+ 
+ 
+ How performance expectations 
+are set  
+ Methods of monitoring 
+performance  
+ Team member’s duties  and 
+responsibilities  
+ Communication skills required for 
+leading teams  
+ Informal performance counseling 
+skills 
+ Team -building skills  
+ Negotiating skills  
+    
+LO 4. Supervise team performance.  
+4.1 Monitor performance against defined 
+performance criteria and/or assignment 
+instructions and corrective action taken if 
+required  
+4.2 Provide team members with feedback, 
+positive support, and advice on strategies 
+to overcome any deficiencies  
+4.3 Refer to appropriat e personnel according to 
+employer policy when performance issues 
+cannot be rectified or addressed within the 
+team  
+4.4 Keep team members informed of any 
+changes in the priority allocated to 
+assignments or tasks, which might impact 
+on client/customer needs and satisfaction  
+4.5 Monitor operations to ensure that 
+employer/client needs and requirements 
+are met  
+4.6 Provide follow -up communication on all 
+issues affecting the team  
+4.7 Complete all relevant documentation in 
+accordance with company procedures  
+ 
+ 
+  
+TVL_ICTORCL
+11-12LST -Ib-7
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 8 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+LESSON  3: DEVELOPING AND PRACT ICING NEGOTIATION SK ILLS  (DPN)  
+ 
+ Codes of practice and guidelines 
+for the organization   
+ Organizations policy and 
+procedures for negotiations   
+ Decision making and conflict -
+resolution strategies/ procedures   
+ Problem -solving strategies to deal 
+with unexpected questions and 
+attitudes during negotiation  
+ Interpersonal skills to develop 
+rapport with other parties  
+ Communication skills (verbal and 
+listening)   
+The learners demonstrate 
+an understanding of the 
+principles and concepts in 
+planning and participating in 
+negotiations   
+The learners  independently 
+plan and participate in 
+negotiations  based on TESDA 
+Training Regulations   
+LO 1. Plan negotiations  
+1.1 Identify and include information on 
+preparing for negotiation in the plan  
+1.2 Identify and include information on 
+creating nonverbal environments for 
+positive negotiating in the plan  
+1.3 Identify and include information on active 
+listening in the plan  
+1.4 Identify and include information on 
+different questioning techniques in the plan  
+1.5 Check information to ensure it is correct 
+and up -to-date  
+TVL_ICTORCL
+11-12DPN -Ib-
+c-8 
+ 
+ 
+ Codes of practice and guidelines 
+for the organization   
+ Organizations policy and 
+procedures for negotiations   
+ Decision making and conflict -
+resolution strategies/procedures   
+ Problem -solving strategies to deal 
+with unexpected questions and 
+attitudes during negotiation  
+ Interpersonal skills to develop 
+rapport with other parties  
+    
+LO 2. Participate in negotiations  
+2.1 Agree on criteria for successful outcome by 
+all parties.  
+2.2 Consider desired outcome of all parties  
+2.3 Use appropriate language throughout the 
+negotiation  
+2.4 Use a variety of questioning techniques  
+2.5 Document  and agree on the issues and 
+processes upon by all parties  
+2.6 Discuss possible solutions and their viability 
+assessed  
+2.7 Confirm and record areas for agreement  
+2.8 Agree on follow -up action by all parties   
+TVL_ICTORCL
+11-12DPN -Ic-
+9 
+ 
+LESSON  4: SOLVING PROBLEMS RELATED TO WORK ACTI VITIES  (PRW)  
+ 
+ Competence includes a thorough 
+knowledge and understanding of 
+the process, normal operating 
+parameters, and product quality 
+to recognize nonstandard 
+situations  
+ Competence to include the ability  
+The learners demonstrate 
+an understanding of the 
+principles and concepts in  
+solving problems in the 
+workplace, including the 
+application of problem -
+solving techniques, and in  
+The learners  independently 
+solve problems in the 
+workplace by deploying 
+problem -solving techniques 
+and determining and 
+resolving the root cause of 
+problems  based on TESDA  
+LO 1. Identify the problem  
+1.1 Identify variances from normal operating 
+parameters and product quality  
+1.2 Define extent, cause, and nature are of the 
+problem through observ ation, investigation, 
+and analytical techniques  
+1.3 State and specify problems clearly   
+TVL_ICTORCL
+11-12PRW -Ic-
+10
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 9 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+to apply and explain, sufficient for 
+the identification of fundamental 
+cause, determining the corrective 
+action and provision of 
+recommendations  
+- Relevant equipment and 
+operational processes  
+- Enterprise goals, targets, and 
+measures  
+- Enterprise quality, OHS, and 
+environmental requi rement  
+- Principles of decision - making 
+strategies and techniques  
+- Enterprise information systems 
+and data collation  
+- Industry codes and standards  determining and resolving 
+the root cause of problems  Training Regulations  
+ 
+ Using a range of formal problem -
+solving techniques  
+ Identifying and clarifying the 
+nature of the problem  
+ Devising the best solution  
+ Evaluating the solution  
+- Implementation of a developed 
+plan to rectify the problem     
+LO 2. Determine fundamental causes of 
+the problem  
+2.1 Identify possible causes based on 
+experience and the use of problem -solving 
+tools/ analytical techniques  
+2.2 Develop possible cause statements based 
+on findings  
+2.3 Identify fundamental causes per results of 
+investigation conducted   
+TVL_ICTORCL
+11-12PRW -Ic-
+11 
+ 
+ 
+ Using range of formal problem 
+solving techniques  
+ Identifying and clarifying the 
+nature of the problem  
+ Devising the best solution  
+ Evaluating the solution  
+ Implementation of a developed 
+plan to rectify the problem  
+    
+LO 3. Determine corrective action  
+3.1 Consider all possible options for resolution 
+of the problem  
+3.2 Consider strengths and weaknesses of 
+possible options  
+3.3 Determine corrective actions to resolve the 
+problem and possible future causes  
+3.4 Develop action plans identifying 
+measurable objectives, resource needs, and 
+timelines in accordance with safety and 
+operating procedures  
+  
+TVL_ICTORCL
+11-12PRW -Id-
+12
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 10 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ 
+ Identifying and clarifying the 
+nature of the problem  
+ Devising the best solution  
+ Evaluating the solution  
+- Implementation of a developed 
+plan to rectify the problem     
+LO 4. Provide recommendations to 
+manager  
+4.1 Prepare reports on recommendations  
+4.2 Present recommendations to appropriate 
+personnel  
+4.3 Follow up recommendations, if required   
+TVL_ICTORCL
+11-12PRW -Id-
+13 
+ 
+LESSON  5: USING MATHEMATICAL C ONCEPTS AND TECHNIQU ES (MCT)  
+ 
+ Fundamental operation (addition, 
+subtraction, division, 
+multiplication)  
+ Measurement system  
+ Precision and accuracy  
+ Basic measuring tools/devices  
+  
+The learners demonstrate 
+an understanding of the 
+principles and concepts in  
+selecting, sourcing , nd 
+applying appropriate and 
+affordable technologies in 
+the workplace   
+The learners  independently 
+select, source, and apply 
+appropriate and affordable 
+technologies in the 
+workplace  based on TESDA 
+Training Regulations   
+LO 1. Identify mathematical tools and 
+techniques to solve problems  
+1.1 Identify problem areas based on the given 
+condition  
+1.2 Select mathematical techniques based  on 
+the given problem  
+  
+TVL_ICTORCL
+11-12MCT -Id-
+14 
+ 
+ 
+ Measurement system  
+ Precision and accuracy  
+ Basic measuring tools/devices  
+ Applying mathematical 
+computations  
+ Using calculator  
+ Using different measuring tools  
+    
+LO 2. Apply mathematical procedure/ 
+solution  
+2.1 Apply mathematical techniques based on 
+the problem identified  
+2.2 Perform mathematical computations to the 
+level of accuracy required for the problem  
+2.3 Determine results of mathematical 
+computation and verify based on job 
+requirements   
+TVL_ICTORCL
+11-12MCT -Id-
+15 
+ 
+ 
+ Precision and accuracy  
+ Applying mathematical 
+computations  
+ Using calculator  
+ Using different measuring tools  
+    
+LO 3. Analyze results  
+3.1 Identify problem areas based on given 
+condition  
+3.2 Apply appropriate action in case of error   
+TVL_ICTORCL
+11-12MCT -Ie-
+16 
+LESSON  6: USING RELEVANT TECHN OLOGIES  (URT)  
+ Awareness of technology and its 
+functions  
+ Repair and maintenance 
+procedure  The learners demonstrate 
+an understanding of the 
+principles and concepts in  
+applying mathematical The learners  independently 
+apply mathematical concepts 
+and techniques  based on 
+TESDA Training Regulations  LO 1. Study/Select appropriate 
+technologies  
+1.1 Determine usage of different technologies 
+based on job requirements  TVL_ICTORCL
+11-12URT -Ie-
+17
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 11 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ Operating instructions  
+ Applicable software  
+ Communication techniques  
+ Health and safety procedure  
+ Company policy in relation to 
+relevant technology  
+ Different management concepts  
+ Technology adaptability  concepts and techniques  1.2 Select appropriate technology as per work 
+specification  
+ 
+ 
+ Repair and maintenance 
+procedure  
+ Operating instructions  
+ Applicable software  
+ Communication techniques  
+ Health and safety procedures  
+ Company policy in relation to 
+relevant technology  
+ Different management concepts  
+ Technology adaptability  
+   Relevant technology application/ 
+implementation  
+ Basic communication skills  
+ Software applications skills     
+LO 2. Apply relevant technologies  
+2.1 Use relevant technology effectively in 
+carrying out function  
+2.2 Use applicable software and hardware as  
+per task requirement  
+2.3 Observe and practice management  
+  
+TVL_ICTORCL
+11-12URT -Ie-
+18 
+ 
+ 
+ Relevant technology application/ 
+implementation  
+ Basic communication skills  
+ Software applications skills  
+ Basic troubleshooting skills  
+    
+LO 3. Maintain/enhance relevant 
+technology  
+3.1 Perform maintenance of technology in 
+accordance with the industry standard 
+operating procedures, manufacturer’s 
+operating guidelines, and occupational 
+health and safety procedures to ensure its 
+operative ability.  
+3.2  Update technology through continuing 
+education or training in accordance with 
+job requirement  
+3.3  Report immediately the technology failure/ 
+defect reported to the concern/responsible 
+person or section for appropriate action  
+  
+TVL_ICTORCL
+11-12URT -Ie-
+19
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 12 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+COMMON COMPETENCIES  
+LESSON 7 : APPLYING QUALITY STA NDARDS  (AQS)  
+ 
+ Relevant production processes, 
+materials and products  
+ Characteristics of materials, 
+software, and hardware used in 
+production processes  
+ Quality -checking procedures  
+ Workplace procedures  
+ Safety and environmental aspects 
+of production processes  
+ Fault identification and reporting  
+ Quality improvement processes  
+ Reading skills required to interpret 
+work instruction  
+ Communication skills needed to 
+interpret and apply defined work 
+procedures  
+ Carry out work in accordance with 
+OHS policies and procedures  
+ Critical thinking   
+The learners demonstrate 
+an understanding of the 
+principles and concepts in  
+applying quality standards   
+The learners  independently 
+apply quality standards  
+based on TESDA Training 
+Regulations   
+LO 1. Assess quality of received materials  
+1.1 Obtain work instruction and carry out work 
+in accordance with standard operating 
+procedures  
+1.2 Check and receive materials against 
+workplace standards and specifications  
+1.3 Identify and isolate faulty materials related 
+to work  
+1.4 Record and/or report faults and any 
+identified causes to the supervisor 
+concerned in accordance with workplace 
+procedures  
+1.5 Replace faulty materials in accordance with 
+workplace procedures  
+ 
+  
+TVL_ICTORCL
+11-12AQS -If-
+20 
+ 
+ 
+ Relevant production processes, 
+materials, and products  
+ Characteristics of materials, 
+software, and hardware used in 
+production processes  
+ Quality -checking procedures  
+ Workplace procedures  
+ Safety and environmental aspects 
+of production processes  
+ Fault identification and reporting  
+ Quality improvement processes  
+ Reading skills required to interpret 
+work instruction  
+ Communication skills needed to 
+interpret and apply defined work    
+LO 2. Assess own work  
+2.1 Identify and use documentation relative to 
+quality within the company  
+2.2 Check completed work against workplace 
+standards relevant to the task undertaken  
+2.3 Identify and isolate errors  
+2.4 Record information on the quality and 
+other indicators of production performance 
+in accordance with workplace procedures  
+2.5 Document and report causes in cases of 
+deviations from specific quality standards in 
+accordance with the workplace’s  standard 
+operating procedures  
+  
+TVL_ICTORCL
+11-12AQS -Ig-
+21
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 13 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+procedures  
+ Carry out work in accordance with 
+OHS policies and  procedures  
+ Critical thinking  
+ Solution providing and decision 
+making  
+ 
+ Relevant production processes, 
+materials, and products  
+ Characteristics of materials, 
+software, and hardware used in 
+production processes  
+ Quality -checking procedures  
+ Workplace procedures  
+ Safety and environmental aspects 
+of production processes  
+ Fault identification and reporting  
+ Quality improvement processes  
+ Reading skills required to interpret 
+work instruction  
+ Communication skills needed to 
+interpret and apply defined work 
+procedures  
+ Carry out work in accordance with 
+OHS policies and procedures  
+ Critical thinking  
+ Solution providing and decision 
+making     
+LO 3. Engage in quality improvement.  
+3.1 Participate in process improvement 
+procedures relative to workplace 
+assignment  
+3.2 Carry out work in accordance with process 
+improvement procedures  
+3.3 Monitor performance of operation or quality 
+of product or service to ensure customer 
+satisfaction  
+  
+TVL_ICTORCL
+11-12AQS -Ih-
+22 
+ 
+LESSON 8 : PERFORMING COMPUTER OPERATIONS  (PCO)  
+ 
+ Reading and comprehension skills  
+required to interpret work 
+instructions and to interpret basic 
+user manuals  
+ OH and S principles and 
+responsibilities  
+ Main types of computers and 
+basic features of different 
+operating systems   
+The learners demonstrate 
+an understanding of the 
+principles and concepts in  
+performing computer 
+operations   
+The learners  independently 
+perform computer 
+operations  based on TESDA 
+Training Regulations   
+LO 1. Plan and prepare for tasks at hand  
+1.1 Determine the requirements of tasks in 
+accordance with the required output  
+1.2 Select appropriate hardware and software 
+according to task assigned and required 
+outcome  
+1.3 Plan task to ensure that OHS guidelines 
+and procedures are followed  
+1.4 Follow client -specific guidelines and  
+TVL_ICTORCL
+11-12PCO -Ii-
+23
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 14 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ Main parts of a computer  
+ Storage devices and basic 
+categories of  memory  
+ Relevant types of software  
+ General security, privacy 
+legislation, and copyright  procedures  
+1.5 Apply required data security guidelines in 
+accordance with existing procedures  
+ Relevant types of software  
+ Communication skills to identify 
+lines of communication, request 
+advice, follow instructions and 
+receive feedback  
+ Storage devices and basic 
+categories of memory  
+ Basic ergonomics of keyboard and 
+computer user  
+   LO 2. Input data into computer  
+2.1 Enter data into the computer using 
+appropriate program/application in 
+accordance with company procedure  
+2.2 Check accuracy of information and 
+information saved in accordance with 
+standard operating procedures  
+2.3 Store inputted data in storage media 
+according to requirements  
+2.4 Perform work within ergonomic guidelines  TVL_ICTORCL
+11-12PCO -Ij-
+24 
+ 
+ Relevant types of software  
+ Business application  
+ System software  
+ Basic ergonomics of keyboard and 
+computer user  
+   LO 3. Access information using computer  
+3.1 Select correct program/application based 
+on job requirements  
+3.2 Access program/application containing the 
+information required according to company 
+procedures  
+3.3 Select, open, and close desktop icons 
+correctly for navigation purposes  
+3.4 Carry out keyboard techniqu es in line with 
+OHS requirements for safe use of 
+keyboards  TVL_ICTORCL
+11-12PCO -
+IIa-25 
+ 
+ Relevant types of software  
+ Computer peripherals  
+ Storage devices and basic 
+categories of memory    LO 4. Produce output/data using 
+computer system  
+4.1 Process entered data using appropriate 
+software commands  
+4.2 Print data as required using computer 
+hardware/peripheral devices in accordance 
+with standard operating procedures  
+4.3 Transfer files and data between compatible 
+systems using computer software, 
+hardwar e/peripheral devices in accordance 
+with standard operating procedures  
+ TVL_ICTORCL
+11-12PCO -
+IIb-c-26
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 15 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ 
+ Web surfing  
+ Web browsers  
+ Search engines  
+ URLS and keywords  
+ Links 
+ Bookmarking  
+  
+The learners demonstrate 
+an understanding of the 
+principles and concepts in 
+performing computer 
+operations   
+The learners  independently 
+perform computer 
+operations  based on TESDA 
+Training Regulations   
+LO 5. Use basic functions of a Web 
+browser to locate information  
+5.1 Establish information requirements for 
+Internet search.  
+5.2 Launch browser  
+5.3 Load search engine  
+5.4 Enter appropriate search criteria and/or 
+URL of site  
+5.5 Follow relevant links to locate required 
+information  
+5.6 Bookmark and print useful pages as 
+required.   
+TVL_ICTORCL
+11-12PCO -
+IId-27 
+  
+ 
+ Security measures  
+ Anti-virus software/programs  
+ File management     
+LO 6. Maintain computer equipment  
+6.1 Implement procedures for ensuring security 
+of data, including regular back -ups and 
+virus checks in accordance with standard 
+operating procedures  
+6.2 Implement basic file maintenance 
+procedures in line with standard operating 
+procedures   
+TVL_ICTORCL
+11-12PCO -
+IIe-28 
+ 
+CORE COMPETENCIES  
+LESSON  9: WRITING SQL QUERIES TO ACCESS STORED DATA IN AN ORACLE DATABASE AND CUSTOMIZE OUTPUT, AND SETTING USER ACCESS LEVEL  
+AND USING SCALAR AND CORRELATED SUBQUERIES  (WSQL)  
+ 
+ Familiarity with data processing 
+concepts and techniques  
+ SQL concepts, syntax, and flavors  
+ Control database access to 
+specific objects  
+ Restrictions of sorted data  
+ Capabilities of SQL SELECT 
+statements  
+ PL/SQL framework  
+ Use and application of SELECT 
+statement  
+ Arithmetic expressions and NULL 
+values   
+The learners demonstrate 
+an understanding of the 
+principles and concepts in 
+demonstrating knowledge 
+of fundamentals of SQL 
+using Oracle Database 
+technology. Specifically, it 
+teaches the concepts of 
+relational databases and the 
+SQL programming 
+language. It teaches how to 
+write queries against single 
+and multiple tables,  
+The learners  independently 
+apply the fundamentals of 
+SQL using Oracle Database 
+technology. Specifically, it 
+teaches the concepts of 
+relational databases and the 
+SQL programming language. 
+It teaches how to write 
+queries against single and 
+multiple tables, manipulate 
+data in tables, and create 
+database objects. It also 
+teaches how to use single  
+LO 1. Retrieve data using the SQL Select 
+Statement  
+1.1 List capabilities of SQL SELECT statements 
+in accordance with PL/SQL framework  
+1.2 Generate report of data from the output of 
+a basic SELECT statement in accordance 
+with PL/SQL framework  
+1.3 Use arithmetic expressions and NULL 
+values in accordance with PL/SQL 
+framew ork 
+1.4 Implement column aliases are in 
+accordance with PL/SQL framework  
+1.5 Describe concatenation operator, literal  
+TVL_ICTORCL
+11-12WSQL -
+IIf-j-29
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 16 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ Implementation of column aliases  
+ Use and application of 
+concatenation operator, literal 
+character strings, alternative 
+quote operator, and the 
+DISTINCT keyword  
+ manipulate data in tables, 
+and create database 
+objects. It also teaches how 
+to use single row functions 
+to customize output, use 
+conversion function, and 
+conditional expressions.  row functions to customize 
+output, use conversion 
+functions and conditional 
+expressions based on TESDA 
+Training Regulations . character strings, alternative quote 
+operator, and the DISTINCT keyword in 
+accordance with PL/SQL framework  
+1.6 Sort and restrict data in accordance with 
+PL/SQL framework  
+ 
+ 
+ Usage and application of single 
+and multiple row  
+ Use and application of strings  
+ Use and application of Numbers 
+with the ROUND, TRUNC, and 
+MOD 
+ Use and application of date  
+ Use and application of Conditional 
+Expressions  
+ Use single row functions to 
+customize output, use conversion 
+functions and conditional 
+expressions  
+ RDBMS concepts  
+ Control database access to 
+specific objects  
+    
+LO 2. Use single -row functions to 
+customize output  
+2.1 Differentiate single row and multiple row 
+functions in accordance with PL/SQL 
+framework  
+2.2 Manipulate strings using character 
+functions in accordance with PL/SQL 
+framework  
+2.3 Manipulate numbers with the ROUND, 
+TRUNC, and MOD functions in accordance 
+with PL/SQL framework  
+2.4 Perform arithmetic with date data in 
+accordance with PL/SQL framework  
+2.5 Manipulate dates with the DATE functions 
+in accordance with PL/SQL framework  
+2.6 Convert Functions and Conditional 
+Expressions in accordance with PL/SQL 
+framework   
+TVL_ICTORCL
+11-12WSQL -
+IIIa-b-30 
+ 
+ 
+ Using SELECT statements to 
+access data from more than one 
+table 
+ Using SQL:1999 Syntax  
+ Using outer joins  
+ Creating cross joins  
+ 
+ 
+  
+  
+  
+LO 3. Display data from multiple table 
+using joins  
+3.1 Write SELECT statements to access data  
+from more than one table in accordance 
+with PL/SQL framework  
+3.2 Join tables Using SQL:1999 Syntax in 
+accordance with PL/SQL framework  
+3.3 View data that does not meet a join 
+condition by using outer joins in 
+accordance with PL/SQL framework  
+3.4 Create Cross Joins in  accordance with 
+PL/SQL framework   
+TVL_ICTORCL
+11-12WSQL -
+IIIc-d-31
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 17 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ 
+ Adding new rows to a table ad 
+changing data in a Table  
+ Using DELETE and TRUNCATE 
+Statements  
+ Using and saving COMMIT and 
+ROLLBACK statements  
+ Implementation of Read 
+Consistency  
+ Describing and demonstrating the 
+application of FOR UPDATE Clause  
+ Using DDL Statements to Create 
+and manage Tables  
+ Manipulate large data sets in the 
+Oracle database by using 
+subqueries  
+ 
+  
+  
+  
+LO 4. Manipulate Data  
+4.1 Add new Rows to a Table in accordance 
+with PL/SQL framework  
+4.2 Change data in a Table in accordance with 
+PL/SQL framework.  
+4.3 Use DELETE and TRUNCATE Statements in 
+accordance with PL/SQL framework  
+4.4 Save COMMIT and ROLLBACK statements 
+in accordance with PL/SQL framework  
+4.5 Implement Read Consistency in accordance 
+with PL/SQL framework  
+4.6 Describe FOR UPDATE Clause in 
+accordance with PL/SQL framework  
+4.7 Use DDL Statements to Create and Manage 
+Tables in accordance with PL/SQL 
+framework   
+TVL_ICTORCL
+11-12WSQL -
+IIIe-f-32 
+ 
+ System and Object Privileges  
+ Creating users  
+ Creation and  granting System 
+Privileges and Privileges to a Role  
+ Granting and passing of Object 
+Privileges  
+ Revoking Object Privileges  
+ Managing Schema Objects  
+ Managing Objects with Data 
+Dictionary Views  
+   LO 5. Control User Access  
+5.1 Identify System and Object Privileges  in 
+accordance with PL/SQL framework  
+5.2 Create Users in accordance with PL/SQL 
+framework  
+5.3 Grant System Privileges in accordance with 
+PL/SQL framework  
+5.4 Create and grant Privileges to a Role in 
+accordance with PL/SQL framework.  
+5.5 Grant Object Privileges in accordan ce with 
+PL/SQL framework  
+5.6 Pass Privileges in accordance with PL/SQL 
+framework  
+5.7 Revoke Object Privileges in accordance 
+with PL/SQL framework  
+5.8 Manage Schema Objects in accordance 
+with PL/SQL framework  
+5.9 Manage Objects with Data Dictionary in 
+accordance with PL/SQ L framework  
+ 
+ TVL_ICTORCL
+11-12WSQL -
+IIIg-h-33
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 18 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ 
+ Using subqueries to manipulate 
+Data 
+ Retrieving Data Using a subquery 
+as Source  
+ Inserting Data Using a subquery 
+as a Target  
+ Using the WITH CHECK OPTION 
+Keyword on DML Statements  
+ Types of Multi -table INSERT 
+Statements  
+ Using Multi -table INSERT 
+Statements  
+ Data processing  
+.    
+LO 6.Manipulate Large Data Sets.  
+6.1 Use subqueries to Manipulate Data in 
+accordance with PL/SQL framework  
+6.2 Retrieve Data Using a subquery as Source 
+in accordance with PL/SQL framework  
+6.3 Insert Data Using a subquery as a Target 
+in accordance with PL/SQL framework  
+6.4 Use the WITH CHECK OPTION Keyword on 
+DML Statements in accordance with 
+PL/SQL framework  
+6.5 List the types of Multi -table INSERT 
+Statements in accordance with PL/SQL 
+framework  
+6.6 Identify Multi-table INSERT Statements in 
+accordance with PL/SQL framework   
+TVL_ICTORCL
+11-12WSQL -
+IIIi-j-IVa-34 
+ 
+ 
+ Comparing and using Date and 
+Time in a Session’s Time Zone  
+ Describing and demonstrating the 
+use of DBTIMEZONE and 
+SESSIONTIMEZONE  
+ Differences between DAT E and 
+TIMESTAMP  
+ Identifying and using the 
+INTERVAL Data Types  
+ Using  EXTRACT, TZ_OFFSET and 
+FROM_TZ functions  
+ Using TO_TIMESTAMP, 
+TO_YMINTERVAL, and 
+TO_DSINTERVAL  
+ Manage data in different time 
+zones  
+    
+LO 7. Manage Data in Different Time 
+Zones.  
+7.1 Compare Date and Time in a Session’s 
+Time Zone in accordance with PL/SQL 
+framework  
+7.2 Describe DBTIMEZONE and 
+SESSIONTIMEZONE in accordance with 
+PL/SQL framework  
+7.3 List the differences between DATE and 
+TIMESTAMP in accordance with PL/SQL 
+framework  
+7.4 Identify the INTERVAL  Data Types in 
+accordance with PL/SQL framework  
+7.5 Use EXTRACT, TZ_OFFSET and FROM_TZ 
+functions in accordance with PL/SQL 
+framework  
+7.6 Use TO_TIMESTAMP, TO_YMINTERVAL, 
+and TO_DSINTERVAL in accordance with 
+PL/SQL framework  
+ 
+ 
+  
+TVL_ICTORCL
+11-12WSQL -
+IVb-d-35
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 19 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ Comparing and using Pairwise 
+and Non -pairwise  
+ Using Scalar subquery 
+Expressions  
+ Solving problems on Correlated 
+subqueries  
+ Updating and deleting Correlated 
+subqueries  
+ Using EXISTS and NOT EXISTS 
+operators  
+ Using the WITH clause and the 
+Recursive WITH clause  
+ Retrieve data by using advanced 
+subqueries  
+ Use the regular expression 
+support in SQL to search, match, 
+and replace strings in terms of 
+regular expressions  
+   LO 8. Retrieve Data Using subqueries  
+8.1 Compare Pairwise and Non -pairwise in 
+accordance with PL/SQL framework  
+8.2 Use Scalar subquery Expressions in 
+accordance with PL/SQL framework  
+8.3 Solve Problems with Correlated subqueries 
+in accordance with PL/SQL framework  
+8.4 Update and delete Correlated subqueries in 
+accordance with PL/SQL framework  
+8.5 Use The EXISTS and NOT E XISTS 
+operators in accordance with PL/SQL 
+framework  
+8.6 Use the WITH clause in accordance with 
+PL/SQL framework  
+8.7 Use the Recursive WITH clause in 
+accordance with PL/SQL framework  
+ 
+ 
+ TVL_ICTORCL
+11-12WSQL -
+IVe-g-36 
+ 
+LESSON  10: USING AND APPLYING PL/SQL PROGRAMMING LANGUAGE  (UASQL)  
+ 
+ Introducing PL/SQL language  
+ Different Types of Identifiers in a 
+PL/SQL subprogram  
+ Using Declarative Section to 
+Define Identifiers  
+ Using Variables to store data  
+ Identifying and using Scalar Data 
+Types  
+ Using Sequences in PL/SQL  
+Expressions  
+ Writing Executable Statements  
+ Logic analysis  
+  
+The learners demonstrate 
+an understanding of 
+PL/SQL language and 
+explain the benefits of this 
+programming language. 
+The learners will learn to 
+develop stored procedures, 
+functions, packages, and 
+other basic functions.   
+The learner s independently 
+apply the concept of PL/SQL 
+language and explain  the 
+benefits of this programming 
+language. The learners will 
+also learn to develop stored 
+procedures, functions, 
+packages and other basic 
+functions based on TESDA 
+Training Regulations   
+LO 1. Declare PL/SQL Identifiers  
+1.1 Introduce PL/SQL language in accordance 
+with PL/SQL framework  
+1.2 List the different Types of Identifiers in a 
+PL/SQL subprogram in accordance with 
+PL/SQL framework  
+1.3 Use Declarative Section to Define 
+Identifiers in accordance with PL/SQL 
+framework  
+1.4 Use Variables to store data in accordance 
+with PL/SQL framework  
+1.5 Identify Scalar Data Types in accordance 
+with PL/SQL framework  
+1.6 Use Sequences in PL/SQL Expressions in 
+accordance with PL/SQL framework  
+1.7 Write Exe cutable Statements in accordance 
+with PL/SQL framework  
+  
+TVL_ICTORCL
+11-12UASQL -
+IVh-j-Ia-37
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 20 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ 
+ Invoking SELECT Statements in 
+PL/SQL  
+ Retrieving Data in PL/SQL  
+ Errors using Naming Conventions  
+ Avoiding errors when using 
+Retrieval and DML Statements  
+ Manipulation of Data in the Server 
+using PL/SQL  
+ Using SQL Cursor Attributes to 
+Obtain Feedback on DML  
+    
+LO 2. Interaction with the Oracle 
+Server  
+2.1 Invoke SELECT Statements in PL/SQL in 
+accordance with PL/SQL framework  
+2.2 Retrieve Data in PL/SQL in accordance  with 
+PL/SQL framework  
+2.3 Avoid Errors by using Naming Conventions 
+when using Retrieval and DML Statements 
+in accordance with PL/SQL framework  
+2.4 Manipulate Data in the Server using PL/SQL 
+in accordance with PL/SQL framework  
+2.5 Use SQL Cursor Attributes to Obtain 
+Feedback on DML in accordance with 
+PL/SQL framework  
+  
+TVL_ ICTORCL
+11-12UASQL -
+Ib-e-38 
+ 
+ 
+ Describing and demonstrating the 
+application of Exception  
+ Handling Exceptions with PL/SQL  
+ Trapping Non -Predefined Oracle 
+Server Errors  
+ Trapping User -Defined Exceptions  
+ Propagation of Exception  
+ Conditionally control code flow 
+(loops, control structures).  
+ Use PL/SQL packages to group 
+and contain related constructs.  
+ Generate triggers to solve 
+business challenges.  
+ Create anonymous PL/SQL blocks, 
+as well as stored procedures and 
+functions  
+ Use some of the Oracle supplied 
+PL/SQL packages to generate 
+screen output and file output  
+ Code writing and debugging skills  
+ 
+    
+LO 3. Handle Exception  
+3.1 Understand Exceptions in accordance with 
+PL/SQL framework  
+3.2 Handle Exceptions with PL/SQL in 
+accordance with PL/SQL framework  
+3.3 Trap Predefined Oracle Server Errors in 
+accordance with PL/SQL framework  
+3.4 Trap Non -Predefined Oracle Server Errors 
+in accordance with PL/SQL framework  
+3.5 Trap User -Defined Exceptions in 
+accordance with PL/SQL framework  
+3.6 Propagat e Exceptions in accordance with 
+PL/SQL framework  
+  
+TVL_ICTORCL
+11-12UASQL -
+If-i-39
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 21 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ 
+ Creating Modularized and Layered 
+Subprogram Design  
+ Modularizing the Development 
+With PL/SQL Blocks  
+ Describing and demonstrating the 
+application of PL/SQL Execution 
+Environment  
+ Enumeration of the Benefits of 
+using PL/SQL Subprograms  
+ Differences between Anonymous 
+Blocks and Subprograms  
+ Implementation of Procedures 
+Parameters and Parameters 
+Modes  
+ Create anonymous PL/SQL blocks, 
+functions, and procedures  
+    
+LO 4. Stored  Procedures  
+4.1 Crate Modularized and Layered 
+Subprogram Design in accordance with 
+PL/SQL framework  
+4.2 Modularized Development With PL/SQL 
+Blocks in accordance with PL/SQL 
+framework  
+4.3 Understand PL/SQL Execution Environment 
+in accordance with PL/SQL framework  
+4.4 List benefits of using PL/SQL Subprograms 
+in accordance with PL/SQL framework  
+4.5 List Differences between Anonymous 
+Blocks and Subprograms in accordance 
+with PL/SQL framework  
+4.6 Implement Procedures Parameters and 
+Parameters Modes in accordance with 
+PL/SQL framework  
+4.7 View Procedure Information in accordance 
+with PL/SQL framework   
+TVL_ICTORCL
+11-12UASQL -
+Ij-IIa-c-40 
+ 
+LESSON  11: DESIGNING AND TUNING PL/SQL LANGUAGE  (DTSQL)  
+ 
+ Describing and demonstrating the 
+use of Predefined data types  
+ Creating Subtypes based on 
+existing types for an application  
+ Guidelines for cursor design  
+ Using Collections  
+ Manipulation of Large Objects  
+ PL/SQL designing best practices  
+  
+The learners demonstrate 
+an understanding of 
+advanced features of 
+PL/SQL to design and tune 
+PL/SQL. It also covers how 
+to manage PL/SQL to 
+interface with the database 
+and other applications in 
+the most efficient manner.   
+The learner s independently 
+apply the concept of 
+advanced features of PL/SQL 
+to design and tune PL/SQL. 
+It also covers how to 
+manage PL/SQL to interface 
+with the database and other 
+applications in the most 
+efficient manner based on 
+TESDA Training Regulations .  
+LO 1.Designing PL/SQL Code  
+1.1 Describe Predefined data types in 
+accordance with PL/SQL framework.  
+1.2 Create Subtypes based on existing types 
+for an application in accordance with 
+PL/SQL framework  
+1.3 List different guidelines for cursor design in 
+accordance with PL/SQL framework  
+1.4 Use collections in accordance with PL/SQL 
+framework  
+1.5 Manipulate Manipulating Large Objects in 
+accordance with PL/SQL framework   
+TVL_ICTORCL
+11-12DTSQL -
+IId-i-41 
+ 
+ 
+ Calling External Procedures from 
+PL/SQL  
+ Enumerating the benefits of 
+External Procedures   
+  
+  
+LO2. Using Advanced Interface Methods  
+2.1 Call External Procedures from PL/SQL in 
+accordance with PL/SQL framework  
+2.2 List benefits of External Procedures in  
+TVL_ICTORCL
+11-12DTSQL -
+IIj-IIIa-d-42
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 22 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+ Demonstrating the use of C 
+advanced interface methods  
+ Demonstrating the use of Java 
+advanced interface methods  
+ Create PL/SQL applications that 
+use collections  
+ Implement a virtual private 
+database with fine -grained access 
+control  
+ Write code to interface with 
+external C and Java applications  
+ Write code to interface with large 
+objects and use SecureFile LOBs  accordance with PL/SQL framework  
+2.3 Show C advanced interface methods in 
+accordance with PL/SQL framework  
+2.4 Show Java adv anced interface methods in 
+accordance with PL/SQL framework  
+ 
+ 
+ Describing and demonstrating the 
+application of Compiler  
+ Tuning the PL/SQL code  
+ Enabling the Intra unit in -lining  
+ Identifying and tuning in the 
+memory problems  
+ Improving Performance with 
+Caching  
+ Write code to interface with 
+external C and Java applications.  
+ Write code to interface with large 
+objects and use SecureFile LOBs  
+ Write and tune PL/SQL code 
+effectively to maximize 
+performance   
+  
+  
+LO 3. Apply Tuning and Improve 
+Performance with Caching  
+3.1 Understand and influence the compiler in 
+accordance with PL/SQL framework  
+3.2 Tune PL/SQL code in accordance with 
+PL/SQL framework  
+3.3 Enable Intra unit in -lining in accordance 
+with PL/SQL framework  
+3.4 Identify and tune Memory issues in 
+accordance with PL/SQL framework  
+3.5 Recognize Network issues in accordance 
+with PL/SQL framework  
+3.6 Improve Performance with Caching in 
+accordance with PL/SQL framework  
+ 
+  
+TVL_ICTORCL
+11-12DTSQL -
+IIIe-i-43 
+ 
+ Features of fine -grained access 
+control  
+ How fine -grained access control 
+works  
+ Describing and creating an 
+application context  
+ Setting the application context  
+ The DBMS_RLS procedures  
+ Implementation of the DBMS_RLS   LO 4. Implementing VPD with Fine -
+grained Access Control  
+4.1 Understand how fine -grained access 
+control works overall in accordance with 
+PL/SQL framework  
+4.2 Describe features of fine -grained access 
+control in accordance  with PL/SQL 
+framework  
+4.3 Describe an application context in TVL_ICTORCL
+11-12DTSQL -
+IIIj-IVa-d-44
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 23 of 32 CONTENT  CONTENT STANDARD  PERFORMANCE STANDARD  LEARNING COMPETENCIES  CODE  
+policies  
+ Creating queries on fine -grained 
+access  
+ Implement a virtual private 
+database with fine -grained access 
+control  
+ accordance with PL/SQL framework  
+4.4 Create an application context in accordance 
+with PL/SQL framework  
+4.5 Set an application context in accordance 
+with PL/SQL framework  
+4.6 List the DBMS_RLS procedures in 
+accordance with PL/SQL framework  
+4.7 Implement a policy in accordance with 
+PL/SQL framework  
+4.8 Query dictionary views holding information 
+on fine -grained access in accordance with 
+PL/SQL framework
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 24 of 32  
+RESOURCES  METHODOLOGY  ASSESSMENT  METHOD  
+TOOLS  EQUIPMENT  MATERIALS    
+ 
+ Computer hardware with 
+peripherals  
+ Appropriate software  
+ Access to internet  
+ Conducive testing 
+environment  
+  
+ Network computer with 
+peripherals  
+ Server  
+ Printer whiteboard  
+ LCD projector and screen  
+ Ergonomic computer tables 
+and chairs  
+  
+ Learning materials/ guide  
+ Practice materials  
+ Handouts  
+ Reference books  
+  
+ School -based  
+ Online  
+ Dual Training System  
+ Apprenticeship  
+ Industry Immersion   
+ Observation in workplace  
+ Demonstration  
+ Oral questioning
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 25 of 32  
+GLOSSARY  
+ 
+ 
+GENERAL  
+1.  Certification  - the process of verifying and validating the competencies of a  person through assessment.  
+2.  Certificate of 
+Competency (COC)  - a certification issued to individuals who pass the assessment for a single unit or cluster of units of competency.  
+3.  Common Competencies  - the skills and knowledge needed by all people working in a particular industry.  
+4.  Competency  - the possession and application of knowledge, skills, and attitudes to perform work activities to the standard expected in the wor kplace.  
+5.  Competency Assessment  - the process of collecting evidence and making judgments on whether competency has been achieved Competency Standard (CS) —the 
+industry -determined specification of competencies required for effective work performance.  
+6.  Competency Standard 
+(CS) - the industry -determined specification of competencies required for effective work performance.  
+7.  Context of  Assessment  - refers to the place where assessment is to be conducted or carried out.  
+8.  Core Competencies  - the specific skills and knowledge needed in a particular area of work, i.e., industry sector/occupation/job role.  
+9.  Critical aspects of 
+competency  - refers to the evidence that is essential for successful performance of the unit of competency.  
+10.  Elective Competencies  - the additional skills and knowledge required by the individual or enterprise for work level; refers to the category of skills  and 
+knowledge required to do a job.  
+11.  Elements  - the building blocks of a unit of competency; they describe in outcome terms the functions that a person must perform in the 
+workplace.  
+12.  Evidence Guide  - a component of the unit of competency that defines or identifies the evidences required to determine the competence of the 
+individual.  It provides information on critical aspects of competency, underpinning knowledge, underpinning skills, resource  
+implicat ions, assessment method, and context of assessment.  
+13.  Level - refers to the category of skills and knowledge required to do a job.  
+14.  Method of Assessment  - refers to the ways of collecting evidence and when evidence should be collected.  
+15.  National Certificate (NC)  - a certification issued to individuals who achieve all the required units of competency for a national qualification defined u nder the 
+Training Regulations.  NCs are aligned to specific levels within the PTQF.  
+16.  Performance Criteria  - evaluative statements that specify what is to be assessed and the required level of performance.  
+17.  Qualification  - a cluster of units of competencies that meets job roles and is significant in the workplace.  It is also a certification awar ded to a person 
+on successful completion of a course in recognition of having demonstrated competencies in an industry sector.  
+18.  Basic Competencies  - the skills and knowledge that everyone needs for work.  
+19.  Range of Variables  - describes  the circumstances or context in which the work is to be performed.  
+20.  Underpinning Knowledge  - refers  to the competency that involves in applying knowledge to perform work activities.  It includes specific knowledge that is 
+essential to the performance of the competency.  
+21.  Recognition of Prior 
+Learning (RPL)  - the acknowledgment of an individual’s skills,  knowledge, and attitudes gained from life and work experiences outside registered 
+training programs.  
+22.  Resource Implications  - refers  to the resources needed for the successful performance of the work activity described in the unit of competency.  It includes  
+work environment and conditions, materials, tools, and equipment.  
+23.  Basic Competencies  - the skills and knowledge that everyone n eeds for work.
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 26 of 32 24.  Training Regulations 
+(TR) - refers  to the document promulgated and issued by TESDA consisting of competency standards, national qualifications and training 
+guidelines for specific sectors/occupations.  The TR serves as basis for establishment of qualification and certification und er the PT QF.  
+It also serves as guide for development of competency -based curricula and instructional materials including registration of TVET 
+programs offered by TVET providers  
+25.  Underpinning Knowledge  - refers  to the competency involved in applying knowledge to perform work activities.  It includes specific knowledge that is essentia l to 
+the performance of the competency.  
+26.  Underpinning Skills  - refers  to the list of the skills needed to achieve the elements and performance criteria in the unit of competency.  It includes gen eric 
+and industry -specific skills.  
+27.  Unit of Competency  - a component of the competency standards stating a specific key function or role in a particular job or occupation; it is the sm allest 
+component of achievement that can be assessed and certified under the PTQF.  
+ 
+SECTOR SPECIFIC  
+28.  ADO.NET  - a set of computer software components that programmers can use to access data and data services. It is a part of the base class 
+library  that is included with the Microsoft .NET Framework . It is commonly used by programmers to access and modify data stored in 
+relational database systems , though it can also access data in non -relational sources. ADO.NET is sometimes considered an evolution 
+of ActiveX Data Objects  (ADO) technology, but was changed so extensively that it can be considered an entirely new product.  
+29.  ASP.NET  - a Web application framework  developed and marketed by Microsoft  to allow programmers  to build dynamic websites , Web 
+applications , and Web services . ASP.NET is built on the Common Language Runtime  (CLR), allowing programmers to write ASP.NET 
+code using any supported .NET language . 
+30.  Algorithm  - a type of effective method  in which a list of well -defined instructions for completing a task will, when given an initial state, proceed 
+through a well -defined series of successive states, eventually terminating in an end -state. The transition from one state to the next is 
+not necessarily deterministic ; some algorithms, know n as probabilistic algorithms , incorporate randomness.  
+31.  Artificial intelligence 
+programmer  - develops  the logic the game uses to carry out a large number of actions. An AI programmer may program pathfinding , strategy, and 
+enemy tactic systems. This is one of the most challenging aspects of game programming and its sophistication is developing rapidly.  
+32.  Browser  - a software package that provides the user interface for accessing Internet, intranet, and extranet websites.  
+33.  COBOL  - one of the oldest programming languages. Its name is an acronym  for COmmon Business -Oriented Language, defining its primary 
+domain in business , finance, and administrative systems for companies and governmen ts. 
+34.  Compiler  - a computer program  (or set of programs) that transforms source code  written in a programming language  (the source language) into 
+another computer language (the target language, often having a binary form known as object code ). The most common reason for  
+wanting to transform source code is to create an executable  program.  
+35.  Computer  - a device that has the ability to accept data, internally store and execute a program of instructions, perform mathema tical, logical, and 
+manipulative operations on data, and report the results.  
+36.  Computer program  - also a software  program, or just a program, is a sequence of instructions  written to perform a specified task for a computer .  A 
+computer requires programs to function, typically executing  the program's instructions in a central processor .  The program has an 
+executable  form that the computer can use directly to execute the instructions. The same program in its human -readable source code  
+form, from which executable  programs are derived (e.g., compiled ), enables a programmer  to study and develop its algorithms . 
+37.  Computer programming  - the iterative process of writing or editing source code . Editing source code involves test ing, analyzing, and refining, and sometimes 
+coordinating with other programmers on a jointly developed program. A person who practices this skill is referred to as a com puter 
+programmer , software developer, or coder. The sometimes lengthy process of computer programming is usually referred to as 
+software development .
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 27 of 32  
+38.  Computer Terminal  - any input/output device connected by telecommunications links to a computer.  
+39.  C language  - an imperative  (procedural ) systems implementation  language. It was designed to be compiled using a relatively straightforward 
+compiler , to provide low -level access to me mory, to provide language constructs that map efficiently to machine instructions, and to 
+require minimal run-time support . C was therefore useful for many applications that had formerly bee n coded in assembly language . 
+40.  C++ language  - a statically typed , free-form, multi-paradigm , compiled , general -purpose progra mming language . It comprises a combination of both 
+high-level and low-level language features. Some of its application domains include systems software, application software, device 
+drivers, embedded software, high -performance server and client applications, and entertainment software such as video ga mes. 
+41.  Data - objective measurements of the attributes (characteristics) of entities such as people, places, things, and events.  
+42.  Data access  - typically refers to software and activities related to storing, retrieving, or acting on data housed in a database  or other repository. 
+Historically, different methods  and languages  were required for every repository, including each different database, file system , etc., 
+and many of these repositories stored their content in different  and incompatible formats.  
+43.  Decompiler  - the name given to a computer program  that performs the reverse operation to that of a compiler . That is, it translates a file containing 
+information at a relatively low level of abstraction (usually designed to be computer readable rather than human readable) in to a form 
+having a higher level of abstraction (usually designed to be human readable).  
+44.  Documentation  - a collection of documents or information.  
+45.  Edit - to modify the form or format of data.  
+46.  End-user - anyone who uses an informationsystem or the information it produces.  
+47.  Ergonomics  - the science and technology emphasizing the safety, comfort, and ease of use of human -operated machines.  The goal of ergonomics is 
+to produce systems that are user -friendly, safe, comfortable, and easy to use.  
+48.  HTML, which stands for 
+HyperText  Markup 
+Language  - the predominant markup language  for web pages . It is written in the form of HTML elements  consisting of "tags" surrounded by angle 
+brackets  within the Web page content. It is the building blocks of all basic websites.  
+49.  Information  - data placed in a meaningful and useful context for an end -user. 
+50.  Information and 
+Communication 
+Technology (ICT)  - refers  to technologies associated with the transmission and exchange of data in the form of sound, text, visual images, signals, or any 
+combination thereof through the use of digital technology.  It encompasses such services as telecommunications, posts, multim edia, 
+electronic commerce, broadcasting, and information technology.  
+51.  Integrated development 
+environment (IDE)  - a software application  that provides comprehensive facilities to computer programmers  for software development . An IDE normally 
+consists of a source code editor , a compiler  and/or interpreter , build automation  tools, and (usually) a debugger . Typically, an IDE is 
+dedicated to a specific programming language , so as to provide a featur e set which most closely matches the programming paradigms  
+of the language. However, some multiple -language IDEs are in use, such as Eclipse , ActiveState Komodo , recent versions of NetBeans , 
+and Microsoft Visual Studio . 
+52.  Java - a general -purpose, concurrent, class -based, object -oriented language that is specifically designed to have as few implementation 
+dependencies as possible. It is intended to let application developers "write once, run anywh ere". Java is currently one of the most 
+popular programming languages in use, and is widely used from application software to Web applications  
+53.  Java applications  - These are typically compiled  to bytecode  (class file ) that can run on any Java Virtual Machine  (JVM) re gardless of computer 
+architecture . 
+54.  Local Area Network 
+(LAN)  - a communications network that typically connects computers, terminals, and other computerized devices within a limited physical  area 
+such as an office, building, manufacturing plant and other worksites.
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 28 of 32  
+55.  Microsoft .NET 
+Framework  - a software framework  that can be installed on computers running Microsoft Windows operating systems . It includes a large library  of 
+coded solutions to common programming problems and a common language infrastructure that manages the execution of programs 
+written specifically for the framework. The .NET Framework supports multiple programming languages  in a manner that allows 
+language interoperability, whereby each language can utilize code written in other languages; in particular, the .NET library is available 
+to all the programming languages that .NET encompasses.  
+56.  Microsoft SQL Server  - a relational model  database server  produced by Microsoft . Its primary query languages  are T-SQL and ANSI SQL . 
+57.  Object code  - or an object file; it is the representation of code that a compiler  or assembler  generates by processing a source code  file. Object files 
+contain compact code, often called "binaries". A linker  is typically used to generate an executable  or library  by linking object files 
+together. The only ess ential element in an object file is machine code  (code directly executed by a computer's CPU). Object files for 
+embedded systems  might contain nothing but machine code. However, object files often also contain data for use by the code at 
+runtime, relocation  informatio n, program symbols  (names of variables and functions) for linking and/or debugging purposes, and other 
+debugging  information.  
+58.  Oracle  - the Oracle Database  (commonly referred to as  Oracle RDBMS  or simply as  Oracle ) is an object -relational database management 
+system  [2] produced and marketed by  Oracle Corporation . 
+59.  Oracle Forms  - a software product for creating screens that interact with an Oracle database . It has a typical IDE including an object navigator, 
+property sheet and code editor that uses PL/SQL . It was originally developed to run server -side in character mode terminal sessions. It 
+was ported to other platforms, including Windows, to function in a client –server  environment. Later versions were ported to Java 
+where it runs in a Java EE  container and can integrate with Java and web services . The p rimary focus of Forms is to create data entry 
+systems that access an Oracle  database . 
+60.  Oracle Reports  - a tool for developing reports against data stored in an Oracle database . Oracle Reports consists of Oracle Reports Developer (a 
+component of the Oracle Developer Suite ) and Oracle Application Server Reports Services (a component of the Oracle Application 
+Server ). 
+61.  Outsourcing  - turning over all or part of an organization’s information systems operation to outside contractors, known as systems integrat ors or 
+facilities management companies.  
+62.  Programming language  - an artificial language  designed to express computations  that can be performed by a machine , particularly a computer . Programming 
+languages can be used to create programs  that control the behavior of a machine, to express algorithms  precisely, or as a mode of 
+human communication.  
+63.  Quality Assurance  - methods for ensuring that information systems are free from errors and fraud, and provide information products of high qualit y. 
+64.  Relational database 
+management system 
+(RDBMS)  - a database management system  (DBMS) that is based on the relational model  as introduced by E. F. Codd . Most popular commercial 
+and open source databases currently in use are based on the relational database model. A short definition of an RDBMS may be a 
+DBMS in which data is stored in the for m of tables and the relationship among the data is also stored in the form of tables.  
+65.  Service  - oriented programming (SOP); a programming paradigm  that uses "services" as the unit of computer work, to design and implement 
+integrated business applications and mission -critical  software programs. Services can represent steps of business processes  and thus 
+one of the main applications of this paradigm is the cost -effective delivery of standalone or composite business applications that can 
+“integrate from the inside -out.” 
+66.  Software  - computer programs and procedures concerned with the operation of an information system.  
+67.  Source code  - any collection of statements or declarations written in some human -readable  computer programming language . Source code is the 
+means most often used by programmers  to specify the actions to be performed by a computer.
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 29 of 32  
+68.  SQL, often referred to as 
+Structured Query 
+Language  - a database  computer language designed for managing data in relational database management systems  (RDBMS), and originally 
+based upon relational algebra . Its scope includes data insert, query, update and del ete, schema  creation and modification, and data 
+access control.  
+69.  Standards  - measures of performance developed to evaluate the progress of a system toward its objectives.  
+70.  System  - an assembly of methods, procedures, or techniques unified by regulated interaction to form an organized whole.  
+71.  User- friendly  - a characteristic of human -operated equipment and systems that makes them safe, comfortable, and easy to use.  
+72.  User interface  - the system by which people ( users) interact  with a machine . The user interface inclu des hardware (physical) and software (logical) 
+components. User interfaces exist for various systems , and provide a means of: 1) input, allowing the users to manipulate a system, 
+and/or 2) output, allowin g the system to indicate the effects of the users' manipulation.  
+73.  VB.NET  - a redesigned, object -oriented dialect of Visual Basic . 
+74.  Web application  - an application  that is accessed over a network such as the Internet  or an intranet . The term may also mean a computer software 
+application that is hosted in a browser -controlled environment (e.g. a Java applet ) or coded in a browser -supported language (such as 
+JavaScript , combined with a browser -rendered markup language  like HTML ) and reliant on a common web browser to render the 
+application executable . 
+75.  Windows Forms  - the name given to the graphical  application programming interface (API)  included as a part of Microsoft's .NET Framework , providing 
+access to the native Microsoft Windows  interface elements by wrapping the existing Windows API  in managed code . While it is seen as 
+a replacement for the earlier and more complex C++ based Microsoft Foundation Class Library , it does not offer a paradigm 
+comparable to model –view–controller . 
+76.  Windows Forms 
+application  - an event -driven application  supported by Microsoft's .NET Framework . Unlike a batch program , it spends most of its time simply 
+waiting for the user to do something, s uch as fill in a text box  or click a button .
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 30 of 32 CODE BOOK LEGEND  
+Sample: TVL_ICT ORCL11 -12AQS -If-20 
+ 
+LEGEND  SAMPLE  
+ DOMAIN / COMPONENT  CODE  
+First Entry  Learning Area and 
+Strand/ Subject or  
+Specialization  Techn ical-Vocational -Liveliho od 
+Education  TVL_ICT  Basic Competencies   
+Leading Workplace Communication  LWC 
+Information and Communications  
+Technology  Leading Small Teams  LST 
+Developing and Practicing Negotiation Skills  DPN 
+Programming (Oracle) NC III  ORCL  Solving Problems Related to Work Activities   PRW 
+Grade Level  11 to 12  11-12 Using Mathematical Concepts and Techniques  MCT 
+Uppercase Letter/s  Domain/Content/ 
+Component/Topic  Applying Quality Standards  AQS Using Relevant Technologies  URT 
+Common Competencies   
+ - Applying Quality Standards   AQS 
+Roman Numeral 
+*Zero if no specific 
+Quarter  Quarter  First Quarter  I Performing Computer Operations   PCO 
+Core Competencies   
+Writing SQL Queries to Access Stored Data in an Oracle 
+Database and Customize Output; and Setting User Access 
+Level and Using Scalar and Correlated Subqueries   WSQL  
+Lower case letter/s 
+*put a hyphen ( -) in 
+between letters to 
+indicate more than 
+a specific week  Week  Week six f Using and Applying PL/SQL Programming Language   UASQL  
+Designing a nd Tuning PL/SQL Language  DTSQL  
+- -   
+Arabic Number  Competency  Assess quality of received materials  20   
+ 
+ 
+Technology -Livelihood Education and Technical -Vocational Track specializations may be taken between Grades 9 to 12.   
+ 
+Schools may offer specializations from the four strands as long as the minimum number of hours for each specialization is met . 
+ 
+Please refer to the sample Curriculum Map on the next page for the number of semesters per ICT specialization and those that have pre -requisites.   Curriculum Maps may 
+be modified according to specializations offered by a school.
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 31 of 32 Computer Programming (.Net Technology) (NC III)+ 
+updated based on TESDA Training Regulations released December 28 , 2013 
+ *Telecom OSP Installation  
+(Fiber Optic Cable)  
+(NC II)  
+Computer Programming (Java ) (NC III)+ 
+updated based on TESDA Training Regulations released December 28 , 2013 
+ *Broadband Installation  
+(Fixed Wireless 
+Systems)  
+(NC II)  SAMPLE ICT CURRICULUM MAP** (as of May 2016 ) 
+Grade 7/8 (EXPLORATORY)  GRADES 9 -12 
+   
+4 sems          
+ 
+8 sems  
+   
+  
+  
+4 sems  
+   
+ 
+ 
+2 sems   
+2 sems  
+   
+4 sems     
+4 sems  
+    
+ 
+ 
+4 sems     
+4 sems  
+    
+ 
+4 sems     
+4 sems  
+   
+4 sems     
+4 sems  
+*       Please note that  these subjects have pre -requisites mentioned in the CG.  
++      CG updated based on new Training Regulations of TESDA.  
+ Pre-requisites of the subjects to the right should be taken up during these semesters.  
+ 
+ **This is just a sample .  Schools make their own curriculum maps 
+considering the specializations to be offered.   Subjects may be taken 
+up at any point during Grades 9 -12. Contact Center Services  (NC II)  
+Animation (NC II)  
+Medical Transcription  (NC II)   
+(NC II)  Illustration  (NC II)  Technical Drafting  (NC II)  
+Computer Programming (Oracle Database )  
+(NC III)+ 
+updated based on TESDA Training Regulations released December 28 , 2013 
+ *Telecom OSP and Subscriber Line Installation 
+(Copper Cable/POTS and DSL) (NC II)  Computer Systems  Servicing (NC II)+ 
+updated based on TESDA Training Regulations released December 28, 2007  
+EXPLORATORY
+K TO 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNOLOGY AND LIVELIHOOD TRACK AND SENIOR HIGH SCHOOL – TECHNICAL -VOCATIONAL LIVELIHOOD TRACK  
+INFORMATION AND COMMUNICATIONS TECHNOLOGY – PROGRAMMING (ORACLE DATABASE) NC III  
+(320 hours)  
+K to 12 ICT – Programming (Oracle Da tabase) NC III Curriculum Guide  May 2016   *LO-Learning Outcomes       Page 32 of 32  
+Reference:  
+ 
+Technical Education and Skills Development Authority -Qualification Standards Office. Training Regulations for Programming (Oracle Database) NC III . Taguig City,  
+Philippines: TESDA, 2013.

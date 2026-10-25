@@ -53,6 +53,30 @@ Grades 9 and 10 publish one per specialization.
 | bow-g9-g10-ia-residential-plumbing.pdf | [G9 / G10] TLE: IA - Residential Plumbing | https://drive.google.com/file/d/1aN0Q9JYREhZNuWegZzf78tjvgizqXDxk/view |
 | bow-g9-g10-ia-shielded-metal-arc-welding-smaw.pdf | [G9 / G10] TLE: IA - Shielded Metal Arc Welding (SMAW) | https://drive.google.com/file/d/1ddk8gcg0pb2IwpMfcbGdLOLHFFPwMZkp/view |
 
+## TESDA-aligned ICT curriculum guides, and MATATAG Grades 4 and 7
+
+Added 2026-10-25 from a zip the project owner supplied. Each file is byte for byte the one
+DepEd publishes (same size as the copy at the source URL). The K to 12 ICT specialization
+guides (May 2016, JHS TLE and SHS TVL, leading to a TESDA NC II or NC III) sit in their own
+"TESDA Curriculum Guide" folder. The zip's MATATAG Grades 4 to 10 guide is already
+matatag-epp-tle-cg-grades-4-10.pdf (same file), so it wasn't added twice.
+
+| File | Title | Source |
+|---|---|---|
+| matatag-epp-tle-cg-grades-4-and-7.pdf | MATATAG EPP/TLE Curriculum Guide, Grades 4 and 7 | https://www.deped.gov.ph/wp-content/uploads/MATATAG-EPP_TLE-CG-Grades-4-and-7.pdf |
+| tesda-ict-animation-nc-ii.pdf | ICT - Animation (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Animation-NC-II-CG.pdf |
+| tesda-ict-broadband-installation-fixed-wireless-systems-nc-ii.pdf | ICT - Broadband Installation (Fixed Wireless Systems) (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Broadband-Installation-Fixed-Wireless-Systems-NC-II-CG.pdf |
+| tesda-ict-computer-systems-servicing-nc-ii.pdf | ICT - Computer Systems Servicing (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Computer-Systems-Servicing-NC-II-CG.pdf |
+| tesda-ict-contact-center-services-nc-ii.pdf | ICT - Contact Center Services (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Contact-Center-Services-NC-II-CG.pdf |
+| tesda-ict-illustration-nc-ii.pdf | ICT - Illustration (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Illustration-NC-II-CG.pdf |
+| tesda-ict-medical-transcription-nc-ii.pdf | ICT - Medical Transcription (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Medical-Transcription-NC-II-CG.pdf |
+| tesda-ict-programming-net-technology-nc-iii.pdf | ICT - Programming (.NET Technology) (NC III) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Programming-.Net-Technology-NC-III-CG.pdf |
+| tesda-ict-programming-java-nc-iii.pdf | ICT - Programming (Java) (NC III) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Programming-Java-NC-III-CG.pdf |
+| tesda-ict-programming-oracle-database-nc-iii.pdf | ICT - Programming (Oracle Database) (NC III) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Programming-Oracle-Database-NC-III-CG.pdf |
+| tesda-ict-technical-drafting-nc-ii.pdf | ICT - Technical Drafting (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Technical-Drafting-NC-II-CG.pdf |
+| tesda-ict-telecom-osp-installation-fiber-optic-cable-nc-ii.pdf | ICT - Telecom OSP Installation (Fiber Optic Cable) (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Telecom-OSP-Installation-Fiber-Optic-Cable-NC-II-CG.pdf |
+| tesda-ict-telecom-osp-and-subscriber-line-installation-copper-cable-pots-and-dsl-nc-ii.pdf | ICT - Telecom OSP and Subscriber Line Installation (Copper Cable / POTS and DSL) (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Telecom-OSP-and-Subscriber-Line-Installation-Copper-Cable-POTS-and-DSL-NC-II-CG.pdf |
+
 ## Not included
 
 - Grades 11 and 12: the LR Portal has no TLE or ICT budget of work

@@ -154,6 +154,19 @@ def check_standards_only_from_a_guide():
     print("  standards only from a guide OK")
 
 
+def check_owl_options_explained():
+    """Alan's options carry a line on why they fit; follow-up questions don't."""
+    out = ai_service._clean_owl_reply({"reply": "Two ways in.", "choices": [
+        {"type": "use", "label": "A video hook", "text": "Show a 1-minute clip.", "why": "It gets attention fast."},
+        {"type": "ask", "label": "Any shorter?", "text": "Any shorter?", "why": "ignored"},
+        {"type": "use", "label": "A question", "text": "Ask what they know."},
+    ]})
+    use, ask, bare = out["choices"]
+    assert use["why"] == "It gets attention fast." and "why" not in ask and "why" not in bare, out
+    print("  owl options explained OK")
+
+
+check_owl_options_explained()
 check_standards_only_from_a_guide()
 check_subset_only()
 check_missing_counts_requested_only()

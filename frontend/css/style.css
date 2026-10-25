@@ -4342,12 +4342,12 @@ body.owl-chat-shown .dash-main {
 .owl-choice {
   font: inherit;
   text-align: left;
-  cursor: pointer;
   border-radius: 12px;
   transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
 .owl-choice-ask {
+  cursor: pointer;
   align-self: flex-start;
   padding: 6px 12px;
   border: 1px solid var(--primary);
@@ -4369,25 +4369,26 @@ body.owl-chat-shown .dash-main {
   color: var(--text-body);
 }
 
-.owl-choice-use:hover:not(:disabled) { border-color: var(--primary); background: var(--primary-tint); }
-
 .owl-choice-label { font-size: 13px; font-weight: 700; color: var(--text-heading); }
 
 .owl-choice-text {
   font-size: 12.5px;
   line-height: 1.4;
+  color: var(--text-heading);
   white-space: pre-wrap;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
-.owl-choice-action { font-size: 12px; font-weight: 700; color: var(--primary); }
+/* Why this option fits, under it: read, not tapped. */
+.owl-choice-why {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-body);
+}
 
 .owl-choice:disabled { cursor: default; opacity: 0.55; }
-.owl-choice.is-used { opacity: 1; border-color: var(--primary); background: var(--primary-tint); }
-.owl-choice.is-used .owl-choice-action { color: var(--primary-hover); }
 
 .owl-chat-note {
   align-self: center;

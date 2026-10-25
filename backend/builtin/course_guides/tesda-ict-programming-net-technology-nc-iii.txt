@@ -1,0 +1,2037 @@
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 1 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes   
+These are the specializations and their pre -requisites.  These lists should be used as reference for curriculum maps.  
+ 
+AGRI -FISHERY ARTS  
+ Specialization  Number of Hours  Pre-requisite  
+1.  Agricultural Crop s Production (NC I) 320 hours   
+2.  Agricultural Crops Production (NC II) 
+updated based on TESDA Training Regulations published December 28, 2013  640 hours   
+3.  Agricultural Crop s Production (NC III)  640 hours  Agricultural Crop s Production (NC II)  
+4.  
+Animal Health Care Management (NC III)  320 hours  Animal Production (Poultry -Chicken) (NC II)  or 
+Animal Production (Ruminants) (NC II) or  
+Animal Production (Swine) (NC II)  
+5.  Animal Production (Poultry -Chicken) (NC II) 
+updated based on TESDA Training Regulations published December 28, 2013  320 hours   
+6.  Animal Production ( Large Ruminants) (NC II) 
+updated based on TESDA Training Regulations published December 28, 2013  320 hours   
+7.  Animal Production (Swine) (NC II) 
+updated based on TESDA Training Regulations published December 28, 2013  320 hours   
+8.  Aquaculture (NC II)  640 hours   
+9.  Artificial Insemination (Large Ruminants) (NC II)  160 hours  Animal Production (Large Ruminants) (NC II)  
+10.  Artificial Insemination (Swine) (NC II)  160 hours  Animal Production (Swine) (NC II)  
+11.  Fish Capture (NC II)  640 hours   
+12.  Fishing Gear Repair and Maintenance (NC III)  320 hours   
+13.  Fish-Products Packaging (NC II)  320 hours   
+14.  Fish Wharf Operation (NC I)  160 hours   
+15.  Food Processing (NC II)  640 hours   
+16.  Horticulture (NC III)  640 hours  Agricultural Crops Production  (NC II)  
+17.  Landscape Installation and Maintenance (NC II)  320 hours   
+18.  Organic Agriculture (NC II)  320 hours   
+19.  Pest Management (NC II)  320 hours   
+20.  Rice Machinery Operations (NC II)  320 hours   
+21.  Rubber Processing (NC II)  320 hours   
+22.  Rubber Production (NC I I) 320 hours   
+23.  Slaughtering Operations (Hog/Swine/Pig) (NC II)  160 hours
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 2 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes   
+HOME ECONOMICS  
+ Specialization  Number of 
+Hours  Pre-requisite  
+1.  Attractions and Theme Parks Operations with Ecotourism (NC II)  160 hours   
+2.  Barbering (NC II)  320 hours   
+3.  Bartending (NC II)  320 hours   
+4.  Beauty/Nail Care (NC II)  160 hours   
+5.  Bread and Pastry Production (NC II)  160 hours   
+6.  Caregiving (NC II)  640 hours   
+7.  Commercial Cooking (NC III) 320 hours  Cookery (NC II)  
+8.  Cookery (NC II)  320 hours   
+9.  Dressmaking (NC II)  320 hours   
+10.  Event s Management Services (NC III)  320 hours   
+11.  Fashion Design (Apparel) (NC III)  640 hours  Dressmaking (NC II) or Tailoring (NC II)  
+12.  Food and Beverage Services (NC II)  
+updated based on TESDA Training Regulations published December 28, 2013  160 hours   
+13.  Front Office Services (NC II)  160 hours   
+14.  Hairdressing (NC II)  320 hours   
+15.  Hairdressing (NC III)  640 hours  Hairdressing (NC II)  
+16.  Handicraft (Basketry, Macrame) (Non -NC) 160 hours   
+17.  Handicraft (Fashion Accessories, Paper Craft) (Non -NC) 160 hours   
+18.  Handicraft (Needlecraft) (Non -NC) 160 hours   
+19.  Handicraft (Woodcraft, Leathercraft) (Non -NC) 160 hours   
+20.  Housekeeping (NC II)  
+updated  based on TESDA Training Regulations published December 28, 2013  160 hours   
+21.  Local Guiding Services (NC II)  160 hours   
+22.  Tailoring (NC II)  320 hours   
+23.  Tourism Promotion Services (NC II)  160 hours   
+24.  Travel Services (NC II)  160 hours   
+25.  Wellness Massage (NC II)  160 hours
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 3 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  INDUSTRIAL ARTS  
+ Specialization  Number of 
+Hours  Pre-requisite  
+1.  Automotive Servicing (NC I)  
+updated based on TESDA Training Regulations published December 28, 2013  640 hours   
+2.  Automotive Servicing (NC II)  640 hours  Automotive Servicing (NC I)  
+3.  Carpentry (NC II)  640 hours   
+4.  Carpentry (NC III)  320 hours  Carpentry (NC II)  
+5.  Construction Painting (NC II)  160 hours   
+6.  Domestic Refrigeration and Air -conditioning (DOMRAC) Servicing (NC 
+II) 640 hours   
+7.  Driving (NC II)  160 hours   
+8.  Electrical Installation and Maintenance (NC II)  640 hours   
+9.  Electric Power Distribution Line Construction (NC II)  320 hours  Electrical Installation and Maintenance (NC II)  
+10.  Electronic Products Assembly and Servicing (NC II)  
+updated based on TESDA Training Regulations published December 28, 2013  640 hours   
+11.  Furniture Making (Finishing) (NC II)  640 hours   
+12.  Instrumentation and Control Servicing (NC II)  320 hours  Electronic Products Assembly and Servicing (EPAS) (NC II)  
+13.  Gas Metal Arc Welding (GMAW) (NC II)  320 hours  Shielded Metal Arc Welding (SMAW) (NC II)  
+14.  Gas Tungsten Arc Welding (GTAW) (NC II)  320 hours  Shielded Metal Arc Welding (GMAW) (NC II)  
+15.  Machining (NC I)  640 hours   
+16.  Machining (NC II)  640 hours  Machining (NC I)  
+17.  Masonry (NC II)  320 hours   
+18.  Mechatronics Servicing (NC II)  320 hours  Electronic Products Assembly and Servicing (EPAS) (NC II)  
+19.  Motorcycle/Small Engine Servicing (NC II)  320 hours   
+20.  Plumbing (NC I)  320 hours   
+21.  Plumbing (NC II)  320 hours  Plumbing (NC I)  
+22.  Refrigeration and Air -Conditioning (Packaged Air -Conditioning Unit 
+[PACU]/Commercial Refrigeration Equipment [CRE]) Servicing (NC III)  640 hours  Domestic Refrigeration and Air -conditioning (DOMRAC) 
+Servicing (NC II)  
+23.  Shielded Metal Arc Welding (NC I)  320 hours   
+24.  Shielded Metal Arc Welding (NC II)  320 hours  Shielded Metal Arc Welding (NC I)  
+25.  Tile Setting (NC II)  320 hours   
+26.  Transmission Line Installation and Maintenance (NC II)  640 hours  Electrical Installation and Maintenance (NC II)
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 4 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes   
+INFORMATION, COMMUNICATIONS AND TECHNOLOGY (ICT)  
+ 
+ Specialization  Number of 
+Hours  Pre-requisite  
+1.  Animation (NC II)  320 hours   
+2.  Broadband Installation (Fixed Wireless Systems) (NC II)  160 hours  Computer Systems Servicing (NC II)  
+3.  Computer Programming (.Net Technology) (NC III)  
+updated based on TESDA Training Regulations published December 28, 2013 320 hours   
+4.  Computer Programming (Java) (NC III)  
+updated based on TESDA Training Regulations published December 28, 2013 320 hours   
+5.  Computer Programming (Oracle  Database) (NC III)  
+updated based on TESDA Training Regulations published December 28, 2013 320 hours   
+6.  Computer System s Servicing (NC II)  
+updated based on TESDA Training Regulations published December 28, 2007  640 hours   
+7.  Contact Center Services (NC II)  320 hours   
+8.  Illustration (NC II)  320 hours   
+9.  Medical Transcription (NC II)  320 hours   
+10.  Technical Drafting (NC II)  320 hours   
+11.  Telecom OSP and Subscriber Line Installation  
+(Copper Cable/POTS and DSL) (NC II)  320 hours  Computer Systems Servicing (NC II)  
+12.  Telecom OSP Installation (Fiber Optic Cable) (NC II)  160 hours  Computer Systems Servicing (NC II)
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 5 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes   
+Course Description :             
+This curriculum guide provides an introduction to HTML5, CSS3, and JavaScript. The course helps students gain basic HTML5/CSS3/JavaScript programming skills , and 
+is an entry point into both the Web application and Windows Store apps training paths. The course focuses on using HTML5/CSS3/JavaScript to implement programming  logic, 
+define and use variables, perform l ooping and branching, develop user interfaces, capture and validate user input, store data, and create well -structured application. Further, 
+this unit covers the skills, knowledge , and attitude required in developing HTML5 Websites . Students will also lear n to develop advanced ASP.NET MVC applications using .NET 
+Framework 4.5 tools and technologies. The focus will be on coding activities that enhance the performance and scalability of the Web site application. ASP.NET MVC will be 
+introduced and compared wit h Web Forms so that students know when each should/could be used.  
+ 
+It covers the basic, common , and core competencies such as perform programming in HTML5 with JavaScript and CSS3 , and develop ASP.NET MVC 5 Web applications . 
+This also includes an introduction to the Windows 8 platform and the Windows Store applications . 
+ 
+CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+Introduction  
+1. Relevance  of the course  
+2. Core competency  in Programming  
+(.Net Technology) NC III  
+  
+The learner s demonstrate  
+an understanding  of 
+underlying  principles  and 
+core competencies  in 
+Programming  (.Net 
+Technology) NC III.   
+The learner s shall be able to 
+independently  create/  provide  
+quality  and marketable  
+product s and/ or service s in 
+Computer  Programming  as 
+prescribed  in the TESDA  
+Training  Regulations . The learners … 
+1. Discuss  the relevance  of the course  
+2. Explain  the core competencies  in 
+Programming (.Net Technology) NC III  
+  
+BASIC COMPETENCIES  
+LESSON 1 : LEAD WORKPLACE COMMUNICATION  (LWC)  
+ 
+ Organization requirements for 
+written and electronic 
+communication methods  
+ Effective verbal communication 
+methods  
+ Organizing information  
+ Understanding and conveying 
+intended meaning  
+ Participation in various  workplace 
+discussions  
+ Complying with organization  
+requirements for the use of 
+written and electronic 
+communication methods   
+The learner s demonstrate  
+an understanding  of the 
+principles and concepts in  
+leading in the dissemination 
+and discussion of workplace 
+ideas, information , and 
+issues .  
+The learners  independently 
+lead in the dissemination 
+and discussion of workplace 
+ideas, information , and 
+issues based on TESDA 
+Training Regulation s.  
+LO1.  Communicate information about 
+workplace processes  
+1.1 Select appropriate communication method  
+1.2 Communicate multiple operations involving 
+several topics areas accordingly  
+1.3 Use questions to gain extra information  
+1.4 Identify correct sources of information  
+1.5 Select and organize information correctly  
+1.6 Undertake verbal and written reporting 
+when required  
+1.7 Maint ain communication skills in all 
+situations   
+TLE_ICTP .NET
+11-12LWC -Ia-
+1
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 6 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Effective verbal communication 
+methods in the workplace  
+ Understanding and conveying 
+intended meaning  
+ Participation in various  workplace 
+discussions  
+ Complying with organization  
+requirements for the use of 
+written and electronic 
+communication methods    LO 2. Lead workplace discussions  
+2.1 Seek responses to workplace issues  
+2.2 Provide response to workplace issues 
+immediately  
+2.3 Make constructive contributions to 
+workplace discussions on such issues as 
+production, quality , and safety  
+2.4 Communicate goals/objectives and action 
+plan undertaken in the workplace  TLE_ICTP .NET
+11-12LWC -Ia-
+2 
+ 
+ Effective verbal communication 
+methods  
+ Organizing information  
+ Understand and convey intended 
+meaning  
+ Participate in various  workplace 
+discussions  
+ Comply with organization  
+requirements for the use of 
+written and electronic 
+communication methods  
+   LO 3. Identify and communicate issues 
+arising in the workplace  
+3.1 Identify issues and problems as they arise  
+3.2 Organize information regarding problems 
+and issues coherently to ensure clear and 
+effective communication  
+3.3 Initiate dialogue with appropriate 
+personnel  
+3.4 Raise communication problems and issues 
+as they arise  TLE_ICTP .NET
+11-12LWC -Ia-
+3 
+LESSON  2: LEAD SMALL TEAMS  (LST)  
+ Company policies and procedures  
+ Relevant legal requirements  
+ How performance expectations 
+are set  
+ Methods of monitoring 
+performance  
+ Client expectations  
+ Team member’s duties and 
+responsibilities  
+ Communication skills required for 
+leading teams  
+ Informal performance counseling 
+skills 
+ Team -building skills  
+ Negotiating skills  The learner s demonstrate  
+an understanding  of the 
+principles and concepts in  
+leading small teams , 
+including setting and 
+maintaining team and 
+individual performance 
+standards . The learners  independently 
+lead small teams , including 
+setting and maintaining 
+team and individual 
+performance standards  
+based on TESDA Training 
+Regulation s. LO 1. Provide team leadership  
+1.1 Identify and present work requirements to 
+team members  
+1.2 Communicate reasons for instructions and 
+requirements to team members  
+1.3 Recognize, discuss , and deal with team 
+members’ queries and concerns   
+TLE_ICTP .NET
+11-12LST-Ia-4
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 7 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ 
+ How performance expectations 
+are set  
+ Methods of monitoring 
+performance  
+ Client expectations  
+ Team member’s duties and 
+responsibilities  
+ Communication skills required for 
+leading teams  
+ Informal performance counseling 
+skills 
+    
+LO 2. Assign responsibilities among 
+members  
+2.1 Allocate duties and responsibilities with 
+regard to  the skills, knowledge , and 
+aptitude required to properly undertake 
+the assigned task and according to 
+company policy  
+2.2 Allocate duties with regard  to individual 
+preferenc e and domestic and personal 
+considerations whenever possible   
+TLE_ICTP .NET
+11-12LST-Ib-5 
+ 
+ 
+ How performan ce expectations 
+are set  
+ Methods of Monitoring 
+Performance  
+ Client expectations  
+ Team member’s duties and 
+responsibilities  
+ Informal performance counseling 
+skills    
+LO 3. Set performance expectation for 
+team members  
+3.1 Establish performance expectations based 
+on client needs and according to 
+assignment requirements  
+3.2 Base performance expectations on 
+individual team member’s duties and area 
+of responsibility  
+3.3 Discuss performance expectations and 
+disseminate to team members  
+  
+TLE_ICTPNET
+11-12LST-Ib-6 
+ 
+ 
+ How performance expectations 
+are set  
+ Methods of Monitoring 
+Performance  
+ Team member’s duties and 
+responsibilities  
+ Communication skills required for 
+leading teams  
+ Informal performance counseling 
+skills 
+ Team -building skills  
+ Negotiating skills     
+LO 4. Supervise team performance  
+4.1 Monitor  performance against defined 
+performance criteria and/or assignment 
+instructions and corrective action taken if 
+required  
+4.2 Provide team members with feedback, 
+positive support , and advice on strategies 
+to overcome any deficiencies  
+4.3 Refer to appropriate personnel according 
+to employer policy when performance 
+issues cannot be rectified or addressed 
+within the team   
+TLE_ICTP .NET
+11-12LST-Ib-7
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 8 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ 
+ 4.4 Keep team members informed of any 
+changes in the priority allocated to 
+assignments or tasks , which might impact 
+on client/customer needs and satisfaction  
+4.5 Monitor operations to ensure that 
+employer/client needs and requirements 
+are met  
+4.6 Provide follow -up communication on all 
+issues affecting the team  
+4.7 Complete all relevant documentation in 
+accordance with company procedures  
+ 
+LESSON  3: DEVELOP AND PRACTICE  NEGOTIATION SKILLS  (DPN)  
+ 
+ Codes of practice and guidelines 
+for the organization   
+ Organization ’s polic ies and 
+procedures for negotiations   
+ Decision making and conflict - 
+resolution strategies and 
+procedures   
+ Problem -solving strategies to deal 
+with unexpected questions and 
+attitudes during negotiation  
+ Interpersonal skills to develop 
+rapport with other parties  
+ Communication skills  (verbal and 
+listening)  
+  
+The learner s demonstrate  
+an understanding  of the 
+principles and concepts in  
+planning and participating in 
+negotiations   
+The learners  independently 
+plan and participate in 
+negotiations  based on TESDA 
+Training Regulation s  
+LO 1. Plan negotiations  
+1.1 Identify and include information on 
+preparing for negotiation in the plan  
+1.2 Identify and include information on 
+creating nonverbal environments for 
+positive negotiating in the plan  
+1.3 Identify and include information on active 
+listening in the plan  
+1.4 Identify an d include information on 
+different questioning techniques in the 
+plan  
+1.5 Check information to ensure it is correct 
+and up -to-date  
+TLE_ICTP .NET
+11-12DPN-Ib-
+c-8 
+ Codes of practice and guidelines 
+for the organization   
+ Organization ’s polic ies and 
+procedures for negotiations   
+ Decision making and conflict 
+resolution strategies procedures     LO 2. Participate in negotiations  
+2.1 Agree on criteria for successful outcome by 
+all parties  
+2.2 Consider desired outcome of all parties  
+2.3 Use appropriate language throughout the 
+negotiation.  
+2.4 Use a variety of questioning techniques  
+2.5 Document ation and agree ment on the TLE_ICTP .NET
+11-12DPN-Ic-
+9
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 9 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Problem -solving strategies to deal 
+with unexpected questions and 
+attitudes during negotiation  
+ Interpersonal skills to develop 
+rapport with other parties  issues and processes by all parties  
+2.6 Discuss possible solutions and assess their 
+viability  
+2.7 Confirm and record areas for agreement  
+2.8 Agree on follow -up action by all parties  
+LESSON  4: SOLVE PROBLEM RELATE D TO WORK ACTIVITIES  (PRW ) 
+ Competence includes a thorough 
+knowledge and understanding of 
+the process, normal operating 
+parameters, and product quality 
+to recognize nonstandard 
+situations  
+ Competence to include the ability 
+to apply and explain, sufficient for 
+the identification of fundamental 
+cause, determining corrective 
+action and provision of 
+recommendations  
+- Relevant equipment and 
+operational processes  
+- Enterprise goals, targets , and 
+measures  
+- Enterprise quality, OHS , and 
+environmental requirement  
+- Principles of decision -making 
+strategies and techniques  
+- Enterprise information systems 
+and data collation  
+- Industry codes and standards  
+ Using a range of formal problem -
+solving techniques  
+ Identifying and clarifying the 
+nature of the problem  
+ Devising the best solution  
+ Evaluating the solution  
+ Implementation of a developed 
+plan to rectify the problem  The learner s demonstrate  
+an understanding  of the 
+principles and concepts in  
+solving problems in the 
+workplace , including the 
+application of problem -
+solving techniques , and in 
+resolving  the root cause of 
+problems  The learners  independently 
+solve problems in the 
+workplace , including the 
+application of problem - 
+solving techniques based on 
+TESDA Training Regulation s LO 1.Identify the problem  
+1.1 Identify variances from normal operating 
+parameters and product quality  
+1.2 Define extent, cause , and nature are of the 
+problem through observation, 
+investigation , and analytical techniques  
+1.3 State and specify problems clearly  TLE_ICTP .NET
+11-12PRW -Ic-
+10
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 10 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Using a range of formal problem -
+solving techniques  
+ Identifying and clarifying the 
+nature of the problem  
+ Devising the best solution  
+ Evaluating the solution  
+ Implementation of a developed 
+plan to rectify the problem    LO 2. Determine fundamental causes of 
+the problem  
+2.1 Identify possible causes based on 
+experience and the use of problem -solving 
+tools/ analytical techniques  
+2.2 Develop possible cause statements based 
+on findings  
+2.3 Identify fundamental causes per results of 
+investigation conducted  
+ TLE_ICTP .NET
+11-12PRW-Ic-
+11 
+ 
+ Using a range of formal problem -
+solving techniques  
+ Identifying and clarifying the 
+nature of the problem  
+ Devising the best solution  
+ Evaluating the solution  
+ Implementation of a developed 
+plan to rectify the problem    LO 3. Determine corrective action  
+3.1 Consider all possible options for resolution 
+of the problem  
+3.2 Consider strengths and weaknesses of 
+possible options  
+3.3 Determine corrective actions to resolve the 
+problem and possible future causes  
+3.4 Develop action plans identifying 
+measurable objectives,  resource needs , 
+and timelines in accordance with safety 
+and operating procedures  
+ TLE_ICT P.NET
+11-12PRW-Id-
+12 
+ 
+ Identifying and clarifying the 
+nature of the problem  
+ Devising the best solution  
+ Evaluating the solution  
+ Implementation of a developed 
+plan to rectify the problem  
+   LO 4. Provide recommendations to 
+manager.  
+4.1 Prepare reports on recommendations  
+4.2 Present recommendations to appropriate 
+personnel  
+4.3 Follow  up recommendations, if required  TLE_ICTP .NET
+11-12PRW-Id-
+13 
+ 
+LESSON  5: USE MATHEMATICAL CON CEPTS AND TECHNIQUES  (MCT)  
+ Fundamental operation (addition, 
+subtraction, division, 
+multiplication)  
+ Measurement system  
+ Precision and accuracy  
+ Basic measuring tools/devices  
+ The learner s demonstrate  
+an understanding  of the 
+principles and concepts in  
+selecting, sourcing , and 
+applying appropriate and 
+affordable technologies in 
+the workplace  
+ The learners  independently 
+select, source , and apply 
+appropriate and affordable 
+technologies in the 
+workplace  based on TESDA 
+Training Regulation s LO 1. Identify mathematical tools and 
+techniques to solve problems  
+1.1 Identify problem areas based on the given 
+condition  
+1.2 Select mathematical techniques based on 
+the given problem  
+ TLE_ICTP .NET
+11-12MCT-Id-
+14
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 11 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Measurement system  
+ Precision and accuracy  
+ Basic measuring tools/devices  
+ Applying mathematical 
+computations  
+ Using calculator  
+ Using different measuring tools    LO 2. Apply mathematical procedure/  
+solution.  
+2.1 Apply mathematical techniques based on 
+the problem identified  
+2.2 Perform mathematical computations to the 
+level of accuracy required for the problem  
+2.3 Determine results of mathematical 
+computation and verify based on job 
+requirements  
+ TLE_ICTP .NET
+11-12MCT-Id-
+15 
+ 
+ Precision and accuracy  
+ Applying mathematical 
+computations  
+ Using calculator  
+ Using different measuring tools  
+  
+ 
+ 
+ 
+ 
+  LO 3. Analyze results.  
+1.1 Identify problem areas based on given 
+condition.  
+1.2 Apply appropriate action in case of error.  
+ TLE_ICTP .NET
+11-12MCT-Ie-
+16 
+LESSON  6: USE RELEVANT TECHNOL OGIES  (URT)  
+ Awareness of technology and its 
+function s 
+ Repair and maintenance 
+procedure  
+ Operating instructions  
+ Applicable software  
+ Communication techniques  
+ Health and safety procedure s 
+ Company policy in relation to 
+relevant technology  
+ Different management concepts  
+ Technology adaptability  
+ The learner s demonstrate  
+an understanding  of the 
+principles and concepts in  
+applying mathematical 
+concepts and techniques  The learners  independently 
+apply mathematical concepts 
+and techniques  based on 
+TESDA Training Regulation s LO 1. Study/Select appropriate 
+technologies  
+1.1 Determine usage of different technologies 
+based on job requirements  
+1.2 Select appropriate technology as per work 
+specification  
+ TLE_ICTP .NET
+11-12URT-Ie-
+17 
+ 
+ Repair and maintenance 
+procedure  
+ Operating instructions  
+ Applicable software  
+ Communication techniques  
+ Health and safety procedure s 
+ Company policy in relation to 
+relevant technology    LO 2. Apply relevant technologies.  
+2.1 Use relevant technology effectively in 
+carrying out function s 
+2.2 Use applicable software and hardware as 
+per task requirement  
+2.3 Observe and practice management 
+concepts as per established industry 
+practices  TLE_ICTP .NET
+11-12URT-Ie-
+18
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 12 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Different management concepts  
+ Technology adaptability  
+ Relevant technology 
+application/implementation  
+ Basic communication skills  
+ Software applications skills  
+  
+ Relevant technology 
+application/implementation  
+ Basic communication skills  
+ Software applications skills  
+ Basic troubleshooting skills  
+ 
+ 
+   LO 3. Maintain/Enhance relevant 
+technology  
+3.1 Apply maintenance of technology in 
+accordance with industry -standard 
+operating procedure, manufacturer’s 
+operating guidelines , and occupational 
+health and safety procedure to ensure its 
+operative ability  
+3.2 Maintain technology update  through 
+continuing education or training in 
+accordance with job requirement  
+3.3 Report immediately technolog y failure/ 
+defect to responsible  person or section for 
+appropriate action  TLE_ICTP .NET
+11-12URT -Ie-
+19 
+ 
+COMMON COMPETENCIES  
+LESSON  7: APPLY QUALITY STANDA RDS (AQS)  
+ Relevant production processes, 
+materials , and products  
+ Characteristics of materials, 
+software , and hardware used in 
+production processes  
+ Quality checking procedures  
+ Workplace procedures  
+ Safety and environmental aspects 
+of production processes  
+ Fault identification and reporting  
+ Quality improvement processes  
+ Reading skills required to 
+interpret work instruction s The learner s demonstrate  
+an understanding  of the 
+principles and concepts  in 
+applying quality standards  The learners  independently 
+apply quality standards  
+based on TESDA Training 
+Regulation s LO 1. Assess quality of received materials  
+1.1 Obtain work instruction and carry out work 
+in accordance with standard operating 
+procedures  
+1.2 Check and receive materials against 
+workplace standards and specifications  
+1.3 Identify and isolate faulty materials related 
+to work  
+1.4 Record and/or report faults and any 
+identified causes to the supervisor 
+concerned in accordance with workplace 
+procedures  
+1.5 Replace faulty materials in accordance with 
+workplace procedures  
+ TLE_ICTP .NET
+11-12-AQS-If-
+20
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 13 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Communication skills needed to 
+interpret and apply defined work 
+procedures  
+ Carry out work in accordance with 
+OHS policies and procedures  
+ Critical thinking  
+ 
+ Relevant production processes, 
+materials , and products  
+ Characteristics of materials, 
+software , and hardware used in 
+production processes  
+ Quality checking procedures  
+ Workplace procedures  
+ Safety and environmental aspects 
+of production processes  
+ Fault identification and reporting  
+ Quality improvement processes  
+ Reading skills required to 
+interpret work instruction s 
+ Communication skills needed to 
+interpret and  apply defined work 
+procedures  
+ Carry out work in accordance with 
+OHS policies and procedures  
+ Critical thinking  
+ Solution providing and decision  
+making  
+   LO 2. Assess own work.  
+2.1 Identify and use documentation relative to 
+quality within the company  
+2.2 Check completed work against workplace 
+standards relevant to the task undertaken  
+2.3 Identify and isolate errors  
+2.4 Record information on the quality and 
+other indicators of production performance 
+in accordance with workplace procedures  
+2.5 Document and report cause s in cases of 
+deviations from specific quality standards 
+in accordance with the workplace  
+standards operating procedures  
+ TLE_ICTP .NET
+11-12AQS-Ig-
+21 
+ 
+ Relevant production processes, 
+materials , and products  
+ Characteristics of materials, 
+software , and hardware used in 
+production processes  
+ Quality checking procedures  
+ Workplace procedures  
+ Safety and environmental aspects 
+of production processes    LO 3. Engage in quality improvement  
+3.1 Participate in process improvement 
+procedures relative to workplace 
+assignment  
+3.2 Carry out work in accordance with process 
+improvement procedures  
+3.3 Monitor performance of operation or 
+quality of product of service to ensure 
+customer satisfaction  TLE_ICT P.NET
+11-12AQS-Ih-
+22
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 14 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Fault identification and reporting  
+ Quality improvement processes  
+ Reading skills required to 
+interpret work in struction s 
+ Communication skills needed to 
+interpret and apply defined work 
+procedures  
+ Carry out work in accordance with 
+OHS policies and procedures  
+ Critical thinking  
+ Solution providing and decision  
+making   
+LESSON  8: PERFORM COMPUTER OPE RATIONS  (PCO)  
+ Reading and comprehension skills 
+required to interpret work 
+instructions and to interpret basic 
+user manuals  
+ OH and S principles and 
+responsibilities  
+ Main types of computers and 
+basic features of  different 
+operating systems  
+ Main parts of a computer  
+ Storage devices and basic 
+categories of memory  
+ Relevant types of software  
+ General security, privacy 
+legislation , and copyright  The learner  demonstrates  
+an understanding  of the 
+principles and concepts in  
+performing computer 
+operations  The learners  independently 
+perform computer 
+operations  based on TESDA 
+Training Regulation s LO 1. Plan and prepare for the task  at 
+hand  
+1.1 Determine task requirements in 
+accordance with the required output  
+1.2 Select appropriate hardware and software 
+according to task assigned and required 
+outcome  
+1.3 Plan task to ensure that OH and S 
+guidelines and procedures are followed  
+1.4 Follow client -specific guidelines and 
+procedures  
+1.5 Apply required data security guidelines in 
+accordance with exist ing procedures  
+ 
+ TLE_ICTP .NET
+11-12-PCO-Ii-
+23 
+ 
+ Relevant types of software  
+ Communication skills to identify 
+lines of communication, request 
+advice, follow instructions , and 
+receive feedback  
+ Storage devices and basic 
+categories of memory  
+ Basic ergonomics of keyboard and 
+computer user    LO 2. Input data into computer  
+2.1 Enter data into the computer using 
+appropriate program/application in 
+accordance with company procedure  
+2.2 Check accuracy of information and 
+information saved in accordance with 
+standard operating procedures  
+2.3 Store inputted data in storage media 
+according to requirements  
+2.4 Perform work within ergonomic guidelines  TLE_ICTP .NET
+11-12-PCO-Ij-
+24
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 15 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Relevant types of software  
+ Business application  
+ System software  
+ Basic ergonomics of keyboard and 
+computer user  
+   LO 3. Access information using computer.  
+3.1 Select correct program/application -based 
+on job requirements  
+3.2 Access program/application containing the 
+information required according to company 
+procedures  
+3.3 Select, open , and close desktop icons 
+correctly for navigation purposes  
+3.4 Carry out keyboard techniques in line with 
+OHS requirements for safe use of 
+keyboards  
+ TLE_ICT P.NET
+11-12-PCO-
+IIa-25 
+ 
+ Relevant types of software  
+ Computer peripherals  
+ Storage devices and basic 
+categories of memory    LO 4. Produce output/data using 
+computer system  
+4.1 Process entered data using appropriate 
+software commands  
+4.2 Print data as required using computer 
+hardware/peripheral devices in accordance 
+with standard operating procedures  
+4.3 Transfer files and data between compatible 
+system s using computer software  and 
+hardware/peripheral devices in accordance 
+with standard operating procedures  
+ TLE_ICTP .NET
+11-12-PCO-
+IIb-c-26 
+ 
+ 
+ Web surfing  
+ Web browsers  
+ Search engines  
+ URLS and keywords  
+ Links 
+ Bookmarking  
+    
+LO 5. Use basic functions of a Web  
+browser to locate information  
+5.1 Establish information requirements for 
+Internet search  
+5.2 Launch browser  
+5.3 Load search engine  
+5.4 Enter appropriate search criteria and/or 
+URL of site  
+5.5 Follow relevant links to locate required 
+information  
+5.6 Bookmark and print useful pag es as 
+required  
+  
+TLE_ICTP .NET
+11-12-PCO-
+IId-27
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 16 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ 
+ Security measures  
+ Anti-virus software/programs  
+ File management     
+LO 6. Maintain computer equipment  
+6.1 Implement procedures for ensuring 
+security of data, including regular back -ups 
+and virus checks in accordance with 
+standard operating procedures  
+6.2 Implement basic file maintenance 
+procedures in line with standard operating 
+procedures  
+  
+TLE_ICTP .NET
+11-12-PCO-
+IIe-28 
+ 
+ 
+ 
+CORE COMPETENCIES  
+LESSON  9: PERFORM PROGRAMMING IN HTML5 WITH JAVASCRIPT AND CSS3 (PPHJC)  
+ HTML, Java, and CSS3  
+ Different business domain 
+features  
+ Functions and documentation of 
+business processes  
+ Production and documentation of 
+interaction  diagrams  
+ Creation and configuration of 
+HTML5 document  
+ Cascading Style Sheet 3 (CSS3)  
+ Designing HTML5 document using 
+CSS3 The learners demonstrate an 
+understanding of the 
+principles and concepts in 
+performing programming in 
+HTML5 with JavaScript and 
+CSS3 The learners independently 
+demonstrate the programming 
+in HTML5 with JavaScript and 
+CSS3 LO 1. Develop basic HTML document using 
+HTMP5 and CSS 3 syntax  
+1.1 Illustrate different business domain 
+features  
+1.2 Document business processes using 
+agreed -on representation format  
+1.3 Describe the interaction of the objects with 
+the business logic in details  
+1.4 Document interaction diagrams using 
+agreed representation format  
+1.5 Create and configure an HTML document 
+according to user’s specification  
+1.6 Design HTML5 document using Cascading  
+Style Sheet 3 (CSS3)  
+ TLE_ICTP.NET
+11-12PPHJC -
+IIf-i-29 
+ 
+ Using jQuery to simplify code of 
+common JavaScript APIs  
+ Creating forms that use the new 
+HTML5 input types  
+ Validation of user input using the 
+new HTML5 attributes  
+ Writing JavaScript code for non - 
+HTML5 attributes  
+ Provision of feedback for HTML5 
+and non -HTML5 attributes  
+ Styles of text elements    LO 2. Create HTML5 document using 
+advanced techniques with JavaScript and 
+CSS3  
+2.1   Create static pages using new features 
+available in HTML5  
+2.2 Use CSS3 applying  basic styling to the 
+elements in an HTML5 page  
+2.3 Explain the syntax and use of JavaScript 
+with HTML5  
+2.4 Write JavaScript code that manipulates the 
+HTMLDOM and handle events  TLE_ICTP.NET
+11-12PPHJC -
+IIj-IIIa-d-30
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 17 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Using CSS3 selectors  
+ Implementation of CSS3 Graphical 
+effects and transformations  
+ Knowledge of UML or other model 
+and function  
+ Creating document structure  
+ Writing code that interacts with 
+UI controls  
+Applying style to HTML 
+elements programmatically  2.5 Describe the use of jQuery to simplify code 
+that uses many common JavaScript APls  
+2.6 Create forms that use the new HTML5 
+input types  
+2.7 Validate user input and provide feedback 
+by using the new HTML5 attributes  
+2.8 Write JavaScript code to validate user input 
+and provide cases where it is not suitable 
+to use HTML5 attributes  
+2.9 Implement graphical e ffects and 
+transformations by using the CSS3 
+properties  
+2.10 Apply style to block elements by using 
+CSS3 
+2.11 Use CSS3 selectors to specify the elements 
+to be styled in a Web application  
+2.12 Style text elements on an HTML5 page by 
+using CSS3  
+ Using XML HTTP Request object  
+ Simplifying codes using jQuery 
+Ajax method  
+ Benefits of structuring JavaScript 
+code 
+ Creating custom objects in 
+JavaScript  
+ Extending custom and native 
+objects  
+ Implementing HTML5 APIs  
+ Establishing the scope of objects  
+and variables  
+ Creating and implementing 
+objects and methods  
+ Implementing program flow  
+ Raising and handling an event  
+ Implementing exception handling  
+ Implementing callback  
+ Serializing, deserializing, and 
+transmitting data    LO 3. Communicate with Remote Data 
+Source and create objects and methods 
+using JavaScript  
+3.1 Serialize, deserialize, send, and receive 
+data by using XMLHTTP Request object  
+3.2 Simplify code that serializes, deserializes, 
+sends, and receives data by using the 
+jQuery Ajax method  
+3.3 Describe the be nefits of structuring 
+JavaScript code carefully to aid 
+maintainability and extensibility  
+3.4 Explain best practices for creating custom 
+objects in JavaScript  
+3.5 Describe how to extend custom and native 
+objects to add functionality  
+ TLE_ICTP.NET
+11-12PPHJC -
+IIId-h-31
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 18 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Using Drag -and-Drop-and-File 
+APIs 
+ Incorporating audio and video 
+into a Web application  
+ Using the Geolocation API  
+ Debugging and profiling a Web 
+application  
+ Detecting device capabilities  
+ Creating a Web page that can 
+dynamically adapt its layout  
+ Saving  and retrieving data using 
+the Local Storage API  
+ Using the Application Cache API  
+ Providing offline support for a 
+Web application  
+ Different form factors in a Web 
+application  
+ Detecting device capabilities  
+ Creating a Web page that can 
+dynamically adapt its layout    LO 4. Create interactive user interface and 
+add offline support for Web applications  
+4.1 Use Drag-and-Drop-and-File APIs to 
+interact with files in a Web application.  
+4.2 Incorporate audio and video into a Web 
+application.  
+4.3 Detect location of the user run ning a Web 
+application by using the Geolocation API.  
+4.4 Explain how to debug and profile a Web 
+application by using the Web Timing API.  
+4.5 Describe the need to detect device 
+capabilities and react to different form 
+factors in a Web application.  
+4.6 Create a Web page that can dynamically 
+adapt its layout to match different form 
+factors  
+4.7 Save data and retrieve locally on the user's 
+computer by using the Local Storage API  
+4.8 Provide offline support for a Web 
+application by using the Application Cache 
+API 
+ TLE_ICTP.NET
+11-12PPHJC -
+IIIh-j-IVa-d-
+32 
+ 
+ 
+ Scalable Vector Graphics and its 
+uses 
+ Drawing Complex graphics on  
+HTML5 Canvas element  
+ Writing and Using JavaScript 
+code.  
+ Application of CSS transitions  
+ Different types of 2D and 3D 
+transitions  
+ Using CSS key -frames  
+ Implementation of Complex 
+animations  
+ Styling HTML text properties  
+ Styling HTML box properties  
+ Creating a flexible content layout     
+LO 5. Use CSS3 to create  scalable graphics 
+and animated user interface  
+5.1 Use Scalable Vector Graphics to add 
+interactive graphics to an application.  
+5.2 Draw complex graphics on an HTML5 
+Canvas element by using JavaScript code.  
+5.3 Apply CSS transitions to elements on an 
+HTML5 page, and write JavaScript code to 
+detect when a transition has occurred  
+5.4 Describe different types of 2D and 3D 
+transitions available with CSS3  
+5.5 Implement complex animations by using 
+CSS key -frames and JavaScript code   
+TLE_ICTP.NET
+11-12PPHJC -
+IVd-h-33
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 19 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Creating an animated and 
+adaptive UI  
+ Finding elements by using CSS 
+selectors and jQuery  
+ Structuring CSS file by using CSS 
+selectors  
+ Domain modeling / Object -
+Oriented breakdown and 
+encapsulation  
+ Function breakdown and 
+encapsulation  
+ Interaction diagram modeling.  
+ Detailed / step -by-step process 
+modeling  
+ Writing Website with HTML5, 
+CSS3, and JavaScript  
+ How Web Sockets Work  
+ How to send and receive data 
+through a Web socket  
+ Connecting Web Socket API to a 
+Web Socket server  
+ The purpose of a Web Worker 
+process and its uses  
+ Asynchronous processing  
+ Using Web Worker APIs to create, 
+run, and monitor the process  
+ Usage of IDE 
+ Debugging, Testing, Tracing and 
+SQL 
+ Manipulating XML and JSON  
+ Creating an installation package  
+ Deploying and configuring 
+installation package    LO 6. Implement real -time 
+communications by using Web Sockets 
+and Web Worker process  
+6.1 Explain how Web Sockets  work and 
+describe how to send and receive data 
+through a Web Socket  
+6.2 Use Web Socket API with JavaScript to 
+connect to a Web Socket server, send and 
+receive data, and handle the different 
+events that can occur when a message is 
+sent or received  
+6.3 Describe t he purpose of a Web Worker 
+process and how it can be used to perform 
+asynchronous processing as well as provide 
+isolation for sensitive operations  
+6.4 Use Web Worker APIs from JavaScript code 
+to create, run, and monitor a Web Worker 
+process  
+6.5 Follow Occupational health and safety 
+standards in the workplace and 5S 
+disciplines strictly as per enterprise policies 
+and procedures  TLE_ICTP.NET
+11-12PPHJC -
+IVi-j-Ia-c-34
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 20 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+LESSON  10: DEVELOP ASP.NET MVC 5 WEB APPLICATIONS (DAMWA)  
+ 
+ Preparing the feature list in line 
+with client requirements  
+ Gathering client information and 
+requirements  
+ Using Effective Excel Survey form  
+ Release plan on dependencies 
+and business values  
+ Visual presentation and 
+supporting documents  
+ Completion of the fe ature list and 
+establishing design approach  
+ Estimation of time per task based 
+on degree of complexity and size  
+ Using OneNote and Team Sites  
+ Using Lync Online  
+ Analysis of development 
+resources  
+ Formulation and documentation 
+of the Used test -case scenarios  
+ Plotting the test case using Excel 
+Worksheets  
+ Documentation of business 
+process  
+ Understand the value of an end -
+to-end view of Application 
+Lifecycle Management (ALM) tools 
+and practices   
+The learners demonstrate an 
+understanding of principles 
+and concepts in developing 
+ASP.NET MVC 5 Web 
+applications   
+The learners independently 
+develop ASP.NET MVC 5 Web 
+applications   
+LO 1. Employ basic project management 
+tasks  
+1.1 Prepare feature list in line with client 
+requirements  
+1.2 Use effective Excel Survey form to gather 
+client i nformation and requirements  
+1.3 Prepare release plan and agree with clients 
+based on dependencies and business 
+values  
+1.4 Present visual presentation and supporting 
+documents during the client meeting  
+1.5 Identify required tasks to complete the 
+feature based on featur e list and 
+established design approach  
+1.6 Assign time estimates per task based on 
+degree of complexity and size  
+1.7 Perform analysis of development 
+resources.  
+1.8 Itemize Tasks and To -do list using 
+OneNote and Team Sites  
+1.9 Use Lync Online effectively for online 
+interna l meetings throughout the project 
+development  
+1.10 Formulate used test -case scenarios and 
+document using specified format and in 
+line with client requirements  
+1.11 Plot test cases in Excel Worksheets  
+1.12 Document business process using agreed -
+on representation format   
+TLE_ICTP.NET
+11-12DAMWA -
+Ic-h-35 
+ 
+ 
+ The architecture of .NET 
+Framework applications  
+ Introduction to Web Forms 
+Architecture  
+ Using Visual Studio 2013 version 
+or higher     
+LO 2. Perform Object -Oriented 
+Programming with C#  
+2.1 Describe the architecture of .NET 
+Framework applications and use the 
+features that Visual Studio 2013 or higher 
+and programming language provided to  
+TLE_ICTP.NET
+11-12DAMWA - 
+Ih-j-IIa-c-36
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 21 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Using the basic data types, 
+operators, and expressions  
+ Construction of standard 
+programming language  
+ Using Create and invoke methods, 
+pass parameters to methods, and 
+return values from method  
+ Creating Overloaded methods  
+and using optional & output 
+parameters  
+ Handling Exceptions and writing 
+information to the event log  
+ Building large -scale applic ations  
+ Requirements for implementing 
+logging, tracing, and profiling  
+ Principles of object -oriented 
+programming  
+ Defining, creating Custom classes 
+and implementing Custom 
+interfaces  
+ Using generics to implement type -
+safe collections  
+ Creating a class hierarchy  
+ Defining and using Abstract 
+classes and inherit  
+ Using inherit from .NET 
+Framework classes and extension 
+methods  
+ Adding custom functionality to the 
+inherited class  support .NET Framework development  
+2.2 Use the basic data types, operators, and 
+expressions  
+2.3 Use the constructe d standard programming 
+language  
+2.4 Use the created and invoked methods, 
+passed parameters to methods, and 
+returned values from methods  
+2.5 Create overloaded methods and use 
+optional & output parameters  
+2.6 Catch and handle exceptions and write 
+information to the ev ent log  
+2.7 Explain the requirement for implementing 
+logging, tracing, and profiling when 
+building large -scale applications  
+2.8 Describe principles of object -oriented 
+programming  
+2.9 Create and use custom classes  
+2.10 Define and implement custom interfaces  
+2.11 Use generics to implement type -safe 
+collections  
+2.12 Define and inherit abstract classes from 
+base classes to create a class hierarchy.  
+2.13 Use inherit from .NET Framework classes 
+and extension methods to add custom 
+functionality to the inherited class  
+2.14 Create generic classes and m ethods  
+ 
+ 
+ Introduction to ASP.NET  
+ Knowing the difference between 
+ASP and ASP.NET  
+  Web Forms  
+  Web Services  
+ Enumerating ASP.NET features     
+LO 3. Develop ASP.NET Web Applications 
+using Model View Controller architectural 
+pattern.  
+3.1 Learning basics of building an ASP.NET 
+MVC 5 Web app using Visual Studio 2013 
+or higher  
+3.2 Describe the Microsoft Web Technologies  
+TLE_ICTP.NET
+11-12DAMWA - 
+IIc-g-37
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 22 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ The Microsoft Web Technologies 
+stack 
+ Selection of appropriate 
+technology to develop  any given 
+application  
+ The architecture of a Web 
+application  
+ Page Class  
+ Web Forms Life Cycle  
+ Web Forms Event Model  
+ Designing address business 
+models  
+ User interface requirements and 
+functional requirements  
+ Creating the MVC Models  
+ Razor  
+ Writing Code that implements 
+business logic within Model 
+method  
+ Managing user interaction  
+ Adding controllers to an MVC 
+Application  
+ Editing data and updating models  
+ Create interaction with Models 
+and Controllers  
+ Design and implement MVC 
+controllers and actions  
+ Design and imp lement routes  
+ Control application behavior by 
+using MVC controllers and actions  
+ Design and implement routes  
+ Control application behavior by 
+using MVC extensibility points  stack 
+3.3 Select and use appropriate technology to 
+develop any given application  
+3.4 Design architecture of Web application to 
+meet a set of functional requirements, user 
+interface requirements, and address 
+business models  
+3.5 Design the implementation of a Web 
+application that will meet a set of 
+functional requirements, user interface 
+requirements, and address business 
+models  
+3.6 Create  MVC Models  
+3.7 Write code that implements business logic 
+within Model methods, properties, and 
+events.  
+3.8 Add controllers to an MVC Application to 
+manage user interaction  
+3.9 Update models  
+3.10 Select and return Views  
+3.11 Use Razor syntax to create Views in an 
+MVC applicatio n that display  
+3.12 Edit data  
+3.13 Interact with Models and Controllers  
+ 
+ Using Visual Studio  
+ Testing and debugging  
+ Run tools on testing and 
+debugging     
+LO 4. Test and debug ASP.NET MVC Web 
+Applications.  
+4.1 Run unit tests and debugging tools against 
+a Web application in Visual Studio   
+TLE_ICTP.NET
+11-12DAMWA - 
+IIh-j-IIIa-38
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 23 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ Application Tracing  
+ Page Tracing  
+ Configuring the application for 
+troubleshooting  4.2 Configure an application for 
+troubleshooting  
+ 
+ Using the ASP.NET routing engine  
+ Developing the friendly URLs  
+ Using Template Views  
+ Application of a consistent look 
+and feel  
+ Adapting Web pages for different 
+browsers  
+ 
+ 
+    
+LO 5. Create custom URLs and apply style 
+to ASP.NET MVC Web applications.  
+5.1 Develop a Web application that uses the 
+ASP.NET routing engine to present friendly 
+URLs 
+5.2 Develop a Web application that uses the 
+ASP.NET routing engine to a logical 
+navigation hierarchy to users  
+5.3 Use Template Views  
+5.4 Apply a consistent look and feel to an MVC 
+Application  
+5.5 Adapt Web pages for differen t browsers   
+TLE_ICTP.NET
+11-12DAMWA - 
+IIIb-f-39 
+ 
+ 
+ Using partial page updates and 
+caching to reduce the network 
+bandwidth  
+ Perform acceleration responses to 
+user requests  
+ Writing JavaScript code that runs 
+on the client side  
+ Utilizes the jQuery script library  
+ Optimizing the responsiveness of 
+an MVC Web application  
+ Implementing authentication in an 
+MVC Web application  
+ Implementing authorization in an 
+MVC Web application  
+ Using Role Provider  
+ Building a secure MVC application 
+that resists malicious attacks  
+ Building an MVC application that 
+persist information about users 
+and preferences     
+LO 6. Create responsive Web pages and 
+implementing security  
+6.1 Use partial page updates and caching to 
+reduce the network bandwidth used by an 
+application.  
+6.2 Perform accelerate responses to user 
+requests  
+6.3 Write JavaScript code that runs on the 
+client side  
+6.4 Utilize jQuery script library to optimize the 
+responsiveness of an MVC Web application  
+6.5 Implement authentication in an MVC Web 
+application using Membership Provider.  
+6.6 Implement authorization in an MVC Web 
+application using Role Provider  
+6.7 Build a secure MVC application that resists 
+malicious attacks  
+6.8 Build an MVC application that persist 
+information about users and preferences   
+TLE_ICTP.NET
+11-12DAMWA - 
+IIIf-j-40
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 24 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  CONTENT  CONTENT  STANDARD  PERFORMANCE  STANDARD  LEARNING  COMPETENCIES  CODE  
+ 
+ The Web API and its advantage  
+ Building a RESTful Web API  
+ Modifying the Web browser  
+ Using HTTP modules and HTTP 
+handlers  
+ How MVC application modifies 
+and handles browser requests  
+ Intercepting the browser request 
+using Web socket  
+ Writing codes for Windows Azure 
+Web service  
+ Writing codes to call the Web 
+service  
+ Packaging an ASP.NET MVC 4 
+Web application to a Web server 
+for staging or production  
+ Deploying an ASP.NET MVC 4 
+Web application to a Web server 
+for staging or production     
+LO 7. Create RESTful API, modify URLs, 
+and deploy ASP.NET MVC applications  
+7.1 Describe a Web API  
+7.2 Identify and explain why developers might 
+add a Web API to an application  
+7.3 Build RESTful Web API and consume from 
+other applications  
+7.4 Modify the way browser requests by an 
+MVC application using HTTP modules  and 
+HTTP handlers  
+7.5 Intercept request from browser using Web 
+sockets  
+7.6 Write Windows Azure Web service  
+7.7 Write code to call the Web service from 
+and MVC application  
+7.8 Pack an ASP.NET MVC 5 Web application 
+from a development computer to a Web 
+server for staging or  production  
+7.9 Deploy an ASP.NET MVC 5 Web application 
+from a development computer to a Web 
+server for staging or production  
+  
+TLE_ICTP.NET
+11-12DAMWA - 
+IVa-e-41
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 25 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes   
+RESOURCES  
+Methodologies  Assessment Method  
+TOOLS  EQUIPMENT  MATERIALS  
+ 
+Computer Software : 
+ e.g.,  Visual Studio  Express 
+2012 or higher  
+ Internet access  
+ MVC5 or higher  
+ Application servers  
+ Postman  
+e.g. 
+- SQL Server Express 2012 
+or higher  
+- IIS Express   
+ Network Computer (on 
+Windows 8 or higher) with 
+peripherals  
+ Network printer  
+ White board 
+ LCD projector and screen  
+ Ergonomic chairs and tables   
+ 1 free account 
+www.microsoftvirtualacadem
+y.com  
+ Practical Materials  
+ Handouts  
+ Reference Books  
+ Learning Materials/Guide  
+ 
+Learning Materials:  
+ Occupational Health and 
+Safety Handbook  
+ Books  
+ Multimedia Devices  
+ Pictures  
+ Magazines  
+ Manuals  
+ Handouts  
+ Brochures  
+ http://www.asp.net/mvc/ove
+rview/getting -started ) 
+ http://objectdiscovery.com/t
+raining/course/programming
+/microsoft/csharp/asp/outlin
+e.html   
+ Lecture/ discussion  
+ Hands -on 
+ Exercises  
+ Demonstration  
+ Multimedia Presentation  
+ Online   
+ Written exam  
+ Practical exam  
+ Observation in workplace  
+ Interviews/ questioning
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 26 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes   
+GLOSSARY  
+ 
+1.  ADO.NET  - a set of computer software components that programmers can use to access data and data services. It is  part of the base class library  
+that is included with the Microsoft .NET Framework . Commonly  used by programmers to access and modify data stored in relational 
+database systems , it can also access data in nonrelational sources. ADO.NET is sometimes considered an evolution of ActiveX Data 
+Objects  (ADO) technology, but was changed so extensively that it can be considered an entirely new product.  
+2.  ASP.NET  - a Web application framework  developed and marketed by Microsoft  to allow programmers  to build dynamic Web sites , Web 
+applications  and Web services . ASP.NET is built on the Common Language Runtime  (CLR), allowing programmers to write ASP.NET 
+code using any supported .NET language . 
+3.  Algorithm  - a type of effective method  in which a list of well -defined instructions for completing a task will, when given an initial state,  proceed 
+through a well -defined series of successive states, eventually terminating in an end -state. The transition from one state to the next is 
+not necessarily deterministic ; some algorithms, known as probabilistic algorithms , incorporate randomness.  
+4.  Artificial intelligence 
+programmer  - develops the logic the game uses to car ry out a large number of actions. An AI programmer may program pathfinding , strategy and 
+enemy tactic systems. This is one of the most challenging aspects of game programming and its  sophistication is developing rapidly.  
+5.  Browser  - a software package that provides the user interface for accessing Internet, intranet , and extranet Web sites. 
+6.  COBOL  - one of the oldest programming languages. Its name is an acronym  for COmmon Business -Oriented Language, defining its primary 
+domain in business , finance, and administrative systems for companies and governments.  
+7.  Compiler  - a computer program  (or set of programs) that transforms source code  written in a programming language  (the source language) into 
+another computer language (the target language, often having a binary form known as object code ). The most common reason for 
+wanting to transform source code is to create an executable  program.  
+8.  Computer  - a device that has the ability to accept data ,internally store and execute a program of instructions , perform mathematical, logical, and 
+manipulative operations on data , and report the results.  
+9.  Computer program  - also a software  program, or just a program ; a sequence of instructions  written to perform a specified task for a computer .  A computer 
+requires programs to function, typically executing  the program's instructions in a central processor .  The program has an executable  
+form that the computer can use directly to execute the instructions. The same program in its human -readable source code  form, from 
+which executable  programs are derived ( i.e., compiled ), enables a programmer  to study and develop its algorithms . 
+10.  Computer progr amming  - the iterative process of writing or editing source code . Editing source code involves testing, analyzing, and refining, and sometimes 
+coordinating with other programmers on a jointly developed program. A person who practices this skill is referred to as a computer 
+programmer , software developer , or coder. The sometimes lengthy process of computer programm ing is usually referred to as 
+software development . 
+11.  Computer Terminal  - any input/output device connected by telecommunications links to a computer.  
+12.  C language  - an imperative  (procedural ) systems implementation  language. It was designed to be compiled using a relatively straightforward 
+compiler , to provide low -level acces s to memory  and language constructs that map efficiently to machine instructions, and to require 
+minimal run-time support . C was therefore useful for many applicati ons that had formerly been coded in assembly language . 
+13.  C++ language  - a statically typed , free-form, multi-paradigm , compiled , general -purpose programming language . It comprises a combination of both  
+high-level and low-level language features. Some of its application domains include systems software, application software, device 
+drivers, embedded software, high -performance server , and client applications, and entertainment software such as video games . 
+14.  Data - objective measurements of the attributes (characteristics) of entities such as people, places, things, and events.
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 27 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  15.  Data access  - typically  refers to software and activities related to storing, retrieving, or acting on data housed in a database  or other repository. 
+Historically, different methods  and languages  were required for every repository, inc luding each different database, file system , etc., 
+and many of these repositories stored their content in different and incompatible formats.  
+16.  Decompiler  - the name given to a computer program  that performs the reverse operation to that of a compiler . That is, it translates a file containing 
+information at a relatively low level of abstraction (usually designed to be computer readable rather than human readable) in to a form 
+having a higher level of abstraction (usually designed to be human readable)  
+17.  Documentation  - a collection of documents or information.  
+18.  Edit - to modify the form or format of data  
+19.  End-user - anyone who uses an information  system or the information it produces.  
+20.  Ergonomics  - the science and technology emphasizing the safety, comfort, and ease of use of human -operated machines.  The goal of ergonomics is 
+to produce systems that are user -friendly: safe, comfortable and easy to use.  
+21.  HTML  - stands for HyperText  Markup Language ; it is the predominant markup language  for Web pages . It is written in the form of HTML 
+elements  consisting of "tags" surrounded by angle brackets  within the Web page content. It is the building blocks of all basic websites . 
+22.  Information  - data placed in a meaningful and useful context for an end user.  
+23.  Information and 
+Communication 
+Technology (ICT)  - refers to technologies associated with the transmission and exchange of data in the form of sound, text, visual images, signa ls or any 
+combination of those forms through the use of digital technology.  It encompasses such services as telecommunications, po sts, 
+multimedia, electronic commerce, broadcasting, and information technology.  
+24.  Integrated development 
+environment (IDE)  - a software application  that provides co mprehensive facilities to computer programmers  for software development . An IDE normally 
+consists of a source code editor , a compiler  and/or interpreter , build automation  tools, and (usually) a debugger . Typically an IDE is 
+dedicated to a specific programming language , so as to provide a feature set which most closely matches the programming paradigms  
+of the language. However, some multiple -language IDEs are in use, such as Eclipse , ActiveState Komodo , recent versions of NetBeans , 
+and Microsoft Visual Studio . 
+25.  Java - a general -purpose, concurrent, class -based, object -oriented language that is specifically designed to have as few implementation 
+dependencies as possible. It is intended to let application developers "write once, run anywhere". Java is currently one of t he most 
+popular programming languages in use, and is widely used from application software to Web applications  
+26.  Java applications  - are typically compiled  to bytecode  (class file ) that can run on any Java Virtual Machine  (JVM) regardless of computer architecture . 
+27.  Local Area Network 
+(LAN)  - a communications network that typically connects comput ers, terminals, and other computerized devices within a limited physical area 
+such as an office, building, manufacturing plant , and other work sites.  
+28.  Microsoft .NET 
+Framework  - a software framework  that can be installed on computers running Microsoft Windows  operating systems . It includes a large library  of 
+coded solutions to common programmin g problems and a common language infrastructure that manages the execution of programs 
+written specifically for the framework. The .NET Framework supports multiple programming languages  in a manner that allows 
+language interoperability, whereby each language can utilize code written in other languages; in particular, the .NET library is available 
+to all the programming languages that .NET encompasses.  
+29.  Microsoft SQL Server  - a relational model  database server  produced by Microsoft . Its primary query languages  are T-SQL and ANSI SQL . 
+30.  Object code  - or an object file —the representation of code that a compiler  or assembler  generates by processing a source code  file. Object files 
+contain compact code, often called "binaries". A linker  is typically used to generate an executable  or library  by linking object files 
+together. The only essential element in an object file is machine code  (code directly executed by a computer's CPU). Object files for 
+embedded systems  might contain nothing but machine code. However, object files often also contain data for use by the code at 
+runtime, relocation  information, program symbols  (names of variables and functions) for linking and/or debugging purposes, and other 
+debugging  information.
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 28 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  31.  Oracle For ms - a software product for creating screens that interact with an Oracle database . It has a typical IDE including an object navigator, 
+property sheet and code editor that uses PL/SQL . It was originally developed to run server -side in character mode terminal sessions. It 
+was ported to other platforms, including Windows, to function in a client –server  environment. Late r versions were ported to Java 
+where it runs in a Java EE  container and can integrat e with Java and Web services . The primary focus of Forms is to create data entry 
+systems that access an Oracle  database . 
+32.  Oracle Reports  - is a tool for developing reports against data stored in an Oracle database . Oracle Reports consists of Oracle Reports Developer (a 
+component of the Oracle Developer Suite ) and Oracle Application Server Reports Services (a comp onent of the Oracle Application 
+Server ). 
+33.  Outsourcing  - turning over all or part of an organization’s information systems operation to outside contractor s, known as systems integrators or 
+facilities management companies.  
+34.  Programming language  - an artificial language  designed to express computations  that can be performed by a machine , particularly a computer . Programming 
+languages can be used to create programs  that control the behavior of a machine, to express algorithms  precisely, or as a mode of 
+human communication.  
+35.  Program Evaluation and 
+Review Technique 
+(PERT)  - a statistical tool used in project management that is designed to analyze and represent the tasks involved in completi ng a given 
+project.  
+36.  Quality Assurance  - methods for ensuring that information systems are free from errors and fraud and provide information products of high quality . 
+37.  Relational database 
+management system 
+(RDBMS)  - a database management system  (DBMS) that is based on the relational mode l as introduced by E. F. Codd . Most popular commercial 
+and open source databases currently in use are based on the relational database model. A short definition of an RDBMS may be a 
+DBMS in which data is stored in the form of tables and the relationship among the data is also stored in the form of tables.  
+38.  Service -oriented 
+programming (SOP)  - a programming paradigm  that uses "services" as the unit of computer work, to design and implement integrated business applications 
+and mission critical  software programs. Ser vices can represent steps of business processes  and thus one of the main applications of 
+this paradigm is the cost -effective delivery of standalone or composite business ap plications that can “integrate from the inside -out.” 
+39.  Software  - computer programs and procedures concerned with the operation of an information system.  
+40.  Source code  - any collection of statements or declarations written in some human -readable  computer programming language . Source code is the 
+means most often used  by programmers  to specify the actions to be performed by a computer.  
+41.  SQL - often referred to as Structured Query Language ; a database  computer language designed for managing data in relational database 
+management systems  (RDBMS), and originally based upon relational algebra . Its scope includes data insert, query, update and delete, 
+schema  creation and modification, and data access control.  
+42.  Standards  - measures of performance developed to evaluate the progress of a system toward its objectives . 
+43.  System  - an assembly of methods, procedures, or techniques unified by regulated interaction to form an organized whole . 
+44.  User- friendly  - a characteristic of human -operated equipment and systems that makes them safe, comfortable, and easy to use.  
+45.  User interface  -  the system by which people ( users) interact  with a machine . The user interface includes hardware (physical) and software (logical) 
+components. User interfaces exist for various systems , and provide a means of: 1) input, all owing the users to manipulate a system ; 
+and/or 2) output, allowing the system to indicate the effects of the users' manipulation.  
+46.  VB.NET  - a redesigned, object -oriented dialect of Visual Basic . 
+47.  Web application  - an application  that is accessed over a network such as the Internet  or an intranet . The term may also mean a computer software 
+applica tion that is hosted in a browser -controlled environment (e.g. , a Java applet ) or coded in a browser -supported language (such as 
+JavaScript , combined with a browser -rendered markup language  like HTML ) and reliant on a common Web browser to render the 
+application executable .
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 29 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes   
+48.  Windows Forms  - the name given to the graphical  application programming interf ace (API)  included as a part of Microsoft's .NET Framework , providing 
+access to the native Microsoft Windows  interface elements by wrapping the existing Windows API  in managed code . While it is seen as 
+a replacement for the earlier and more complex C++ based Microsoft Foundation Class Library , it does not offer a paradigm 
+comparable to model –view–controller . 
+49.  Windows Forms 
+application  - an event -driven application  supported by Microsoft's .NET Framework . Unlike a batch program , it spends most of its time simply 
+waiting for the user  to do something, such as fill in a text box  or click a button . 
+50.  Work Breakdown 
+Structure (WBS)  - a deliverable oriented decomposition of a project into smaller components.
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 30 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes   
+CODE BOOK LEGEND  
+Sample: TLE_ICT P.NET11-12LWC -Ia-1 
+ 
+LEGEND  SAMPLE  
+ DOMAIN / COMPONENT  CODE  
+First Entry  Learning Area and 
+Strand/ Subject or  
+Specialization  Technology and Livelihood Education  TLE_ Basic Competencies   
+Information and Communications  
+ICT Lead Workplace Communication  LWC 
+Technology  Lead Small Teams  LST 
+Develop and Practice Negotiation Skills  DPN 
+Programming (.NET Technology) NC 
+III P.NET Solve Problem Related to Work Activities  PRW 
+Use Mathematical Concepts and Techniques  MCT 
+Grade Level  11 to 12  11-12 Use Relevant Technologies  URT 
+Uppercase Letter/s  Domain/ Content/ 
+Component/ Topic  Lead Workplace Communication  LWC  Common Competencies   
+Apply Quality Standards  AQS 
+Perform Computer Operations (PCO)  PCO 
+ - Core Competencies   
+Roman Numeral 
+*Zero if no specific 
+Quarter  Quarter  First Quarter  I Perform Programming in HTML with Javascript and 
+CSS3 PPHJC  
+Develop ASP.Net MVC 5 Web Applications  DAMWA  
+  
+Lower case letter/s 
+*put a hyphen ( -) in 
+between letters to 
+indicate more than 
+a specific week  Week  Week one  a   
+  
+  
+  
+  
+ -   
+Arabic Number  Competency  Communicate information about 
+workplace processes  1   
+ 
+Technology -Livelihood Education and Technical -Vocational Track specializations may be taken between Grades 9 to 12.   
+ 
+Schools may offer specializations from the four strands as long as the minimum number of hours for each specialization is met.  
+ 
+Please refer to the sample Curriculum Map on the next page for the number of semesters per ICT specialization and those that have pre -requisites.   Curriculum Maps may be 
+modified according to specializations offered by a school.
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 31 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  Notes:  
+1. What is it that we would like the students to learn —the  technical aspect of  (Programming) .Net or how to integrate it with  business? I t is good that we are 
+integrating both ends (technology and business) , but wouldn’t it be better  if we were  to focus on one? (the course itself is programming).  
+2. The scope of .Net technology itself is  big; specifically , ASP.Net comprises different technologies  (useful guide: http://www.as p.net/mvc/overview/getting -started ) 
+a. HTML5, CSS3, and JavaScript  
+b. Object Oriented Programming Language – C# 
+c. MVC Framework  
+i. Razor  
+ii. Webforms  
+d. Entity Framework  
+i. Code First  
+ii. Database First  
+e. RDBMS – MSSQL Server  
+i. Stored Procedures  
+f. Web Developer Tools  
+i. Visual Studio  
+ii. Postman  
+iii. SQL Server Management Studio  
+g. Deployment  
+i. IIS 
+ii. Azure  
+h. Design Patterns  
+i. Security  
+i. Simple Membership  
+ii. OAuth  
+j. Testing and Debugging  
+k. Creating Web APIs  
+l. Routing  
+3. We can still teach the students the knowledge on ho w to integrate technology with business while focusing on the programming.
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 32 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes  Computer Programming (.Net Technology) (NC III)+ 
+updated based on TESDA Training Regulations released December 28 , 2013 
+ *Telecom OSP Installation  
+(Fiber Optic Cable)  
+(NC II)  
+Computer Programming (Java ) (NC III)+ 
+updated based on TESDA Training Regulations released December 28 , 2013 
+ *Broadband Installation  
+(Fixed Wireless 
+Systems)  
+(NC II)  SAMPLE ICT CURRICULUM MAP** (as of May 2016 ) 
+Grade 7/8 (EXPLORATORY)  GRADES 9 -12 
+   
+4 sems          
+ 
+8 sems  
+   
+  
+  
+4 sems  
+   
+ 
+ 
+2 sems   
+2 sems  
+   
+4 sems     
+4 sems  
+    
+ 
+ 
+4 sems     
+4 sems  
+    
+ 
+4 sems     
+4 sems  
+   
+4 sems     
+4 sems  
+*       Please note that  these subjects have pre -requisites mentioned in the CG.  
++      CG updated based on new Training Regulations of TESDA.  
+ Pre-requisites of the subjects to the right should be taken up during these semesters.  
+ 
+ **This is just a sample .  Schools make their own curriculum maps 
+considering the specializations to be offered.   Subjects may be taken up 
+at any point during Grades 9 -12. Contact Center Services  (NC II)  
+Animation (NC II)  
+Medical Transcription  (NC II)   
+(NC II)  Illustration  (NC II)  Technical Drafting  (NC II)  
+Computer Programming (Oracle Database )  
+(NC III)+ 
+updated based on TESDA Training Regulations released December 28 , 2013 
+ *Telecom OSP and Subscriber Line Installation 
+(Copper Cable/POTS and DSL) (NC II)  Computer Systems  Servicing (NC II)+ 
+updated based on TESDA Training Regulations released December 28, 2007  
+EXPLORATORY
+K to 12 BASIC EDUCATION CURRICULUM  
+JUNIOR HIGH SCHOOL TECHNICAL LIVELIHOOD EDUCATION AND SENIOR HIGH SCHOOL - TECHNICAL -VOCATIONAL -LIVELIHOOD TRACK  
+INFORMATION AND COMMU NICATIONS TECHNOLOGY –PROGRAMMING (.NET TECHNOLOGY) NC III  
+(320 hours)  
+Page 33 of 33 K to 12 ICT – Programming (.Net Tech nology) NC III Curriculum Guide May 2016    *LO-Learning Outcomes   
+Reference:  
+ 
+Technical Education and Skills Development Authority -Qualification Standards Office. Training Regulations for Programming (.Net Technology) NC III . Taguig City, Philippines:  
+TESDA, 2013.
