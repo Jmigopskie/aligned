@@ -5,7 +5,16 @@
 // device asks for reduced motion. The 3D model loads after the page, with the
 // flat pictures as the fallback.
 
-const MOVES = ["wave", "hi", "think", "cheer", "celebrate", "point", "idea", "wink", "surprised", "proud"];
+// Moves whose props stay close to him: the light bulb ("idea") and the board
+// held overhead ("celebrate") would be cut off by the close framing.
+const MOVES = ["wave", "hi", "think", "cheer", "point", "wink", "surprised", "proud"];
+// Hanging upside down: open eyes (smiling ones read as shut when flipped) and
+// no board, whose writing would be upside down.
+const TOP_MOVES = ["surprised", "think", "unsure"];
+// He never covers the form; he keeps off the logo too when the window has the
+// room (a short laptop screen doesn't always).
+const FORM = [".auth-panel"];
+const FORM_AND_LOGO = [...FORM, ".auth-illustration img", ".auth-illustration .wordmark"];
 const PNG_FOR = { wave: "wave", hi: "wave", think: "think", cheer: "celebrate", celebrate: "celebrate", point: "point", idea: "idea" };
 const EDGES = ["left", "right", "bottom", "top"];
 const QUIET_AFTER_TYPING = 4000;
@@ -22,7 +31,6 @@ async function start() {
   document.body.append(layer);
 
   const alan = (await load3D(layer)) || loadPictures(layer);
-  const form = document.querySelector(".auth-panel");
   let size = 0, lastEdge = null, quietUntil = 0, shown = false, timer = 0;
 
   // Typing sends him away, and he stays away for a moment after.
@@ -33,9 +41,10 @@ async function start() {
   document.addEventListener("input", hush, true);
   document.addEventListener("focusin", (e) => { if (e.target.matches("input, textarea")) hush(); });
 
-  // Bigger on a big screen, never so big he crowds a phone.
+  // Sized by the window's height (most of a short laptop screen is width),
+  // never so wide he crowds a phone.
   function fit() {
-    size = Math.round(Math.min(330, Math.max(170, Math.min(innerWidth, innerHeight) * 0.38)));
+    size = Math.round(Math.max(170, Math.min(440, innerHeight * 0.6, innerWidth * 0.55)));
     layer.style.width = layer.style.height = `${size}px`;
     alan.resize(size);
   }
@@ -47,29 +56,33 @@ async function start() {
     if (edge === "left" || edge === "right") {
       const y = rand(H * 0.08, Math.max(H * 0.08, H * 0.92 - S));
       const lean = rand(18, 30) * (edge === "left" ? 1 : -1);
-      // Head and a wing round the edge: enough to fit beside the form on the right too.
-      const inX = edge === "left" ? -S * 0.58 : W - S * 0.42;
+      // Most of him round the edge: head, face and both wings.
+      const inX = edge === "left" ? -S * 0.38 : W - S * 0.62;
       const outX = edge === "left" ? -S * 1.15 : W + S * 0.15;
       return { show: [inX, y, lean], hide: [outX, y, lean], box: [Math.max(0, inX), y, Math.min(W, inX + S), y + S] };
     }
     const x = rand(W * 0.04, Math.max(W * 0.04, W * 0.96 - S));
     if (edge === "bottom") {
       const tilt = rand(-7, 7);
-      return { show: [x, H - S * 0.6, tilt], hide: [x, H + S * 0.08, tilt], box: [x, H - S * 0.6, x + S, H] };
+      return { show: [x, H - S * 0.74, tilt], hide: [x, H + S * 0.08, tilt], box: [x, H - S * 0.74, x + S, H] };
     }
     // From the top he hangs upside down.
     const tilt = 180 + rand(-8, 8);
-    return { show: [x, -S * 0.42, tilt], hide: [x, -S * 1.12, tilt], box: [x, 0, x + S, S * 0.58] };
+    return { show: [x, -S * 0.3, tilt], hide: [x, -S * 1.12, tilt], box: [x, 0, x + S, S * 0.7] };
   }
 
-  // Never over the form (with a margin), on any edge. A tilted square takes
-  // more room than a straight one, so the box grows by what the tilt adds.
-  function clearOfForm(box, deg) {
-    if (!form) return true;
-    const r = form.getBoundingClientRect();
+  // Never over the form or the logo (with a margin), on any edge. A tilted
+  // square takes more room than a straight one, so the box grows by what the
+  // tilt adds.
+  function clearOf(box, deg, selectors) {
     const a = (deg * Math.PI) / 180;
     const m = 12 + (size * (Math.abs(Math.sin(a)) + Math.abs(Math.cos(a)) - 1)) / 2;
-    return box[2] < r.left - m || box[0] > r.right + m || box[3] < r.top - m || box[1] > r.bottom + m;
+    return selectors.every((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return true;
+      const r = el.getBoundingClientRect();
+      return box[2] < r.left - m || box[0] > r.right + m || box[3] < r.top - m || box[1] > r.bottom + m;
+    });
   }
 
   const place = ([x, y, r]) => { layer.style.transform = `translate(${x}px, ${y}px) rotate(${r}deg)`; };
@@ -85,10 +98,11 @@ async function start() {
     if (document.hidden || Date.now() < quietUntil) return schedule(2500);
     fit();
     let where = null;
-    for (let i = 0; i < 16 && !where; i++) {
+    // Spots clear of the logo first; then any spot clear of the form.
+    for (let i = 0; i < 32 && !where; i++) {
       const edge = pick(EDGES.filter((e) => e !== lastEdge));
       const s = spot(edge);
-      if (clearOfForm(s.box, s.show[2])) where = { edge, ...s };
+      if (clearOf(s.box, s.show[2], i < 16 ? FORM_AND_LOGO : FORM)) where = { edge, ...s };
     }
     if (!where) return schedule(4000);
     lastEdge = where.edge;
@@ -96,7 +110,7 @@ async function start() {
     layer.style.transition = "none";
     place(where.hide);
     layer.dataset.hide = JSON.stringify(where.hide);
-    alan.play(pick(MOVES));
+    alan.play(pick(where.edge === "top" ? TOP_MOVES : MOVES));
     requestAnimationFrame(() => requestAnimationFrame(() => {
       layer.style.transition = "";
       place(where.show);
@@ -131,10 +145,10 @@ async function load3D(layer) {
     scene.add(sun);
     const model = createAlan();
     scene.add(model.root);
-    // Framed with room for his widest props (the board, the light bulb).
+    // Framed close, so he fills his square rather than floating in it.
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
-    camera.position.set(0, 1.2, 6.2);
-    camera.lookAt(0, 1.1, 0);
+    camera.position.set(0, 1.18, 4.75);
+    camera.lookAt(0, 1.12, 0);
     layer.append(renderer.domElement);
 
     const clock = new THREE.Clock();
