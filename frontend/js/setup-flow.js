@@ -2,7 +2,7 @@
 // big 3D Alan reacts on the right. The answers go to generator.js through
 // window.Generator; the step order and rules come from setup-flow-steps.js.
 // Guided mode continues on the same shell (guided-flow.js).
-import { createGuided } from "./guided-flow.js?v=2026-10-26j";
+import { createGuided } from "./guided-flow.js?v=2026-10-26o";
 
 const flow = document.getElementById("flow");
 const G = window.Generator;
@@ -19,6 +19,11 @@ const COPY = {
     q: "Which lesson plan format, and which school?",
     help: "Pick the format your school uses, then type the school's name.",
     say: "Hi! I'm Alan. Let's build your lesson plan together, a few questions at a time.",
+  },
+  assessment: {
+    q: "How will you assess this lesson?",
+    help: "I'll write the evaluation to match: the quiz items with an answer key, or the task with its rubric.",
+    say: "Let's settle the assessment first, so the whole lesson builds toward it.",
   },
   people: {
     q: "Who's teaching this lesson?",
@@ -371,6 +376,34 @@ function row(...cells) {
 // ---- answers per step ----
 const STEPS = {
   format: formatStep,
+  // A quiz (1 to 5 items, its count asked under it) or a performance task with a rubric.
+  assessment: () => {
+    const wrap = el("div", { class: "flow-answer" });
+    const paint = () => {
+      const a = G.getAnswers();
+      const choices = el("div", { class: "flow-choices flow-choices-stack flow-mode-choices", role: "group", "aria-labelledby": "flow-question" });
+      [
+        { value: "quiz", title: "Multiple-choice quiz", sub: "1 to 5 items, with an answer key." },
+        { value: "task", title: "Performance task with a rubric", sub: "Learners show the skill; a rubric scores it." },
+      ].forEach((m) => {
+        const btn = el("button", { type: "button", class: "flow-choice flow-format flow-mode", "aria-pressed": String(m.value === a.assessment) },
+          twoLine(m.title, m.sub), tick());
+        btn.addEventListener("click", () => {
+          G.setAnswers({ assessment: m.value, quizItems: G.getAnswers().quizItems || 5 });
+          paint();
+          refresh();
+        });
+        choices.append(btn);
+      });
+      const items = a.assessment === "quiz"
+        ? row(selectAnswer("flow-quiz-items", "Number of items", [1, 2, 3, 4, 5].map((n) => ({ value: n, label: `${n} item${n === 1 ? "" : "s"}` })),
+          a.quizItems || 5, (v) => G.setAnswers({ quizItems: parseInt(v, 10) })))
+        : "";
+      wrap.replaceChildren(choices, items);
+    };
+    paint();
+    return wrap;
+  },
   people: () => row(
     textAnswer("studentTeacher", { label: "Your name", placeholder: "e.g. Ana Cruz" }),
     textAnswer("coop", { label: "Cooperating / Subject Teacher", placeholder: "e.g. Juan Dela Cruz" }),
@@ -923,6 +956,8 @@ function classText(a) {
 // [step that holds the answer, label, value]
 const DETAIL_ROWS = [
   ["format", "School", (a) => a.school],
+  ["assessment", "Assessment", (a) => (a.assessment === "quiz" ? `${a.quizItems || 5}-item multiple-choice quiz`
+    : a.assessment === "task" ? "Performance task with a rubric" : "")],
   ["people", "Your name", (a) => a.studentTeacher],
   ["people", "Cooperating / Subject Teacher", (a) => a.coop],
   ["class", "Class", classText],

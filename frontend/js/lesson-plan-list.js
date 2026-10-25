@@ -137,6 +137,12 @@ function renderPlans(plans) {
                 ? `<a class="btn btn-secondary btn-sm row-continue" href="generator.html?plan_id=${p.id}"><span data-icon="edit"></span>Continue</a>`
                 : ""
             }
+            ${
+              // Same rule as Continue: only a draft can still change on the server.
+              isMineTab && p.status === "draft"
+                ? `<button class="row-action-btn" type="button" data-action="rename" data-plan="${p.id}" title="Rename" aria-label="Rename ${escapeHtml(p.title || "lesson plan")}">${Icons.edit}</button>`
+                : ""
+            }
             <button class="row-action-btn" type="button" data-action="preview" data-plan="${p.id}" title="Preview" aria-label="Preview">${Icons.eye}</button>
             <button class="row-action-btn" type="button" data-action="export" data-plan="${p.id}" data-title="${escapeHtml(p.title || "")}" title="Download" aria-label="Download">${Icons.download}</button>
             ${
@@ -190,6 +196,8 @@ function wireRowActions() {
       const planId = btn.dataset.plan;
       if (btn.dataset.action === "preview") {
         openPreview(planId);
+      } else if (btn.dataset.action === "rename") {
+        renamePlan(planId);
       } else if (btn.dataset.action === "export") {
         exportPlan(planId, btn.dataset.title);
       } else if (btn.dataset.action === "submit") {
@@ -217,6 +225,22 @@ function wireRowActions() {
         }
       }
     });
+  });
+}
+
+// Rename a draft: the same name dialog as Save and Export, saved straight away.
+function renamePlan(planId) {
+  const plan = allPlans.find((p) => String(p.id) === String(planId));
+  if (!plan) return;
+  askName({
+    title: "Rename lesson plan", label: "Lesson plan name", value: plan.title || "",
+    action: "Rename", busy: "Saving…", empty: "Give the lesson plan a name.",
+    onSubmit: async (name) => {
+      const data = await Api.updateLessonPlan(planId, { title: name });
+      Object.assign(plan, data.lesson_plan);
+      applyFilter();
+      showToast("Lesson plan renamed.");
+    },
   });
 }
 

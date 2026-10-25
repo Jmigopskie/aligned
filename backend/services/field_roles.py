@@ -30,9 +30,17 @@ _SELF_KEYWORDS = ("session no", "session number", "no. of sessions", "no of sess
 # underscores turned into spaces. Substrings rather than whole words so
 # "learning_objectives", "Objectives:" and "objective" all match one entry.
 _HEAVY_KEYWORDS = (
-    # Objectives and content
-    "objective", "competency", "competencies", "content", "subject matter",
+    # Standards, objectives and content
+    "standard", "objective", "competency", "competencies", "content", "subject matter",
     "topic outline",
+    # References and learning resources: Guided walks them before the lesson
+    # parts that draw on them (testers found them skipped to the end).
+    "reference", "resource", "material",
+    # The DepEd DLP's procedure parts, worded as SNHS words them
+    "discussion", "review", "purpose", "mastery", "evaluat", "presentation",
+    "engage", "explore", "explain", "elaborate", "elicit",
+    # The TUP SDLP: objectives under their own lead-in, values, activity mechanics
+    "at the end of the lesson", "should be able to", "values", "mechanic",
     # Procedures
     "procedure", "flow", "learning task", "lesson proper", "sequence", "steps",
     # Activity and motivation
@@ -44,8 +52,17 @@ _HEAVY_KEYWORDS = (
     # Assessment and assignment
     "assignment", "assessment", "evaluation", "extended learning",
     "enrichment", "agreement", "remediation",
-    # Reflection and learner context
-    "reflection", "learner context",
+    # Learner context
+    "learner context",
+)
+
+# The reflection the teacher writes after teaching the lesson: the DepEd DLP's
+# Remarks and its reflection questions (A to G). No one can write it before the
+# lesson, so it is never generated, never walked in Guided, and starts static.
+_REFLECTION_KEYWORDS = (
+    "reflection", "remarks", "no. of learners", "no of learners", "remedial lessons",
+    "teaching strategies worked", "difficulties did i encounter", "innovation or locali",
+    "localized materials",
 )
 
 
@@ -68,6 +85,13 @@ def role_for(field) -> str:
         return override
 
     haystack = _haystack(field)
-    if any(word in haystack for word in _SELF_KEYWORDS):
+    # The reflection is the teacher's own to write after the lesson, like the session number.
+    if any(word in haystack for word in _SELF_KEYWORDS) or is_reflection(field):
         return SELF
     return HEAVY if any(word in haystack for word in _HEAVY_KEYWORDS) else EASY
+
+
+def is_reflection(field) -> bool:
+    """Part of the reflection written after the lesson (see _REFLECTION_KEYWORDS)."""
+    haystack = _haystack(field)
+    return any(word in haystack for word in _REFLECTION_KEYWORDS)

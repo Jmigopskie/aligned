@@ -210,7 +210,7 @@ async function saveFieldSetup() {
       ({ field_key, label: label.trim(), anchor_index, guided, locked })));
     // Redraw the document so each field's input shows where it now goes.
     const refreshed = await Api.getFormatTemplateHtml(editingFormatId);
-    renderDocCanvas(refreshed.html);
+    renderDocCanvas(refreshed.plain ? "" : refreshed.html); // the builder edits the real file, never the plain stand-in
     renderFieldRoles(data.format.fields);
     showToast("Fields saved.");
     return true;
@@ -657,7 +657,7 @@ async function flushContentEdits() {
     if (editingFormatId) {
       const res = await Api.editFormatContent(editingFormatId, edits);
       const refreshed = await Api.getFormatTemplateHtml(editingFormatId);
-      renderDocCanvas(refreshed.html);
+      renderDocCanvas(refreshed.plain ? "" : refreshed.html);
       renderFieldRoles(res.format.fields);
       showToast(res.format.fields_reviewed ? "Document updated. Your fields moved with their lines." : "Document updated. Fields refreshed automatically.");
     } else {
@@ -875,7 +875,7 @@ async function enterEditMode(fmt) {
 
     try {
       const data = await Api.getFormatTemplateHtml(fmt.id);
-      renderDocCanvas(data.html);
+      renderDocCanvas(data.plain ? "" : data.html);
     } catch (err) {
       // No usable rendering of the reference file (e.g. it was removed from
       // disk) — the format still has its fields, just nothing to edit visually.

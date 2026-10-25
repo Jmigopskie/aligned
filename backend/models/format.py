@@ -126,6 +126,8 @@ class FormatField(db.Model):
             "role_override": self.role,
             "parts": self.parts_list,
             "locked": bool(self.locked),
+            # Written by the teacher after the lesson: always static, never generated.
+            "reflection": field_roles.is_reflection(self),
             "manual": bool(self.manual),
             # A curriculum statement (standards, competencies, objectives): Guided
             # can fill it straight from the student's Budget of Work / CG.

@@ -30,7 +30,36 @@ _REFERENCE_FIELD = re.compile(r"reference", re.I)
 
 
 def _haystack(field):
-    return f"{field.field_key or ''} {field.label or ''}"
+    # kind_text: what a field is taken for when its own label says more (see competency_view).
+    return getattr(field, "kind_text", None) or f"{field.field_key or ''} {field.label or ''}"
+
+
+class _AsCompetency:
+    """A "Learning Competencies/ Objectives" field read as the competency
+    alone: everything else about the field (its key, type, place) is its own."""
+
+    def __init__(self, field):
+        self._field = field
+        self.kind_text = "learning competency"
+        self.label = re.sub(r"\s*/\s*objectives?\b", "", field.label or "", flags=re.I).strip() or "Learning Competency"
+
+    def __getattr__(self, name):
+        return getattr(self._field, name)
+
+
+def competency_view(fields):
+    """The format's fields as they are written. A combined "Learning
+    Competencies/ Objectives" field holds only the competency, copied from the
+    guide, when the format has its own objectives field: writing objectives in
+    both put them twice, the first time under the competency."""
+    fields = list(fields)
+
+    def says(f, word):
+        return re.search(word, _haystack(f), re.I)
+
+    if not any(says(f, "objective") and not says(f, "competenc") for f in fields):
+        return fields
+    return [_AsCompetency(f) if says(f, "objective") and says(f, "competenc") else f for f in fields]
 
 
 def is_verbatim_field(field) -> bool:

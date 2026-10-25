@@ -11,7 +11,7 @@ from models.course_guide import CourseGuide
 from models.supplementary_source import SupplementarySource
 from models.section import Section, SectionMembership
 from routes.auth_routes import login_required, enrollment_required, current_user
-from services import ai_service, docx_service, grounding
+from services import ai_service, docx_service, field_roles, grounding
 from services.notify import notify
 
 generate_bp = Blueprint("generate", __name__)
@@ -121,9 +121,10 @@ def _include_keys(data, fmt):
 
 def _generatable_keys(include_keys, fmt):
     """What may actually be generated: never a field the teacher locked, which
-    the student writes (in Guided, with Alan's help in the chat). None still
+    the student writes (in Guided, with Alan's help in the chat), nor the
+    reflection, which only the teacher can write after the lesson. None still
     means every field when nothing is locked."""
-    locked = {f.field_key for f in fmt.fields if f.locked}
+    locked = {f.field_key for f in fmt.fields if f.locked or field_roles.is_reflection(f)}
     if not locked:
         return include_keys
     keys = include_keys if include_keys is not None else [f.field_key for f in fmt.fields]
@@ -143,7 +144,8 @@ def generate_full():
     context = _build_context(data, guides)
 
     field_values = ai_service.generate_full(
-        context, fmt.fields, course_guide_text=_guide_sources(guides) + _resolve_sources(data, current_user()),
+        context, grounding.competency_view(fmt.fields),
+        course_guide_text=_guide_sources(guides) + _resolve_sources(data, current_user()),
         include_keys=_generatable_keys(_include_keys(data, fmt), fmt), course_guide_citation=_guide_citation(guides),
     )
     return jsonify({"status": "ok", "field_values": field_values})
@@ -161,7 +163,7 @@ def generate_full_stream():
 
     context = _build_context(data, guides)
     course_guide_text = _guide_sources(guides) + _resolve_sources(data, current_user())
-    fields = fmt.fields
+    fields = grounding.competency_view(fmt.fields)
     # Read here, not inside _stream(): the generator runs after the request
     # context is gone, so `request`/`data` can't be touched from inside it.
     include_keys = _generatable_keys(_include_keys(data, fmt), fmt)
@@ -193,7 +195,7 @@ def owl_chat():
     choices, some of which the page can insert straight into the field."""
     data = request.get_json(silent=True) or {}
     fmt = LessonPlanFormat.query.get_or_404(data.get("format_id"))
-    field = next((f for f in fmt.fields if f.field_key == data.get("field_key")), None)
+    field = next((f for f in grounding.competency_view(fmt.fields) if f.field_key == data.get("field_key")), None)
     if not field:
         return jsonify({"status": "error", "message": "That field isn't part of this format."}), 400
 

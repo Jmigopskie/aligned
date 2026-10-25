@@ -365,58 +365,91 @@ const Api = {
     apiFetch("/api/notifications/read-all", { method: "POST" }),
 };
 
-// Export a plan as Word, asking for the file name first. Every export button
-// (the plan page, the dashboard, the plan list, submissions) goes through here.
-function exportPlan(planId, suggestedName) {
-  const clean = (name) => name.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+// A small dialog that asks for one name: the export's file name, a draft's
+// name on save, a plan's new name. onSubmit(name) runs with the dialog still
+// open; if it throws, its message shows in the dialog, otherwise it closes.
+function askName({ title, label, value = "", suffix = "", action, busy, empty, clean = (s) => s, onSubmit, onCancel }) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay export-name-overlay";
   overlay.innerHTML = `
     <form class="modal-dialog export-name-dialog" role="dialog" aria-modal="true" aria-labelledby="export-name-title" novalidate>
       <div class="modal-header">
-        <h2 id="export-name-title">Export as Word</h2>
-        <button type="button" class="modal-close" aria-label="Cancel export">&times;</button>
+        <h2 id="export-name-title"></h2>
+        <button type="button" class="modal-close" aria-label="Cancel">&times;</button>
       </div>
       <div class="modal-body">
-        <label for="export-name-input">File name</label>
+        <label for="export-name-input"></label>
         <div class="export-name-field">
           <input type="text" id="export-name-input" maxlength="120" autocomplete="off" />
-          <span>.docx</span>
+          ${suffix ? `<span>${escapeHtml(suffix)}</span>` : ""}
         </div>
         <p class="export-name-error" role="alert" hidden></p>
         <div class="export-name-actions">
           <button type="button" class="btn btn-secondary export-name-cancel">Cancel</button>
-          <button type="submit" class="btn btn-primary export-name-go">Export</button>
+          <button type="submit" class="btn btn-primary export-name-go"></button>
         </div>
       </div>
     </form>`;
+  overlay.querySelector("h2").textContent = title;
+  overlay.querySelector("label").textContent = label;
   document.body.appendChild(overlay);
   const form = overlay.querySelector("form");
   const input = overlay.querySelector("input");
   const error = overlay.querySelector(".export-name-error");
   const go = overlay.querySelector(".export-name-go");
+  go.textContent = action;
   const opener = document.activeElement;
-  input.value = clean(suggestedName || "") || "Lesson plan";
+  input.value = value;
+  input.addEventListener("input", () => { error.hidden = true; });
+  let done = false;
   const close = () => {
     overlay.remove();
     if (opener && opener.focus) opener.focus();
   };
-  overlay.querySelector(".modal-close").addEventListener("click", close);
-  overlay.querySelector(".export-name-cancel").addEventListener("click", close);
-  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
-  overlay.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  const cancel = () => {
+    if (done) return;
+    done = true;
+    close();
+    if (onCancel) onCancel();
+  };
+  overlay.querySelector(".modal-close").addEventListener("click", cancel);
+  overlay.querySelector(".export-name-cancel").addEventListener("click", cancel);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) cancel(); });
+  overlay.addEventListener("keydown", (e) => { if (e.key === "Escape") cancel(); });
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const name = clean(input.value.replace(/\.docx$/i, ""));
+    const name = clean(input.value.replace(/\s+/g, " ").trim()).slice(0, 120);
     if (!name) {
-      error.textContent = "Give the file a name.";
+      error.textContent = empty;
       error.hidden = false;
       input.focus();
       return;
     }
     go.disabled = true;
-    go.textContent = "Exporting…";
+    go.textContent = busy;
     try {
+      await onSubmit(name);
+      done = true;
+      close();
+    } catch (err) {
+      error.textContent = err.message;
+      error.hidden = false;
+      go.disabled = false;
+      go.textContent = action;
+    }
+  });
+  input.focus();
+  input.select();
+}
+
+// Export a plan as Word, asking for the file name first. Every export button
+// (the plan page, the dashboard, the plan list, submissions) goes through here.
+function exportPlan(planId, suggestedName) {
+  const clean = (name) => name.replace(/\.docx$/i, "").replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
+  askName({
+    title: "Export as Word", label: "File name", value: clean(suggestedName || "") || "Lesson plan",
+    suffix: ".docx", action: "Export", busy: "Exporting…", empty: "Give the file a name.", clean,
+    onSubmit: async (name) => {
       const res = await fetch(Api.exportUrl(planId), { credentials: "include" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -428,17 +461,9 @@ function exportPlan(planId, suggestedName) {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
-      close();
       showToast(`Saved as ${name}.docx`);
-    } catch (err) {
-      error.textContent = err.message;
-      error.hidden = false;
-      go.disabled = false;
-      go.textContent = "Export";
-    }
+    },
   });
-  input.focus();
-  input.select();
 }
 
 function showToast(message, isError = false) {

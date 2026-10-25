@@ -884,5 +884,172 @@
         "is_required": false
       }
     ]
+  },
+  {
+    "key": "tup-sdlp",
+    "name": "TUP Semi-Detailed Lesson Plan",
+    "description": "TUP Cavite semi-detailed plan: objectives, subject matter, references, procedure, evaluation and assignment.",
+    "source": "tup-sdlp.pdf",
+    "template": "tup-sdlp.docx",
+    "pages": 3,
+    "fields": [
+      {
+        "label": "Lesson Plan in (Subject)",
+        "field_type": "text",
+        "anchor_index": 7,
+        "is_required": true,
+        "ai_hint": "Only the subject and grade the plan is for, e.g. 'TLE - ICT 7'."
+      },
+      {
+        "label": "Prepared by (Student Teacher)",
+        "field_type": "text",
+        "anchor_index": 8,
+        "is_required": true,
+        "ai_hint": "The student teacher's name exactly as given in the lesson details (student_teacher); empty if not given."
+      },
+      {
+        "label": "Checked by (Cooperating Teacher)",
+        "field_type": "text",
+        "anchor_index": 11,
+        "is_required": true,
+        "ai_hint": "The cooperating teacher's name exactly as given in the lesson details (teacher_name); empty if not given."
+      },
+      {
+        "label": "Lesson Objectives",
+        "field_type": "textarea",
+        "anchor_index": 45,
+        "is_required": true,
+        "ai_hint": "Only the objectives, one per line: the template already prints 'At the end of the lesson, the students should be able to:' above them."
+      },
+      {
+        "label": "Main Topic",
+        "field_type": "text",
+        "anchor_index": 51,
+        "is_required": true,
+        "ai_hint": "The main topic from the lesson details."
+      },
+      {
+        "label": "Sub-Topic",
+        "field_type": "text",
+        "anchor_index": 52,
+        "is_required": true,
+        "ai_hint": "The specific topic of this lesson, from the lesson details."
+      },
+      {
+        "label": "Values Integrated",
+        "field_type": "textarea",
+        "anchor_index": 53,
+        "is_required": false,
+        "ai_hint": "Up to three values the lesson develops, one per line."
+      },
+      {
+        "label": "Instructional Materials",
+        "field_type": "textarea",
+        "anchor_index": 57,
+        "is_required": false,
+        "ai_hint": "Up to three materials actually used in this lesson, one per line."
+      },
+      {
+        "label": "References",
+        "field_type": "textarea",
+        "anchor_index": 62,
+        "is_required": false
+      },
+      {
+        "label": "Greetings",
+        "field_type": "textarea",
+        "anchor_index": 70,
+        "is_required": false,
+        "role": "easy"
+      },
+      {
+        "label": "Prayer",
+        "field_type": "textarea",
+        "anchor_index": 71,
+        "is_required": false,
+        "role": "easy"
+      },
+      {
+        "label": "Checking of Attendance",
+        "field_type": "textarea",
+        "anchor_index": 72,
+        "is_required": false,
+        "role": "easy"
+      },
+      {
+        "label": "Checking of Assignment",
+        "field_type": "textarea",
+        "anchor_index": 73,
+        "is_required": false,
+        "role": "easy"
+      },
+      {
+        "label": "Classroom Management",
+        "field_type": "textarea",
+        "anchor_index": 74,
+        "is_required": false,
+        "ai_hint": "Three short classroom rules for this session, one per line."
+      },
+      {
+        "label": "Energizer",
+        "field_type": "textarea",
+        "anchor_index": 78,
+        "is_required": false
+      },
+      {
+        "label": "Review of the Past Lesson",
+        "field_type": "textarea",
+        "anchor_index": 80,
+        "is_required": false
+      },
+      {
+        "label": "Motivation",
+        "field_type": "textarea",
+        "anchor_index": 83,
+        "is_required": false
+      },
+      {
+        "label": "Introduction",
+        "field_type": "textarea",
+        "anchor_index": 102,
+        "is_required": false
+      },
+      {
+        "label": "Lesson Proper",
+        "field_type": "textarea",
+        "anchor_index": 104,
+        "is_required": false
+      },
+      {
+        "label": "Application",
+        "field_type": "textarea",
+        "anchor_index": 106,
+        "is_required": false
+      },
+      {
+        "label": "Generalization",
+        "field_type": "textarea",
+        "anchor_index": 108,
+        "is_required": false
+      },
+      {
+        "label": "Evaluation",
+        "field_type": "textarea",
+        "anchor_index": 111,
+        "is_required": false
+      },
+      {
+        "label": "Follow-up Assignment",
+        "field_type": "textarea",
+        "anchor_index": 115,
+        "is_required": false
+      },
+      {
+        "label": "Advance Assignment",
+        "field_type": "textarea",
+        "anchor_index": 116,
+        "is_required": false
+      }
+    ]
   }
 ]

@@ -3058,6 +3058,33 @@ body.auth-page {
   zoom: var(--doc-zoom, 1);
 }
 
+/* A format with no usable Word file: a plain page built from its fields
+   (docx_service.render_plain_html), set like a simple printed plan. */
+.lp-doc.lp-doc-plain {
+  width: 8.5in;
+  max-width: 100%;
+  min-height: 11in;
+  padding: 1in;
+  font: 11pt/1.45 Calibri, "Segoe UI", Arial, sans-serif;
+}
+
+.lp-doc-plain .lp-plain-title {
+  margin-bottom: 18pt;
+  text-align: center;
+  font-size: 14pt;
+  font-weight: 700;
+}
+
+.lp-doc-plain .lp-plain-label {
+  margin-top: 12pt;
+  font-weight: 700;
+}
+
+.lp-doc-plain .lp-plain-part {
+  margin-top: 4pt;
+  font-style: italic;
+}
+
 .lp-doc .lp-p {
   margin: 0;
   /* Word keeps runs of spaces, and its tabs stop every half inch. */
@@ -4233,12 +4260,23 @@ body.owl-chat-shown .dash-main {
 }
 
 .owl-chat-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
   border: 0;
   background: transparent;
   color: var(--primary);
   font: inherit;
   cursor: pointer;
   padding: 0;
+}
+
+.owl-chat-back [data-icon],
+.owl-chat-back svg {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
 }
 
 .owl-chat-history-list {
@@ -4390,6 +4428,78 @@ body.owl-chat-shown .dash-main {
   color: var(--primary-hover);
   font-size: 12px;
   text-align: center;
+}
+
+/* Where the conversation moves on to the next part: a hairline with the
+   part's name, so one long chat still reads part by part. */
+.owl-chat-note.owl-chat-part {
+  align-self: stretch;
+  max-width: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.owl-chat-part::before,
+.owl-chat-part::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Several lines in a message or an option: paragraphs and a real bulleted
+   list, not one run of text. */
+.owl-bubble p,
+.owl-choice-text p {
+  margin: 0;
+}
+
+.owl-bubble p + p,
+.owl-bubble ul,
+.owl-bubble ol,
+.owl-bubble p + ul,
+.owl-bubble p + ol,
+.owl-bubble ul + p,
+.owl-bubble ol + p {
+  margin-top: 6px;
+}
+
+.owl-bubble ul,
+.owl-bubble ol,
+.owl-choice-text ul,
+.owl-choice-text ol {
+  margin: 0;
+  padding-left: 18px;
+  white-space: normal;
+}
+
+.owl-bubble ol,
+.owl-choice-text ol {
+  padding-left: 20px;
+}
+
+.owl-bubble li + li,
+.owl-choice-text li + li {
+  margin-top: 3px;
+}
+
+.owl-bubble li::marker,
+.owl-choice-text li::marker {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.owl-bubble strong,
+.owl-choice-text strong {
+  font-weight: 700;
+  color: var(--text-heading);
 }
 
 .owl-dots { display: inline-flex; gap: 4px; padding: 3px 0; }
@@ -6955,6 +7065,39 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
 }
 .flow-textarea:focus { outline: none; }
 .flow-textarea::placeholder { color: #66736b; }
+
+/* A part's answer with its formatting toolbox (guided-flow.js richEditor). */
+.flow-format {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: -6px;
+}
+.flow-format-btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-heading);
+  font: 600 15px var(--font);
+  cursor: pointer;
+  transition: background-color 0.2s var(--flow-ease), color 0.2s var(--flow-ease);
+}
+.flow-format-btn svg { width: 18px; height: 18px; }
+.flow-format-btn:hover { background: rgba(28, 92, 78, 0.08); }
+.flow-format-btn[aria-pressed="true"] { background: rgba(28, 92, 78, 0.14); color: var(--primary); }
+.flow-format-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.flow-format-num { font-size: 14px; letter-spacing: -0.02em; }
+.flow-rich { height: auto; cursor: text; overflow-wrap: anywhere; }
+.flow-rich ul, .flow-rich ol { margin: 0; padding-left: 1.4em; }
+.flow-rich li + li { margin-top: 2px; }
+.flow-rich .hl-yellow { background: #FDE68A; }
+.flow-rich .hl-green { background: #BBF7D0; }
+.flow-rich .hl-cyan { background: #A5F3FC; }
 .flow-clear { align-self: flex-start; height: 40px; padding: 0 12px; gap: 8px; }
 .flow-clear svg { width: 16px; height: 16px; }
 

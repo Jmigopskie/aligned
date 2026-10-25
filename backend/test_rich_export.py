@@ -117,6 +117,26 @@ def check_lists_still_work():
 
     lines = docx_service.parse_rich_value("<ol><li>first</li></ol>")
     assert lines[0]["list"] == "number", lines
+
+    # Text after a list is its own line, not glued onto the last item.
+    lines = docx_service.parse_rich_value("<ul><li>a</li><li>b</li></ul>after<br><ol><li>x</li><li>y</li></ol>")
+    assert [(l["list"], "".join(r["text"] for r in l["runs"])) for l in lines] == \
+        [("bullet", "a"), ("bullet", "b"), (None, "after"), ("number", "x"), ("number", "y")], lines
+
+    # A template with no List Bullet / List Number style (most lesson-plan
+    # templates) still shows the bullet and the number, as text.
+    doc = Document()
+    para = doc.add_paragraph("placeholder")
+    real_has_style = docx_service._has_style
+    docx_service._has_style = lambda d, name: False
+    try:
+        docx_service._set_paragraph_rich(doc, para._p, lines[0])
+        assert para.text == "• a", para.text
+        para2 = doc.add_paragraph("placeholder")
+        docx_service._set_paragraph_rich(doc, para2._p, lines[4])
+        assert para2.text == "2. y", para2.text
+    finally:
+        docx_service._has_style = real_has_style
     print("  lists OK")
 
 

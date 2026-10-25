@@ -30,12 +30,13 @@ from models.lesson_plan import LessonPlan
 from models.user import User
 from services import builtins, docx_service
 
-KEYS = {"4as-lesson-plan", "dlp", "ilaw-lesson-plan", "pal3-sdlp", "snhs-dlp"}
+KEYS = {"4as-lesson-plan", "dlp", "ilaw-lesson-plan", "pal3-sdlp", "snhs-dlp", "tup-sdlp"}
 
 # Paragraph counts of the built-in templates. The PDF repair changed fonts,
 # widths and a few characters, never structure: a field's anchor_index still
 # names the same paragraph, so saved plans keep their answers where they were.
-TEMPLATE_ITEMS = {"4as-lesson-plan": 60, "dlp": 111, "ilaw-lesson-plan": 190, "pal3-sdlp": 96, "snhs-dlp": 91}
+TEMPLATE_ITEMS = {"4as-lesson-plan": 60, "dlp": 111, "ilaw-lesson-plan": 190, "pal3-sdlp": 96, "snhs-dlp": 91,
+                  "tup-sdlp": 129}
 
 
 def client_for(app, user):
@@ -136,7 +137,7 @@ def check_visibility(app, student):
     res = client_for(app, student).get("/api/formats").get_json()
     shown = [f for f in res["formats"] if f["is_builtin"]]
     assert {f["name"] for f in shown} >= {"4A's Lesson Plan", "SNHS Detailed Lesson Plan"}
-    assert len(shown) == 5
+    assert len(shown) == len(KEYS)
     for f in shown:
         assert f["thumbnail"].startswith("img/formats/") and f["field_count"] > 0 and f["description"]
     src = client_for(app, student).get(f"/api/formats/{shown[0]['id']}/source?inline=1")
@@ -369,7 +370,7 @@ def check_upgrade_from_old_schema():
         Config.SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
         app = create_app()
         with app.app_context():
-            assert LessonPlanFormat.query.filter_by(is_builtin=True).count() == 5
+            assert LessonPlanFormat.query.filter_by(is_builtin=True).count() == len(KEYS)
             old = db.session.get(LessonPlanFormat, 1)
             assert old.name == "Old format" and not old.is_builtin
             db.session.remove()

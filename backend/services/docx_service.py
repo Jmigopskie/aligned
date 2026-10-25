@@ -358,6 +358,30 @@ def render_template_html(fmt):
         "unmatched_fields": [f.field_key for f in fields_sorted if f.field_key not in anchors],
     }
 
+def render_plain_html(fmt):
+    """A plain document page built from the format's own fields, for a format
+    with no usable reference file or whose fields couldn't be placed in it:
+    every screen still shows a document (the title, then each field's label
+    with its slot underneath, in order), never a bare form. Same shape as
+    render_template_html()."""
+    fields = sorted(fmt.fields, key=lambda f: f.sort_order or 0)
+    body = [f'<p class="lp-p lp-plain-title">{html_lib.escape(fmt.name or "Lesson Plan")}</p>']
+    for f in fields:
+        body.append(f'<p class="lp-p lp-plain-label">{html_lib.escape(f.label or f.field_key)}</p>')
+        names = f.parts_list if f.field_type == "weekly" else None
+        for i, name in enumerate(names or [None]):
+            if name is not None:
+                body.append(f'<p class="lp-p lp-plain-part">{html_lib.escape(name)}</p>')
+            part = f' data-part="{i}"' if name is not None else ""
+            body.append(f'<div class="lp-field lp-field-block" data-field-key="{html_lib.escape(f.field_key)}"{part} '
+                        f'contenteditable="true"></div>')
+    return {
+        "html": '<div class="lp-doc lp-doc-plain" data-page-width="816">' + "".join(body) + "</div>",
+        "matched_fields": [f.field_key for f in fields],
+        "unmatched_fields": [],
+        "plain": True,
+    }
+
 def render_reference_html(source_path):
     """Render a bare reference .docx as HTML for the format builder's live
     document editor, before any fields exist yet. Every paragraph is tagged
@@ -1415,6 +1439,9 @@ class _RichLineParser(_html_parser.HTMLParser):
             self.underline = max(0, self.underline - 1)
         elif tag in ("ul", "ol") and self.list_stack:
             self.list_stack.pop()
+            # Text after a list is a line of its own, not part of the last item.
+            if not self.list_stack and self.lines[-1]["runs"]:
+                self._new_line()
         elif tag == "span" and self.span_stack:
             frame = self.span_stack.pop()
             if frame.get("cap"):
@@ -1464,6 +1491,11 @@ def parse_rich_value(html_str):
     parser = _RichLineParser()
     parser.feed(html_str or "")
     lines = [l for l in parser.lines if l.get("image") or any(r["text"].strip() for r in l["runs"])]
+    # Each numbered item's place in its list, for a template with no List Number style.
+    n = 0
+    for line in lines:
+        n = n + 1 if line.get("list") == "number" else 0
+        line["n"] = n
     if not lines:
         lines = [{"runs": [{"text": "-", "bold": False, "italic": False, "underline": False,
                             "size": None, "color": None, "highlight": None}], "list": None}]
@@ -1498,6 +1530,12 @@ def _set_paragraph_rich(doc, para_el, line, template_run=None):
     existing = [r for r in para.runs if not _run_has_drawing(r)]
     runs = line["runs"] or [{"text": "", "bold": False, "italic": False, "underline": False,
                              "size": None, "color": None, "highlight": None}]
+    style_name = _LIST_STYLE_BY_TYPE.get(line["list"]) if line["list"] else None
+    if line["list"] and not (style_name and _has_style(doc, style_name)):
+        # Lesson-plan templates rarely carry Word's list styles, and without
+        # one the bullet or number vanished on export: it is written as text.
+        marker = f"{line.get('n') or 1}. " if line["list"] == "number" else "• "
+        runs = [{**runs[0], "text": marker + runs[0]["text"]}] + runs[1:]
 
     for i, r in enumerate(runs):
         if i < len(existing):

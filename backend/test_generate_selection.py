@@ -12,6 +12,7 @@ runs with no API key and no network.
 
 Run it directly: `venv/Scripts/python test_generate_selection.py`.
 """
+import json
 import os
 import sys
 
@@ -42,7 +43,7 @@ def stub_answers(answers, seen_keys):
     """Replace the provider with a stub that answers from `answers` and records
     which keys it was asked for."""
     def fake_call(system_instruction, parts, label):
-        asked = [f.field_key for f in FIELDS if f.field_key in " ".join(parts)]
+        asked = [f.field_key for f in FIELDS if f"- {f.field_key} (" in " ".join(parts)]
         seen_keys.extend(asked)
         return {k: answers.get(k, "") for k in asked}
 
@@ -129,7 +130,7 @@ def check_standards_only_from_a_guide():
     seen = []
 
     def fake_call(system_instruction, parts, label):
-        asked = [f.field_key for f in fields if f.field_key in " ".join(parts)]
+        asked = [f.field_key for f in fields if f"- {f.field_key} (" in " ".join(parts)]
         seen.extend(asked)
         made = {"cs": "demonstrate understanding of spreadsheet formulas and functions",
                 "lc": "create simple formulas to compute totals and averages",
@@ -188,6 +189,97 @@ def check_one_statement_and_sample():
     print("  one statement, sample plan OK")
 
 
+def check_competency_view_and_three_objectives():
+    """SNHS has "Learning Competencies/ Objectives" AND "Specific Learning
+    Objectives": the first holds the competency alone (testers found the
+    objectives under it too). A lesson has exactly three objectives."""
+    from services import grounding
+    combined = Field("learning_competencies_objectives", "Learning Competencies/ Objectives")
+    specific = Field("specific_learning_objectives", "Specific Learning Objectives")
+    view = grounding.competency_view([combined, specific])
+    lc, obj = view
+    assert lc.field_key == combined.field_key and lc.label == "Learning Competencies", lc.label
+    assert grounding.is_copy_only_field(lc) and not ai_service._is_objective_field(lc)
+    assert ai_service._is_objective_field(obj) and obj is specific
+    assert "exactly ONE statement" in ai_service._field_directive(lc)
+    # A format whose only objectives field is the combined one keeps it combined.
+    alone = grounding.competency_view([combined])[0]
+    assert alone is combined and ai_service._is_objective_field(alone)
+
+    four = "At the end of the lesson, the learners are expected to:\n1. identify parts\n2. explain uses\n3. value care\n4. assemble a PC"
+    got = ai_service._unnumber_objectives({"o": four}, [Field("o", "Learning Objectives")])["o"]
+    assert got.split("\n") == ["At the end of the lesson, the learners are expected to:", "identify parts",
+                               "explain uses", "value care"], got
+    both = "Discuss ICT trends.\nAt the end of the lesson, the learners are expected to:\na\nb\nc\nd"
+    got = ai_service._unnumber_objectives({alone.field_key: both}, [alone])[alone.field_key]
+    assert got.split("\n") == ["Discuss ICT trends.", "At the end of the lesson, the learners are expected to:",
+                               "a", "b", "c"], got
+    # The TUP SDLP prints the lead-in itself (its hint says so): not written twice.
+    tup = Field("lesson_objectives", "Lesson Objectives",
+                ai_hint="Only the objectives: the template already prints 'At the end of the lesson, the students should be able to:'")
+    assert "expected to:" not in ai_service._field_directive(tup), ai_service._field_directive(tup)
+    got = ai_service._unnumber_objectives({"lesson_objectives": four}, [tup])["lesson_objectives"]
+    assert got.split("\n") == ["identify parts", "explain uses", "value care"], got
+    print("  competency view, three objectives OK")
+
+
+def check_web_references():
+    """References come from a web search: a line is kept only if its URL was
+    in the search results, it is APA, and the link opens. Search trouble means
+    no references, never a failed plan."""
+    from services import grounding
+    real = "https://www.w3schools.com/html/html_images.asp"
+    answer = json.dumps({"references": [
+        f"W3Schools. (n.d.). HTML images. W3Schools. {real}",
+        "Made Up. (2024). A page. Nowhere. https://invented.example/page",  # not a search result
+        "no apa here https://www.w3schools.com/html/",                      # not APA
+    ]})
+    calls = []
+    real_post, real_provider, real_works = ai_service._web_search_post, ai_service.PROVIDER, grounding.link_works
+    ai_service._web_search_post = lambda system, prompt: (calls.append(prompt), (answer, {real, "https://www.w3schools.com/html"}))[1]
+    ai_service.PROVIDER = "openrouter"
+    grounding.link_works = lambda url: url == real
+    try:
+        found = ai_service.find_references({"topic": "HTML images", "subject": "ICT"})
+        assert found == [f"W3Schools. (n.d.). HTML images. W3Schools. {real}"], found
+        assert "HTML images" in calls[0]
+        refs = Field("references", "References")
+        merged = ai_service._with_web_references({"references": "DepEd. (2023). CG. https://deped.gov.ph/cg.pdf"},
+                                                 [refs, Field("flow", "Flow")], {"topic": "HTML images"})
+        assert merged["references"].split("\n")[0].startswith("DepEd."), merged
+        assert merged["references"].split("\n")[1].startswith("W3Schools."), merged
+        assert ai_service._with_web_references({}, [Field("flow", "Flow")], {"topic": "x"}) == {}
+
+        def boom(system, prompt):
+            raise RuntimeError("search down")
+        ai_service._web_search_post = boom
+        assert ai_service.find_references({"topic": "HTML images"}) == []
+    finally:
+        ai_service._web_search_post, ai_service.PROVIDER, grounding.link_works = real_post, real_provider, real_works
+    print("  web references OK")
+
+
+def check_assessment_type():
+    """The setup's assessment choice shapes the field that assesses: a quiz of
+    exactly N items with an answer key, or a performance task with a rubric.
+    A practice activity that "leads to" an assessment, other fields, and a
+    plan whose setup never asked get no such directive."""
+    evaluation = Field("evaluating_learning", "Evaluating learning")
+    quiz = ai_service._grounding_directive(evaluation, {"assessment_type": "a 3-item multiple-choice quiz"})
+    assert "exactly 3 items" in quiz and "Answer key" in quiz, quiz
+    task = ai_service._grounding_directive(Field("assessment", "Formative Assessment"),
+                                           {"assessment_type": "a performance task with a rubric"})
+    assert "performance task" in task and "Rubric:" in task and "Answer key" not in task, task
+    mastery = Field("developing_mastery", "Developing mastery (leads to Formative Assessment 3)")
+    assert "quiz" not in ai_service._grounding_directive(mastery, {"assessment_type": "a 3-item multiple-choice quiz"})
+    assert "quiz" not in ai_service._grounding_directive(Field("flow", "Flow"), {"assessment_type": "a 3-item multiple-choice quiz"})
+    assert ai_service._grounding_directive(evaluation, {}) == ""
+    print("  assessment type OK")
+
+
+check_assessment_type()
+check_web_references()
+check_competency_view_and_three_objectives()
 check_one_statement_and_sample()
 check_owl_options_explained()
 check_standards_only_from_a_guide()

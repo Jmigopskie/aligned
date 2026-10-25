@@ -3,14 +3,14 @@
 // blanks from the answers, and which formats an account may pick. No DOM here,
 // so frontend/js/setup-flow-steps.check.js can run it under node.
 
-// Eight steps, a few fields each: format + school, people, class, subject +
-// duration, the four topics, supplementary sources, a sample plan (optional),
-// mode.
-const FLOW_STEP_IDS = ["format", "people", "class", "subject", "topics", "sources", "sample", "mode"];
+// Nine steps, a few fields each: format + school, how the lesson is assessed,
+// people, class, subject + duration, the four topics, supplementary sources,
+// a sample plan (optional), mode.
+const FLOW_STEP_IDS = ["format", "assessment", "people", "class", "subject", "topics", "sources", "sample", "mode"];
 
 // Alan's pose for each step (keys from js/alan3d.js POSES).
 const FLOW_POSES = {
-  format: "hi", people: "present", class: "present", subject: "point",
+  format: "hi", assessment: "think", people: "present", class: "present", subject: "point",
   topics: "think", sources: "reading", sample: "check", mode: "idea",
 };
 
@@ -49,6 +49,8 @@ function isStepAnswered(stepId, answers) {
   const a = answers || {};
   switch (stepId) {
     case "format": return filled(a.formatId); // the school is encouraged, not required
+    case "assessment": // a 1-5 item quiz, or a performance task with a rubric
+      return a.assessment === "task" || (a.assessment === "quiz" && Number.isInteger(a.quizItems) && a.quizItems >= 1 && a.quizItems <= 5);
     case "people": return filled(a.studentTeacher) && filled(a.coop);
     case "class":
       return a.levelType === "college" ? filled(a.program) && filled(a.year) : filled(a.grade);

@@ -34,18 +34,20 @@ ILAW = [
     ("designed_by_teacher_s", "Designed by Teacher/s", "easy"),
     ("designed_for_which_grade_level_section", "Designed for which Grade Level & Section", "easy"),
     ("no_of_sessions", "No. of Sessions", "self"),
-    ("references", "References", "easy"),
+    # References and resources are walked too (testers found them skipped).
+    ("references", "References", "heavy"),
     ("declaration_of_ai_use", "Declaration of AI use", "easy"),
     ("learning_competency", "Learning Competency", "heavy"),
     ("learning_objectives", "Learning Objectives", "heavy"),
     ("learner_context", "Learner Context", "heavy"),
     ("pre_lesson", "Pre-lesson", "heavy"),
     ("flow", "Flow", "heavy"),
-    ("learning_resources", "Learning Resources", "easy"),
+    ("learning_resources", "Learning Resources", "heavy"),
     ("opportunities_for_integration", "Opportunities for integration", "heavy"),
     ("formative_assessment", "Formative Assessment", "heavy"),
     ("extended_learning_opportunities", "Extended learning opportunities", "heavy"),
-    ("reflections", "Reflections", "heavy"),
+    # Written by the teacher after the lesson: never generated, not walked.
+    ("reflections", "Reflections", "self"),
 ]
 
 
@@ -72,11 +74,55 @@ def check_real_format():
     # walks the heavy ones in exactly that order.
     heavy = [l for k, l, _ in ILAW if field_roles.role_for(Field(k, l)) == "heavy"]
     easy = [l for k, l, _ in ILAW if field_roles.role_for(Field(k, l)) == "easy"]
-    assert len(heavy) == 9, heavy
-    assert len(easy) == 7, easy  # Name of Lesson is now AI-filled from the topic
-    assert heavy[0] == "Learning Competency", heavy
-    assert heavy[-1] == "Reflections", heavy
+    assert len(heavy) == 10, heavy
+    assert len(easy) == 5, easy  # Name of Lesson is now AI-filled from the topic
+    assert heavy[0] == "References", heavy
+    assert heavy[-1] == "Extended learning opportunities", heavy
     print("  real format OK")
+
+
+# The SNHS DLP (a built-in) as testers used it: every lesson part is walked in
+# document order, the quick facts stay quick, and the reflection is the teacher's.
+SNHS = [
+    ("School", "easy"), ("Grade Level", "easy"), ("Teacher", "easy"), ("Learning Area", "easy"),
+    ("Teaching Dates and Time", "easy"), ("Quarter", "easy"),
+    ("Content Standards", "heavy"), ("Performance Standards", "heavy"),
+    ("Learning Competencies/ Objectives", "heavy"), ("Specific Learning Objectives", "heavy"),
+    ("Content", "heavy"), ("Curriculum/Teacher's Guide pages", "easy"), ("Textbook pages", "easy"),
+    ("Additional Materials from Learning Resource (LR) portal", "heavy"),
+    ("Other Learning Resources", "heavy"), ("Routine Activities", "heavy"),
+    ("Reviewing previous lesson or presenting the new lesson", "heavy"),
+    ("Establishing a purpose for the lesson", "heavy"), ("Discussion", "heavy"),
+    ("Developing mastery (leads to Formative Assessment 3)", "heavy"),
+    ("Finding practical applications of concepts and skills in daily living", "heavy"),
+    ("Making generalizations and abstractions about the lesson", "heavy"),
+    ("Evaluating learning", "heavy"), ("Additional activities for application or remediation", "heavy"),
+    ("Remarks", "self"), ("No. of learners who earned 80% in the evaluation", "self"),
+    ("No. of learners who require additional activities for remediation", "self"),
+    ("Which of my teaching strategies worked well? Why did these work?", "self"),
+    ("What difficulties did I encounter which my principal or supervisor can help me solve?", "self"),
+]
+
+
+def check_tup():
+    """The TUP SDLP's quick-blanks screen held whole lesson parts (tester
+    screenshot): only its sign-offs are quick facts."""
+    heavy = ["At the end of the lesson, the students should be able to", "Values Integrated",
+             "Instructional Materials", "References", "Mechanics", "Materials Needed"]
+    easy = ["Prepared by", "Checked by", "Noted by"]
+    wrong = [l for l in heavy if field_roles.role_for(Field("k", l)) != "heavy"]
+    wrong += [l for l in easy if field_roles.role_for(Field("k", l)) != "easy"]
+    assert not wrong, wrong
+    print("  TUP SDLP OK")
+
+
+def check_snhs():
+    wrong = [(label, want, field_roles.role_for(Field("k", label))) for label, want in SNHS
+             if field_roles.role_for(Field("k", label)) != want]
+    assert not wrong, f"misclassified: {wrong}"
+    assert field_roles.is_reflection(Field("remarks", "Remarks"))
+    assert not field_roles.is_reflection(Field("discussion", "Discussion"))
+    print("  SNHS DLP OK")
 
 
 def check_self_fields():
@@ -97,7 +143,7 @@ def check_easy_default():
     """Anything the keywords do not recognise is easy: the teacher can answer an
     unknown short field faster than the AI can be asked about it."""
     for label in ["Name", "Date", "Quarter", "School Year", "Signature",
-                  "Checked by", "Page", "Remarks column"]:
+                  "Checked by", "Page"]:
         assert field_roles.role_for(Field("x", label)) == "easy", label
     print("  easy default OK")
 
@@ -324,6 +370,8 @@ def check_content_edit_keeps_roles():
 
 check_named_six()
 check_real_format()
+check_snhs()
+check_tup()
 check_self_fields()
 check_easy_default()
 check_override_wins()

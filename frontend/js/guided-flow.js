@@ -72,8 +72,185 @@ export function createGuided(ui) {
     box.style.height = `${box.scrollHeight + 2}px`;
   }
 
+  // ---- the formatting toolbox ----
+  // Bold, italic, underline, lists, highlight and clear on a part's answer.
+  // The styled HTML is stored like a styled document slot (G.setGuidedRich),
+  // so it shows in the document, the preview, the saved plan and the export.
+  const TOOLS = [
+    { cmd: "bold", label: "Bold (Ctrl+B)", mark: () => el("strong", {}, "B") },
+    { cmd: "italic", label: "Italic (Ctrl+I)", mark: () => el("em", {}, "I") },
+    { cmd: "underline", label: "Underline (Ctrl+U)", mark: () => el("u", {}, "U") },
+    { cmd: "insertUnorderedList", label: "Bulleted list", mark: () => icon("list") },
+    { cmd: "insertOrderedList", label: "Numbered list", mark: () => el("span", { class: "flow-format-num" }, "1.") },
+    { cmd: "highlight", label: "Highlight", mark: () => icon("highlight") },
+    { cmd: "clear", label: "Clear formatting", mark: () => icon("clearFormat") },
+  ];
+
+  // A contenteditable answer with its toolbar (editor.toolbar). `partOf` says
+  // which day it shows (null for a plain part); `onChange` stores it.
+  function richEditor(p, partOf, onChange, rows) {
+    const editor = el("div", { class: "flow-textarea flow-rich", contenteditable: "true", role: "textbox",
+      "aria-multiline": "true", spellcheck: "true", style: `min-height: ${rows * 27 + 28}px` });
+    const buttons = TOOLS.map((t) => el("button", { type: "button", class: "flow-format-btn", "data-cmd": t.cmd,
+      title: t.label, "aria-label": t.label, "aria-pressed": "false" }, t.mark()));
+    editor.toolbar = el("div", { class: "flow-format", role: "toolbar", "aria-label": "Format this answer" }, buttons);
+
+    const highlighted = () => {
+      const node = (window.getSelection() || {}).anchorNode;
+      const at = node && (node.nodeType === 1 ? node : node.parentElement);
+      return !!(at && editor.contains(at) && at.closest(".hl-yellow"));
+    };
+    const states = () => buttons.forEach((b) => {
+      const cmd = b.dataset.cmd;
+      const on = cmd === "highlight" ? highlighted() : cmd === "clear" ? false : document.queryCommandState(cmd);
+      b.setAttribute("aria-pressed", String(!!on));
+    });
+    const changed = () => { onChange(editor); states(); ui.refresh(); };
+
+    // Text just pasted, as character offsets in the answer, so one click on a
+    // list tool turns every pasted line into an item; any other key or click forgets it.
+    let pasted = null;
+    const caretOffset = () => {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount || !editor.contains(sel.anchorNode)) return null;
+      const r = document.createRange();
+      r.selectNodeContents(editor);
+      r.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
+      return r.toString().length;
+    };
+    // Offsets ignore line breaks, so `from` at a line's end is also the next
+    // line's start: `startAfter` picks the next line (a paste's first line).
+    const selectChars = (from, to, startAfter = false) => {
+      const range = document.createRange();
+      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+      let seen = 0, started = false, node;
+      while ((node = walker.nextNode())) {
+        const len = node.textContent.length;
+        if (!started && (startAfter ? seen + len > from : seen + len >= from)) { range.setStart(node, from - seen); started = true; }
+        if (started && seen + len >= to) { range.setEnd(node, to - seen); break; }
+        seen += len;
+      }
+      if (!started) return false;
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return true;
+    };
+
+    function run(cmd) {
+      editor.focus();
+      const sel = window.getSelection();
+      if (cmd === "highlight") G.applySpanClass(["hl-"], highlighted() ? "hl-none" : "hl-yellow");
+      else if (cmd === "clear") {
+        if (sel && !sel.isCollapsed) G.applySpanClass(["hl-", "fc-", "fs-"], "");
+        document.execCommand("removeFormat", false, null);
+      } else {
+        const list = cmd === "insertUnorderedList" || cmd === "insertOrderedList";
+        if (list && pasted && sel && sel.isCollapsed && caretOffset() === pasted.to) selectChars(pasted.from, pasted.to, true);
+        // Chrome leaves the caret at the start of the line after a list
+        // command, so Enter would split it: the caret goes back where it was
+        // (a line with text only; on an empty line Chrome's caret is right).
+        const at = sel && sel.anchorNode;
+        const keep = list && sel.isCollapsed && at && at.nodeType === 3 && at.textContent.trim() ? caretOffset() : null;
+        document.execCommand(cmd, false, null);
+        if (keep !== null) selectChars(keep, keep);
+      }
+      pasted = null;
+      changed();
+    }
+
+    buttons.forEach((b) => {
+      // Keep the selection in the answer when a tool is clicked.
+      b.addEventListener("mousedown", (e) => e.preventDefault());
+      b.addEventListener("click", () => run(b.dataset.cmd));
+    });
+
+    editor.addEventListener("keydown", (e) => {
+      const mod = e.ctrlKey || e.metaKey;
+      // Ctrl+Shift+8 bullets, Ctrl+Shift+7 numbers (as in Google Docs).
+      if (mod && e.shiftKey && (e.code === "Digit8" || e.code === "Digit7")) {
+        e.preventDefault();
+        run(e.code === "Digit8" ? "insertUnorderedList" : "insertOrderedList");
+        return;
+      }
+      if (!["Shift", "Control", "Meta", "Alt"].includes(e.key)) pasted = null;
+      // Enter on an empty bullet ends the list (the browser alone keeps adding bullets).
+      if (e.key === "Enter" && !e.shiftKey && !mod) {
+        const sel = window.getSelection();
+        const node = sel && sel.anchorNode;
+        const li = node && (node.nodeType === 1 ? node : node.parentElement).closest("li");
+        if (li && editor.contains(li) && !li.textContent.trim()) {
+          e.preventDefault();
+          run(li.parentElement.tagName === "OL" ? "insertOrderedList" : "insertUnorderedList");
+        }
+      }
+    });
+    editor.addEventListener("mousedown", () => { pasted = null; });
+
+    // "- " or "* " at the start of a line starts a bulleted list, "1. " a numbered one.
+    function autoList(e) {
+      if (e.inputType !== "insertText" || e.data !== " ") return false;
+      const sel = window.getSelection();
+      const node = sel && sel.anchorNode;
+      if (!node || node.nodeType !== 3 || !sel.isCollapsed || node.parentElement.closest("li")) return false;
+      const before = node.textContent.slice(0, sel.anchorOffset).replace(/ /g, " ");
+      const marker = { "- ": "insertUnorderedList", "* ": "insertUnorderedList", "1. ": "insertOrderedList" }[before];
+      // Only at the start of a line: a line break, a list or a block (or the answer's edge) before it.
+      const prev = node.previousSibling;
+      if (!marker || (prev && !/^(BR|UL|OL|DIV|P)$/.test(prev.nodeName))) return false;
+      const r = document.createRange();
+      r.setStart(node, 0);
+      r.setEnd(node, sel.anchorOffset);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      document.execCommand("delete", false, null);
+      document.execCommand(marker, false, null);
+      return true;
+    }
+
+    editor.addEventListener("input", (e) => {
+      autoList(e);
+      changed();
+    });
+    editor.addEventListener("keyup", states);
+    editor.addEventListener("mouseup", states);
+    // Pasted text comes in plain (styling from other sites wouldn't survive export anyway).
+    editor.addEventListener("paste", (e) => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData("text/plain").replace(/\r\n?/g, "\n");
+      const from = caretOffset();
+      document.execCommand("insertText", false, text);
+      const to = caretOffset();
+      pasted = from !== null && to !== null && text.includes("\n") ? { from, to } : null;
+    });
+
+    // Shows the stored answer: its formatting if it has any, else its lines.
+    editor.fill = () => {
+      const part = partOf();
+      const rich = G.guidedRich(p.key, part);
+      if (rich) {
+        editor.innerHTML = rich;
+        return;
+      }
+      const text = part === null ? asText(G.fieldValue(p.key)) : dayText(G.fieldValue(p.key), part);
+      editor.textContent = "";
+      text.split("\n").forEach((line, i) => editor.append(...(i ? [el("br"), line] : [line])));
+    };
+    editor.fill();
+    return editor;
+  }
+
+  // The box(es) as placed on the screen: a formatted answer brings its toolbar.
+  const fieldNode = (input) => [input.toolbar || "", el("div", { class: "flow-field" }, input)];
+
   function box(p, part, { compact = false } = {}) {
     const multi = p.type !== "text" || part !== null;
+    // A part's own screen gets the formatting toolbox; the quick blanks stay plain.
+    if (multi && !compact) {
+      const editor = richEditor(p, () => part, (ed) => G.setGuidedRich(p.key, ed, part), part !== null ? 3 : 6);
+      editor.addEventListener("focus", () => G.setGuidedDay(part));
+      return editor;
+    }
     const input = multi
       ? el("textarea", { class: "flow-textarea", rows: compact ? "2" : part !== null ? "3" : "6", maxlength: "6000" })
       : el("input", { type: "text", maxlength: "500", autocomplete: "off" });
@@ -100,11 +277,21 @@ export function createGuided(ui) {
     const options = () => days.map((d, i) => el("option", { value: String(i) }, d));
     const fromSel = el("select", { id: `${id}-from` }, options());
     const toSel = el("select", { id: `${id}-to`, "aria-label": "Through" }, options());
-    const input = el("textarea", { class: "flow-textarea", id, rows: opts.compact ? "2" : "5", maxlength: "6000" });
+    // On a part's own screen the day's answer is formatted, written to every day in the range.
+    const rich = !opts.compact;
+    const input = rich
+      ? richEditor(p, () => from, (ed) => { for (let d = from; d <= to; d++) G.setGuidedRich(p.key, ed, d); }, 5)
+      : el("textarea", { class: "flow-textarea", rows: "2", maxlength: "6000" });
+    input.id = id;
+    if (rich) input.setAttribute("aria-label", `${p.label}: answer for the chosen day`);
 
     function paint() {
       fromSel.value = String(from);
       toSel.value = String(to);
+      if (rich) {
+        if (document.activeElement !== input) input.fill();
+        return;
+      }
       const text = dayText(G.fieldValue(p.key), from);
       if (input.value !== text) input.value = text;
       grow(input);
@@ -120,12 +307,15 @@ export function createGuided(ui) {
       paint();
     });
     input.addEventListener("focus", () => G.setGuidedDay(from));
-    input.addEventListener("input", () => {
-      for (let d = from; d <= to; d++) G.setGuidedValue(p.key, input.value, d);
-      grow(input);
-      paint();
-      ui.refresh();
-    });
+    // The formatted editor stores itself (richEditor's onChange).
+    if (!rich) {
+      input.addEventListener("input", () => {
+        for (let d = from; d <= to; d++) G.setGuidedValue(p.key, input.value, d);
+        grow(input);
+        paint();
+        ui.refresh();
+      });
+    }
     G.setGuidedDay(from);
     requestAnimationFrame(paint);
     const picker = el("div", { class: "flow-day-picker" },
@@ -133,7 +323,7 @@ export function createGuided(ui) {
       el("div", { class: "flow-field flow-select" }, fromSel),
       el("span", { class: "flow-day-to" }, "to"),
       el("div", { class: "flow-field flow-select" }, toSel));
-    return { node: [picker, el("div", { class: "flow-field" }, input)], sync: paint };
+    return { node: [picker, ...fieldNode(input)], sync: paint };
   }
 
   // Every box for one part: one, or the day editor for a weekly part.
@@ -146,15 +336,20 @@ export function createGuided(ui) {
       const input = box(p, 0, opts);
       input.id = id(0);
       boxes.push([input, 0]);
-      node = [opts.label ? el("label", { class: "flow-label", for: input.id }, p.label) : "", el("div", { class: "flow-field" }, input)];
+      node = [opts.label ? el("label", { class: "flow-label", for: input.id }, p.label) : "", ...fieldNode(input)];
     } else {
       const input = box(p, null, opts);
       input.id = id(null);
       if (!opts.label) input.setAttribute("aria-labelledby", "flow-question");
       boxes.push([input, null]);
-      node = [opts.label ? el("label", { class: "flow-label", for: input.id }, p.label) : "", el("div", { class: "flow-field" }, input)];
+      node = [opts.label ? el("label", { class: "flow-label", for: input.id }, p.label) : "", ...fieldNode(input)];
     }
     const sync = () => boxes.forEach(([input, part]) => {
+      // A formatted answer repaints from the stored HTML (after "Clear this part", say).
+      if (input.fill) {
+        if (document.activeElement !== input) input.fill();
+        return;
+      }
       const v = G.fieldValue(p.key);
       const text = part === null ? asText(v) : dayText(v, part);
       if (input.value !== text) {

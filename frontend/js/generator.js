@@ -222,7 +222,7 @@ const mainTopicInput = document.getElementById("ctx-main-topic");
 // The flow's own state, saved with the setup so a refresh lands on the same step.
 // guides: the library documents picked in step 6, any number of either kind;
 // sources: the student's own private uploads.
-let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [], guides: [], term: "", week: "", sample: null, guidedAt: "part" };
+let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [], guides: [], term: "", week: "", sample: null, assessment: null, quizItems: 5, guidedAt: "part" };
 // One run = one pass through the flow; its draft is keyed by run, not by
 // format, so picking a format never silently brings back an older draft.
 let currentRunId = new URLSearchParams(window.location.search).get("run");
@@ -278,48 +278,98 @@ const OWL_COACH_STARTERS = [
 ];
 const CHAT_TURNS_SENT = 8;
 
-// One conversation per field, not one long stream. Switching field (or
-// leaving guided mode and coming back) swaps the visible thread instead of
-// starting over, and every thread is written to localStorage so it is still
-// there after a reload — the History button reads them back.
-const CHAT_STORE_PREFIX = "owlChat:v1:";
-const CHAT_MAX_TURNS_PER_FIELD = 60;
-const chat = { threads: {}, busy: false, fieldKey: null };
+// One conversation per lesson plan, like a chat app's conversation list: moving
+// to the next part never clears the log, Alan just opens the new part with a
+// message of his own. Each turn remembers its part, so only that part's turns
+// are sent to the AI. All of them are kept in localStorage (the History button
+// lists them, one per plan). The old per-field threads (owlChat:v1:) are left
+// where they are and not shown.
+const CHAT_STORE_KEY = "owlChat:v2";
+const CHAT_MAX_TURNS = 300;
+const CHAT_MAX_CONVERSATIONS = 30;
+const chat = { store: {}, busy: false, fieldKey: null, shown: null };
 
-function chatStoreKey() {
-  const formatId = new URLSearchParams(window.location.search).get("format_id") || "none";
-  return `${CHAT_STORE_PREFIX}${formatId}`;
+// The run id while a plan is being made; a plan opened from the list has none.
+function chatConvKey() {
+  return currentRunId ? `run:${currentRunId}` : planId ? `plan:${planId}` : "run:none";
 }
 
 function loadChatThreads() {
   try {
-    chat.threads = JSON.parse(localStorage.getItem(chatStoreKey()) || "{}") || {};
+    const store = JSON.parse(localStorage.getItem(CHAT_STORE_KEY) || "{}");
+    chat.store = store && typeof store === "object" && !Array.isArray(store) ? store : {};
   } catch (err) {
     // Corrupt or unavailable storage must never stop the chat working.
-    chat.threads = {};
+    chat.store = {};
   }
 }
 
 function saveChatThreads() {
   try {
-    localStorage.setItem(chatStoreKey(), JSON.stringify(chat.threads));
+    // The oldest conversations go first once there are too many.
+    const keys = Object.keys(chat.store).sort((a, b) => (chat.store[b].updatedAt || 0) - (chat.store[a].updatedAt || 0));
+    keys.slice(CHAT_MAX_CONVERSATIONS).forEach((k) => delete chat.store[k]);
+    localStorage.setItem(CHAT_STORE_KEY, JSON.stringify(chat.store));
   } catch (err) {
-    /* private mode, or the quota is full — the in-memory threads still work */
+    /* private mode, or the quota is full — the in-memory chat still works */
   }
 }
 
-function threadFor(key) {
-  if (!chat.threads[key]) chat.threads[key] = [];
-  return chat.threads[key];
+function currentConversation() {
+  const key = chatConvKey();
+  const conv = chat.store[key];
+  if (conv && Array.isArray(conv.turns)) return conv;
+  chat.store[key] = { turns: [], startedAt: Date.now() };
+  return chat.store[key];
 }
 
-function recordTurn(key, role, text, options = []) {
-  const thread = threadFor(key);
-  thread.push({ role, text, at: Date.now(), ...(options.length ? { options } : {}) });
-  // Keep a lid on it: a very long conversation about one field would
-  // otherwise grow the stored blob without limit.
-  if (thread.length > CHAT_MAX_TURNS_PER_FIELD) thread.splice(0, thread.length - CHAT_MAX_TURNS_PER_FIELD);
+// role: "teacher" | "owl" | "part" (the divider naming the part). intro marks
+// Alan's built-in opening for a part, which is never sent to the AI.
+function recordTurn(key, role, text, options = [], intro = false) {
+  const conv = currentConversation();
+  conv.turns.push({ role, text, field: key, at: Date.now(), ...(options.length ? { options } : {}), ...(intro ? { intro } : {}) });
+  if (conv.turns.length > CHAT_MAX_TURNS) conv.turns.splice(0, conv.turns.length - CHAT_MAX_TURNS);
+  conv.updatedAt = Date.now();
+  conv.title = topicInput.value.trim() || mainTopicInput.value.trim() || conv.title || "";
+  conv.format = (fmt && fmt.name) || conv.format || "";
   saveChatThreads();
+}
+
+// Text with several lines: lines starting with "- " or "• " (or every line,
+// for an option's text) become a bulleted list, the rest paragraphs.
+// Alan's replies and options, organised: "- " or "•" lines become a bulleted
+// list and "1." lines a numbered one, a list run together on one line is
+// split into its items, and **bold** shows as bold, not as asterisks.
+function fillLines(el, text, listAll = false) {
+  let raw = String(text || "").replace(/\r/g, "");
+  if (/(^|\s)1[.)]\s.+\s2[.)]\s/.test(raw)) raw = raw.replace(/\s+(?=\d{1,2}[.)]\s+\S)/g, "\n");
+  raw = raw.replace(/\s+•\s+/g, "\n• ");
+  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  el.textContent = "";
+  if (lines.length < 2 && !listAll) {
+    appendBold(el, lines[0] || "");
+    return;
+  }
+  let list = null;
+  lines.forEach((line) => {
+    const numbered = /^\d{1,2}[.)]\s+/.test(line);
+    const bulleted = /^[-•*]\s+/.test(line);
+    if (listAll || numbered || bulleted) {
+      const tag = numbered ? "ol" : "ul";
+      if (!list || list.tagName.toLowerCase() !== tag) list = el.appendChild(document.createElement(tag));
+      appendBold(list.appendChild(document.createElement("li")), line.replace(/^([-•*]|\d{1,2}[.)])\s+/, ""));
+    } else {
+      list = null;
+      appendBold(el.appendChild(document.createElement("p")), line);
+    }
+  });
+}
+
+function appendBold(el, text) {
+  String(text).split(/\*\*(.+?)\*\*/).forEach((piece, i) => {
+    if (!piece) return;
+    el.appendChild(i % 2 ? document.createElement("strong") : document.createTextNode(piece)).textContent = piece;
+  });
 }
 
 function scrollChatToEnd() {
@@ -375,7 +425,7 @@ function addOwlMessage(text, choices = [], { error = false, unread = true } = {}
   if (error) row.classList.add("is-error");
   const bubble = document.createElement("div");
   bubble.className = "owl-bubble";
-  bubble.textContent = text;
+  fillLines(bubble, text);
   body.appendChild(bubble);
 
   if (choices.length) {
@@ -390,9 +440,10 @@ function addOwlMessage(text, choices = [], { error = false, unread = true } = {}
         const label = document.createElement("span");
         label.className = "owl-choice-label";
         label.textContent = choice.label;
-        const text = document.createElement("span");
+        // Several lines (objectives, say) read as a bulleted list, not one run.
+        const text = document.createElement("div");
         text.className = "owl-choice-text";
-        text.textContent = choice.text;
+        fillLines(text, choice.text, true);
         card.append(label, text);
         if (choice.why) {
           const why = document.createElement("span");
@@ -418,18 +469,29 @@ function addOwlMessage(text, choices = [], { error = false, unread = true } = {}
   if (unread && !owlChat.hidden && owlChat.classList.contains("is-collapsed")) setChatUnread(true);
 }
 
-// Draw a saved thread back into the log. Restored owl turns keep their
-// options (read-only) but not their follow-up questions.
-function renderThread(key, note) {
-  owlChatLog.innerHTML = "";
-  const thread = chat.threads[key] || [];
-  // The note introduces what follows, so it goes in before the messages.
-  if (note && thread.length) addChatNote(note);
-  thread.forEach((turn) => {
-    if (turn.role === "teacher") addTeacherMessage(turn.text);
+// The part divider in the log: which part the messages below are about.
+function addPartNote(text) {
+  addChatNote(text);
+  owlChatLog.lastElementChild.classList.add("owl-chat-part");
+}
+
+// Draw a conversation's turns into the log. Owl turns keep their options
+// (read-only); follow-up questions are only ever offered live.
+function drawTurns(turns) {
+  turns.forEach((turn) => {
+    if (turn.role === "part") addPartNote(turn.text);
+    else if (turn.role === "teacher") addTeacherMessage(turn.text);
     else addOwlMessage(turn.text, turn.options || [], { unread: false });
   });
-  return thread.length;
+}
+
+const startersFor = (field) => (field.locked ? OWL_COACH_STARTERS : OWL_STARTERS);
+
+// Alan's built-in opening for a part (js/part-guides.js): no AI call.
+function partIntro(field) {
+  return partGuide(field) + (field.locked
+    ? "\n\nYour teacher wants this part in your own words, so I won't write it for you, but I can help you think it through."
+    : "");
 }
 
 function introduceFieldInChat() {
@@ -441,18 +503,26 @@ function introduceFieldInChat() {
   owlChatField.textContent = `Helping with: ${field.label}`;
   if (!owlChatHistory.hidden) showChatHistory(false);
 
-  // Show this field's own conversation. Coming back to a field you already
-  // discussed picks up where you left off rather than wiping the log.
-  const hadTurns = renderThread(key, `Earlier conversation about "${field.label}".`);
-  if (hadTurns) {
-    scrollChatToEnd();
-  } else if (field.locked) {
-    // Locked by the teacher: Alan coaches, he doesn't write it.
-    addOwlMessage(`Your teacher wants "${field.label}" in your own words, so I won't write it for you. I can help you think it through.`,
-      OWL_COACH_STARTERS, { unread: false });
-  } else {
-    addOwlMessage(`I can help with "${field.label}". Ask a question or tap an option.`, OWL_STARTERS, { unread: false });
+  // The whole plan is one conversation, drawn once; a new part is added below.
+  const conv = currentConversation();
+  if (chat.shown !== chatConvKey()) {
+    chat.shown = chatConvKey();
+    owlChatLog.innerHTML = "";
+    drawTurns(conv.turns);
   }
+  const lastPart = [...conv.turns].reverse().find((t) => t.role === "part");
+  if (!lastPart || lastPart.field !== key) {
+    const note = `${field.label}`;
+    const intro = partIntro(field);
+    recordTurn(key, "part", note);
+    recordTurn(key, "owl", intro, [], true);
+    addPartNote(note);
+    addOwlMessage(intro, startersFor(field), { unread: false });
+  } else if (!owlChatLog.querySelector("button.owl-choice:not(:disabled)")) {
+    // Back on the same part (a reload): offer its questions again.
+    addOwlMessage("Ask me anything about this part.", startersFor(field), { unread: false });
+  }
+  scrollChatToEnd();
 }
 
 async function sendToOwl(text) {
@@ -469,7 +539,9 @@ async function sendToOwl(text) {
   addTeacherMessage(text);
   const typing = addOwlTyping();
   try {
-    const history = (chat.threads[key] || [])
+    // Only this part's exchange is sent: the AI answers about the part on screen.
+    const history = currentConversation().turns
+      .filter((t) => t.field === key && (t.role === "teacher" || t.role === "owl") && !t.intro)
       .slice(-CHAT_TURNS_SENT)
       .map(({ role, text: turnText }) => ({ role, text: turnText }));
     const data = await Api.owlChat({
@@ -649,39 +721,51 @@ function showChatHistory(visible) {
 
 function renderHistoryList() {
   owlChatHistoryBack.hidden = true;
-  owlChatHistoryTitle.textContent = "Saved conversations";
+  owlChatHistoryTitle.textContent = "Your conversations";
   owlChatHistoryList.innerHTML = "";
 
-  const entries = Object.entries(chat.threads).filter(([, turns]) => turns.length);
+  // One conversation per lesson plan, newest first, like a chat app's list.
+  const talked = (c) => (c.turns || []).filter((t) => t.role === "teacher").length;
+  const entries = Object.entries(chat.store)
+    .filter(([, c]) => c && Array.isArray(c.turns) && c.turns.length)
+    .sort(([, a], [, b]) => (b.updatedAt || 0) - (a.updatedAt || 0));
   if (!entries.length) {
     owlChatHistoryList.innerHTML =
-      '<p class="owl-chat-history-empty">Nothing saved yet. Conversations you have with Alan about each field are kept here so you can read them back.</p>';
+      '<p class="owl-chat-history-empty">Nothing saved yet. Each lesson plan you write with Alan keeps its conversation here, so you can read it back.</p>';
     return;
   }
 
-  entries.forEach(([key, turns]) => {
-    const field = fieldByKey(key);
-    const last = turns[turns.length - 1];
+  entries.forEach(([key, conv]) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "owl-chat-thread-btn";
     const title = document.createElement("strong");
-    const when = last.at ? ` · ${new Date(last.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "";
-    title.textContent = `${field ? field.label : key} (${turns.length} messages)${when}`;
-    const preview = document.createElement("span");
-    preview.textContent = last.text;
-    btn.append(title, preview);
+    const when = new Date(conv.updatedAt || conv.startedAt || Date.now())
+      .toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    title.textContent = `${conv.title || conv.format || "Lesson plan"}${key === chatConvKey() ? " (this plan)" : ""}`;
+    const meta = document.createElement("span");
+    const asked = talked(conv);
+    meta.textContent = `${when} · ${asked ? `${asked} question${asked === 1 ? "" : "s"}` : "no questions yet"}${conv.format ? ` · ${conv.format}` : ""}`;
+    btn.append(title, meta);
     btn.addEventListener("click", () => renderHistoryThread(key));
     owlChatHistoryList.appendChild(btn);
   });
 }
 
+// One saved conversation, read-only: its parts, questions, answers and options.
 function renderHistoryThread(key) {
-  const field = fieldByKey(key);
+  const conv = chat.store[key];
   owlChatHistoryBack.hidden = false;
-  owlChatHistoryTitle.textContent = field ? field.label : key;
+  owlChatHistoryTitle.textContent = (conv && (conv.title || conv.format)) || "Lesson plan";
   owlChatHistoryList.innerHTML = "";
-  (chat.threads[key] || []).forEach((turn) => {
+  ((conv && conv.turns) || []).forEach((turn) => {
+    if (turn.role === "part") {
+      const note = document.createElement("div");
+      note.className = "owl-chat-note owl-chat-part";
+      note.textContent = turn.text;
+      owlChatHistoryList.appendChild(note);
+      return;
+    }
     const row = document.createElement("div");
     row.className = `owl-msg owl-msg-${turn.role === "teacher" ? "teacher" : "owl"}`;
     if (turn.role !== "teacher") {
@@ -695,8 +779,26 @@ function renderHistoryThread(key) {
     body.className = "owl-msg-body";
     const bubble = document.createElement("div");
     bubble.className = "owl-bubble";
-    bubble.textContent = turn.text;
+    fillLines(bubble, turn.text);
     body.appendChild(bubble);
+    (turn.options || []).forEach((o) => {
+      const card = document.createElement("div");
+      card.className = "owl-choice owl-choice-use";
+      const label = document.createElement("span");
+      label.className = "owl-choice-label";
+      label.textContent = o.label;
+      const text = document.createElement("div");
+      text.className = "owl-choice-text";
+      fillLines(text, o.text, true);
+      card.append(label, text);
+      if (o.why) {
+        const why = document.createElement("span");
+        why.className = "owl-choice-why";
+        why.textContent = o.why;
+        card.append(why);
+      }
+      body.appendChild(card);
+    });
     row.appendChild(body);
     owlChatHistoryList.appendChild(row);
   });
@@ -763,6 +865,12 @@ function getClassLabel() {
   return parts.join(" · ");
 }
 
+function assessmentText(a) {
+  if (a.assessment === "quiz") return `a ${a.quizItems || 5}-item multiple-choice quiz`;
+  if (a.assessment === "task") return "a performance task with a rubric";
+  return "";
+}
+
 function getAdvancedContext() {
   const isCollege = levelTypeSelect.value === "college";
   const context = {
@@ -780,6 +888,8 @@ function getAdvancedContext() {
     // Step 6: which term and week of the Budget of Work this lesson is.
     term: flowFlags.term || "",
     week: flowFlags.week || "",
+    // Step 2: how the lesson is assessed, in words, as the prompt reads it.
+    assessment_type: assessmentText(flowFlags),
   };
   // Only when Alan actually asked (the plan went through the flow): then an
   // empty value means "first lesson" / "not sure yet" and the server grounds
@@ -1250,8 +1360,9 @@ function loadStaticKeys() {
 }
 
 // Fields the format's teacher locked: never generated, whatever is chosen here.
+// The reflection, written after the lesson, is never generated either.
 function lockedKeys() {
-  return fieldsInDocumentOrder().filter((f) => f.locked).map((f) => f.field_key);
+  return fieldsInDocumentOrder().filter((f) => f.locked || f.reflection).map((f) => f.field_key);
 }
 
 function saveStaticKeys() {
@@ -1282,8 +1393,9 @@ function selectedGenerateKeys() {
 // the teacher can see which blanks are theirs to write.
 // The placeholder says so too, instead of a tag that would sit on top of it.
 function setStaticLook(el, isStatic) {
-  const locked = (fieldByKey(el.dataset.fieldKey) || {}).locked;
-  el.setAttribute("data-placeholder", locked ? "Locked by your teacher: yours to write" : isStatic ? "Static: yours to fill in" : "Not generated yet");
+  const f = fieldByKey(el.dataset.fieldKey) || {};
+  el.setAttribute("data-placeholder", f.reflection ? "Reflection: write it after the lesson"
+    : f.locked ? "Locked by your teacher: yours to write" : isStatic ? "Static: yours to fill in" : "Not generated yet");
 }
 
 function paintStaticMarks() {
@@ -2167,7 +2279,12 @@ function planPayload() {
   };
 }
 
+// The name the teacher gave the plan (asked on Save, or set by renaming it in
+// the list). Until there is one, the title follows the topic.
+let planName = "";
+
 function planTitle() {
+  if (planName) return planName;
   const subject = subjectInput.value.trim();
   const topic = topicInput.value.trim();
   // Topic first when there is one: a teacher's drafts are nearly all the same
@@ -2486,6 +2603,7 @@ function writeDraft() {
         fieldValues,
         fieldRichValues,
         modeSlots,
+        planName,
         // Same shape the saved plan stores, from one definition.
         ...setupContext(),
         docEdits: collectDocEdits(),
@@ -2572,6 +2690,10 @@ function applyOpenedPlan(plan) {
     // back through "Before we start" on a plan they already filled in.
     applySetupContext(plan.setup_context);
     if (plan.subject) subjectInput.value = plan.subject;
+    // A title other than the one the topic gives was chosen (named on Save
+    // or renamed in the list), so autosaves keep it.
+    planName = "";
+    if (plan.title && plan.title !== planTitle()) planName = plan.title;
     syncGuideSearchLabels();
     if (plan.is_public) visibilityCheckbox.checked = true;
 
@@ -2651,6 +2773,7 @@ function restoreDraft() {
     // Both modes' work comes back, not just the one that happened to be active.
     if (draft.modeSlots) modeSlots = draft.modeSlots;
     planId = draft.planId || null;
+    planName = draft.planName || "";
     // A draft from before revisions has none, and its first save goes through
     // unchecked, as every save did then.
     planRevision = draft.planRevision ?? null;
@@ -2907,6 +3030,13 @@ function reviewRowMarkup(f) {
   const label = escapeHtml(f.label || f.field_key);
   const isStatic = staticKeys.has(f.field_key);
   const filled = isFieldComplete(f.field_key) ? '<span class="gen-review-note">has content</span>' : "";
+  if (f.reflection) {
+    return `
+    <div class="gen-review-row" data-review-key="${key}">
+      <span class="gen-review-label">${label}${filled}</span>
+      <span class="gen-review-locked">${Icons.edit}Write after the lesson</span>
+    </div>`;
+  }
   if (f.locked) {
     return `
     <div class="gen-review-row" data-review-key="${key}">
@@ -2926,12 +3056,13 @@ function reviewRowMarkup(f) {
 
 function renderReviewList() {
   const all = fieldsInDocumentOrder();
-  const fields = all.filter((f) => !f.locked);
+  const fields = all.filter((f) => !f.locked && !f.reflection);
   const groups = [
     ["Quick fields", fields.filter((f) => f.role !== "heavy" && f.role !== "self")],
     ["Needs real thinking", fields.filter((f) => f.role === "heavy")],
     ["Yours to fill in", fields.filter((f) => f.role === "self")],
-    ["You write these (locked by your teacher)", all.filter((f) => f.locked)],
+    ["You write these (locked by your teacher)", all.filter((f) => f.locked && !f.reflection)],
+    ["Your reflection, after the lesson", all.filter((f) => f.reflection)],
   ].filter(([, list]) => list.length);
   reviewList.innerHTML = groups
     .map(([title, list]) => `<fieldset class="gen-review-group"><legend>${title}</legend>${list.map(reviewRowMarkup).join("")}</fieldset>`)
@@ -3466,7 +3597,20 @@ visibilityCheckbox.addEventListener("change", async () => {
 // any other: it autosaves, and Export waits for that save.
 pageSizeSelect.addEventListener("change", markDirty);
 
+// Saving asks what to call the plan first (its title in the list), prefilled
+// with the name it has; cancelling saves nothing.
+function askPlanName() {
+  return new Promise((resolve) => askName({
+    title: "Save lesson plan", label: "Lesson plan name", value: planTitle(),
+    action: "Save", busy: "Saving…", empty: "Give the lesson plan a name.",
+    onSubmit: async (name) => resolve(name), onCancel: () => resolve(null),
+  }));
+}
+
 saveBtn.addEventListener("click", async () => {
+  const name = await askPlanName();
+  if (!name) return;
+  planName = name;
   // A pending autosave would otherwise race this one and re-send the same
   // payload a moment later.
   clearTimeout(serverSaveTimer);
@@ -3568,7 +3712,7 @@ const ANSWER_INPUTS = {
   section: sectionInput, previousTopic: prevTopicInput, topic: topicInput, nextTopic: nextTopicInput,
   mainTopic: mainTopicInput,
 };
-const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "term", "week", "sample", "guidedAt"];
+const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "term", "week", "sample", "assessment", "quizItems", "guidedAt"];
 
 function getAnswers() {
   const answers = {};
@@ -3646,6 +3790,31 @@ function partInfo(key) {
     key, label: f.label, type: f.field_type, group: f.section_group || "",
     days: partCount(key) ? f.parts : null, locked: !!f.locked,
   };
+}
+
+// A formatted Guided answer (the part's toolbar box): its sanitized HTML goes
+// to fieldRichValues, the same as a styled document slot, and its plain text
+// to fieldValues, so completeness checks, Alan and the quick parts keep
+// reading text while the document, preview, save and export get the styling.
+function setGuidedRich(key, editorEl, part = null) {
+  const html = sanitizeRichValueHtml(editorEl);
+  const text = editorEl.innerText.replace(/\n+$/, "");
+  const target = { dataset: part === null ? { fieldKey: key } : { fieldKey: key, part: String(part) } };
+  storeSlot(target, text, html);
+  const canvas = liveDocWrap.querySelector(".lp-doc");
+  if (canvas) {
+    slotsFor(key, canvas).forEach((el) => {
+      if (part !== null && slotPart(el) !== part) return;
+      el.innerHTML = html;
+      el.classList.toggle("lp-filled", !!text.trim());
+    });
+  }
+  markDirty();
+}
+
+// The formatted HTML of one Guided answer (one day of a weekly part), or "".
+function guidedRich(key, part = null) {
+  return richForSlot({ dataset: part === null ? { fieldKey: key } : { fieldKey: key, part: String(part) } });
 }
 
 // Writes one part's answer (or one day of a weekly part) and shows it in the
@@ -3780,6 +3949,11 @@ window.Generator = {
   fieldValue: (key) => fieldValues[key],
   isFieldComplete,
   setGuidedValue,
+  // The part screens' formatting toolbox: the formatted answer, read and
+  // written through the document's own rich-value machinery.
+  setGuidedRich,
+  guidedRich,
+  applySpanClass: applyDocSpanClass,
   setGuidedDay: (i) => { guidedPart = i; },
   guidedIndex: () => stepIndex,
   setGuidedIndex: (i) => {

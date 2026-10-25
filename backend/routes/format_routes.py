@@ -754,12 +754,10 @@ def get_format_template_html(format_id):
                        f"template ({exc.__class__.__name__}).",
         }), 500
 
-    if rendered is None:
-        return jsonify({
-            "status": "error",
-            "message": "No reference file is on record for this format, so there's no "
-                       "real template to render.",
-        }), 404
+    # No reference file, or none of its fields could be placed in it: a plain
+    # document built from the fields, so every screen shows document view.
+    if rendered is None or not rendered.get("html"):
+        rendered = docx_service.render_plain_html(fmt)
 
     return jsonify({"status": "ok", **rendered})
 

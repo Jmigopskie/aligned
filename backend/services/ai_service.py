@@ -153,14 +153,18 @@ _OWL_SYSTEM_INSTRUCTION = (
     "teachers in the Philippines. The teacher writes one field of the lesson plan at a time "
     "and chats with you about it.\n\n"
     "Rules (follow strictly):\n"
-    "- Reply in at most 2 short sentences and no more than 35 words. No greetings, no "
-    "praise, no filler, no markdown, no lists. Answer exactly what was asked.\n"
+    "- Reply briefly and organised: one or two short sentences, or, when the answer has "
+    "several points or steps, one short lead-in line and then each point on its own line "
+    "starting with '- ' (or '1. ', '2. ' for steps in order), at most 5 points of a few words "
+    "each. Never run a list together in one sentence. No greetings, no praise, no filler, no "
+    "headings, tables or other markdown. Answer exactly what was asked.\n"
     "- Always give 2 to 4 choices.\n"
     "- A \"use\" choice is an example of finished content for the current field, shown as "
     "an option to read and learn from (it is never inserted; the writer writes the field "
     "in their own words): classroom-ready, in DepEd K-12 terminology, grounded in the lesson's "
     "topic, subject and course guide. Fit the field: one line for a short text field; for "
-    f"a list, one item per line and at most {_MAX_LIST_ITEMS} complete items. Its label names the option in at most "
+    f"a list, one item per line and at most {_MAX_LIST_ITEMS} complete items; for learning objectives, exactly "
+    "3 objectives, one per line (no competency, no lead-in). Its label names the option in at most "
     "6 words. Its \"why\" explains that option in one short sentence (at most 25 words): "
     "why it fits this field and lesson, or what it does for the learners.\n"
     "- An \"ask\" choice is a follow-up question the teacher may want to ask next, at most "
@@ -408,11 +412,14 @@ def _field_directive(field):
         )
     if _is_objective_field(field):
         combined = re.search(r"competenc", field.label or "", re.I)
+        lead_in = ("" if _stem_printed(field) else
+                   " the line 'At the end of the lesson, the learners are expected to:' (not counted, not "
+                   "numbered), then")
         return (
             (" First line: the learning competency copied word for word from the guide. Then"
              if combined else "")
-            + " the line 'At the end of the lesson, the learners are expected to:' (not counted, not "
-            f"numbered), then at least {_MIN_OBJECTIVES} learning objectives, one per line with no "
+            + lead_in
+            + f" exactly {_MIN_OBJECTIVES} learning objectives, one per line with no "
             "numbers or bullet characters (the app bullets them; this overrides any 'numbered' "
             "wording above). Each is unpacked from the competency, achievable in the session, and "
             "starts with a measurable Bloom's taxonomy action verb in lowercase, never 'understand', "
@@ -530,7 +537,32 @@ def _grounding_directive(field, context: dict) -> str:
     if minutes and any(w in haystack for w in _TIMING_WORDS):
         span = f"{minutes} minutes per session" if weekly else f"{minutes} minutes"
         out += f" The whole discussion lasts {span}. Where the procedure gives times, they must add up to that."
-    return out
+    return out + _assessment_directive(haystack, context)
+
+
+# The evaluation part, not a practice activity that merely "leads to" one.
+_ASSESSMENT_FIELD = re.compile(r"assess|evaluat|quiz|\btest\b", re.I)
+_QUIZ_ITEMS = re.compile(r"(\d)-item multiple-choice quiz")
+
+
+def _assessment_directive(haystack: str, context: dict) -> str:
+    """The assessment the setup chose (step 2), for the field that assesses:
+    a multiple-choice quiz of its item count with an answer key, or a
+    performance task with its rubric. Nothing when the setup didn't ask."""
+    kind = str(context.get("assessment_type") or "")
+    if not kind or not _ASSESSMENT_FIELD.search(haystack) or "mastery" in haystack:
+        return ""
+    quiz = _QUIZ_ITEMS.search(kind)
+    if quiz:
+        n = int(quiz.group(1))
+        return (f" Assess with a multiple-choice quiz of exactly {n} item{'s' if n > 1 else ''} on the lesson's "
+                "specific topic: each item a numbered question with four options, a. to d., one per line, "
+                "then 'Answer key:' with the correct letter for every item.")
+    if "performance task" in kind:
+        return (" Assess with a performance task on the lesson's specific topic: the task, its step-by-step "
+                "instructions, then 'Rubric:' with 3 to 5 criteria, one per line, each giving its levels and "
+                "points (e.g. 'Accuracy: Excellent 5 | Good 4 | Fair 3 | Needs improvement 2'), then the total points.")
+    return ""
 
 
 # What the standard DepEd lesson-plan parts are for, used only when a format
@@ -585,6 +617,14 @@ def _lesson_block(context: dict, guide_text: str, citation: str = "") -> str:
     """The part of every generation and chat request that stays the same for a
     lesson, sent first so it can be served from the provider's prompt cache."""
     block = f"Lesson details: {_context_block(context)}\n"
+    # Testers found plans drifting to the main topic in general.
+    topic = str(context.get("topic") or "").strip()
+    main = str(context.get("main_topic") or "").strip()
+    if topic:
+        within = f" (part of the main topic {main})" if main and main.lower() != topic.lower() else ""
+        block += (f"\nThis lesson teaches ONE specific topic: {topic}{within}. Every field (content, examples, "
+                  f"activities, questions, assessment, assignment) is about {topic} itself; the main topic and "
+                  f"the guide's section are only its frame. Do not drift into the main topic's other subtopics.\n")
     # Typed by hand: "3" reads as "Week 3", "Week 4" stays as written.
     week = str(context.get("week") or "").strip()
     week = f"Week {week}" if week.isdigit() else week
@@ -813,14 +853,31 @@ def _unnumber_objectives(values: dict, fields) -> dict:
     of the lesson, the learners are expected to:'), so any numbering the model
     added anyway (ILAW's own field hint says 'numbered') comes off here and the
     page bullets the lines. A numbered list would also keep the page from
-    bulleting them, since it treats numbers as an ordered procedure."""
+    bulleting them, since it treats numbers as an ordered procedure. A lesson
+    has three objectives (the DepEd standard testers asked for): any beyond
+    the third are dropped."""
     out = dict(values)
     for f in fields:
         if f.field_key not in out or not _is_objective_field(f):
             continue
+        # A combined "Competencies/Objectives" field leads with the competency.
+        combined = bool(re.search(r"competenc", f.label or "", re.I))
+        printed = _stem_printed(f)
 
         def clean(text):
-            return "\n".join(_LIST_NUMBER.sub("", line) for line in str(text or "").split("\n"))
+            kept, objectives = [], 0
+            for line in str(text or "").split("\n"):
+                line = _LIST_NUMBER.sub("", line)
+                if printed and grounding._OBJECTIVE_STEM.match(line.strip()):
+                    continue  # the format prints its own lead-in
+                is_objective = (line.strip() and not grounding._OBJECTIVE_STEM.match(line.strip())
+                                and not (combined and not any(k.strip() for k in kept)))
+                if is_objective:
+                    objectives += 1
+                    if objectives > _MAX_OBJECTIVES:
+                        continue
+                kept.append(line)
+            return "\n".join(kept)
 
         value = out[f.field_key]
         out[f.field_key] = [clean(v) for v in value] if isinstance(value, list) else clean(value)
@@ -837,11 +894,19 @@ def _must_answer(fields):
 # A learning objective field must carry at least this many objectives
 # (the teacher's rule, matching DO 016's knowledge / skill / attitude split).
 _MIN_OBJECTIVES = 3
+_MAX_OBJECTIVES = 3  # exactly three, the DepEd standard
 _OBJECTIVE_STEM = re.compile(r"(?i)^\s*at the end of the")
 
 
 def _is_objective_field(field):
-    return bool(re.search(r"objective", f"{field.field_key or ''} {field.label or ''}", re.I))
+    return bool(re.search(r"objective", grounding._haystack(field), re.I))
+
+
+def _stem_printed(field):
+    """The format prints the objectives' lead-in ('At the end of the lesson...')
+    itself, as the TUP SDLP does (its field hint says so): writing it again
+    would show it twice."""
+    return bool(re.search(r"at the end of the lesson", field.ai_hint or "", re.I))
 
 
 def _cell_complete(field, value):
@@ -1059,7 +1124,8 @@ Fill ONLY the following fields and return strict JSON with field_key as keys:
     values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], "Building Proficiency"), targets,
                    course_guide_text, cite, context)
     values = _complete_batch(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
-    return _fix_timing(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
+    values = _fix_timing(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
+    return {**values, **_with_web_references(values, targets, context)}
 
 
 _STREAM_CHUNK_SIZE = 4
@@ -1141,6 +1207,12 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
             yield {"type": "section_done", "section": "Session timing",
                    "index": len(chunks), "total": len(chunks), "values": changed}
 
+    referenced = _with_web_references(all_values, fields, context)
+    if referenced:
+        all_values.update(referenced)
+        yield {"type": "section_done", "section": "Online references",
+               "index": len(chunks), "total": len(chunks), "values": referenced}
+
     # `missing` answers "did everything I was asked to write come back": the
     # requested field keys with no real content even after the retry. It says
     # nothing about fields outside include_keys, so the page must combine this
@@ -1154,6 +1226,85 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
         "missing_labels": [f.label for f in fields if f.field_key in set(missing)],
         **needs_guide,
     }
+
+
+# ---------------------------------------------------------------------------
+# Online references, found by a web search
+# ---------------------------------------------------------------------------
+# A model asked for references writes plausible links that lead nowhere, and
+# the link check then drops them all, so plans went out with none (tester
+# report). These come from a real web search (OpenRouter's web plugin): a
+# reference is kept only if its URL is one the search returned, it is in APA
+# 7 form, and the link opens.
+
+_WEB_REFERENCES = 4
+_WEB_RESULTS = 8
+_REFERENCES_SYSTEM = (
+    "You list online references for a Philippine K-12 lesson plan, using ONLY the web search "
+    "results you are given. Return strict JSON: {\"references\": [\"...\", ...]}. Each is one "
+    "APA 7 reference: Author or organization. (Year, or n.d.). Title. Site Name. URL, with the "
+    "URL copied exactly from a search result and nothing after it. Prefer educational, "
+    "government (DepEd), university and reputable reference pages that teach the topic; never "
+    "social media, shops, forums or pages behind a login. Never invent a source or a URL."
+)
+
+
+def _web_search_post(system_instruction: str, prompt: str):
+    """(answer text, set of URLs the search returned) from one web-search call."""
+    payload = {
+        "model": Config.OPENROUTER_MODEL,
+        "messages": [{"role": "system", "content": system_instruction}, {"role": "user", "content": prompt}],
+        "plugins": [{"id": "web", "max_results": _WEB_RESULTS}],
+        "response_format": {"type": "json_object"},
+        "reasoning": {"enabled": False},
+    }
+    response = requests.post(
+        _OPENROUTER_URL,
+        headers={"Authorization": f"Bearer {Config.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
+        json=payload,
+        timeout=90,
+    )
+    response.raise_for_status()
+    message = response.json()["choices"][0]["message"]
+    urls = {(a.get("url_citation") or {}).get("url", "") for a in message.get("annotations") or []
+            if a.get("type") == "url_citation"}
+    return message.get("content") or "", {u.rstrip("/") for u in urls if u}
+
+
+def find_references(context: dict, count: int = _WEB_REFERENCES) -> list:
+    """Up to `count` APA 7 references for the lesson's topic whose links came
+    from a web search and open; [] when search is unavailable or finds none."""
+    topic = str(context.get("topic") or context.get("main_topic") or "").strip()
+    if PROVIDER != "openrouter" or not topic:
+        return []
+    about = ", ".join(str(context.get(k)) for k in ("subject", "grade_level") if context.get(k))
+    prompt = (f"Find {count} accessible online pages a teacher could use to teach this lesson, and list "
+              f"them as APA 7 references.\nLesson topic: {topic}" + (f"\nFor: {about}" if about else ""))
+    try:
+        text, urls = _web_search_post(_REFERENCES_SYSTEM, prompt)
+        lines = _parse_json(text).get("references") or []
+    except Exception as exc:  # noqa: BLE001 - no references is better than a failed plan
+        _log.warning("Reference search failed: %s", exc)
+        return []
+    found = [str(l) for l in lines if isinstance(l, str)
+             and any(u.rstrip(".,;/") in urls for u in re.findall(r"https?://\S+", l))]
+    return grounding._check_lines(found, "")[:count]
+
+
+def _with_web_references(values: dict, fields, context: dict) -> dict:
+    """The reference fields with found references added after what they hold
+    (the course guide's own citation stays first). {} when nothing changes."""
+    refs = [f for f in fields if grounding.is_reference_field(f)]
+    found = find_references(context) if refs else []
+    changed = {}
+    for f in refs if found else []:
+        value = values.get(f.field_key)
+        first = value[0] if isinstance(value, list) and value else value
+        lines = [l for l in str(first or "").split("\n") if l.strip()]
+        merged = "\n".join(lines + [l for l in found if l not in lines])
+        # A weekly field cites its references once, on its first day.
+        changed[f.field_key] = [merged] + list(value[1:]) if isinstance(value, list) and value else merged
+    return changed
 
 
 # ---------------------------------------------------------------------------
@@ -1202,7 +1353,15 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
     if locked:
         # Whatever the model sends, nothing ready-made goes into a locked field.
         return {**answer, "choices": [c for c in answer["choices"] if c["type"] == "ask"]}
-    return _ground_choices(answer, field, course_guide_text, course_guide_citation)
+    answer = _ground_choices(answer, field, course_guide_text, course_guide_citation)
+    if grounding.is_reference_field(field):
+        # References Alan offers are real pages from a web search, not the model's guesses.
+        found = find_references(context)
+        if found:
+            card = {"type": "use", "label": "Online references", "text": "\n".join(found),
+                    "why": "Real pages found for this topic, in APA 7; every link was checked and opens."}
+            answer = {**answer, "choices": [card] + [c for c in answer["choices"] if c["type"] != "use"][:_MAX_CHOICES - 1]}
+    return answer
 
 
 def _ground_choices(answer, field, guide_text, citation):
@@ -1247,4 +1406,4 @@ def _clean_owl_reply(data) -> dict:
         choices.append(choice)
         if len(choices) == _MAX_CHOICES:
             break
-    return {"reply": reply[:400] or "Here are some options for this field.", "choices": choices}
+    return {"reply": reply[:700] or "Here are some options for this field.", "choices": choices}
