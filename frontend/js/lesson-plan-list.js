@@ -495,8 +495,11 @@ async function init() {
   const teacher = user.role === "teacher";
   document.getElementById("submissions-tab").hidden = !teacher;
   // ?tab=submissions: where a submission notification (and the old page) lands.
-  const wanted = new URLSearchParams(location.search).get("tab");
+  const params = new URLSearchParams(location.search);
+  const wanted = params.get("tab");
   selectTab(teacher && wanted === "submissions" ? "submissions" : "mine");
+  // ?preview=<id>: a submitted plan opened from the dashboard.
+  if (params.get("preview")) openPreview(params.get("preview"));
 }
 
 init();

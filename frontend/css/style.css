@@ -2601,11 +2601,25 @@ body.auth-page::after {
   margin-top: 2px;
 }
 
-.dash-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 24px;
-  align-items: start;
+/* Dashboard recent plans: the whole row opens the plan. */
+.data-table tr.row-link {
+  cursor: pointer;
+}
+
+.data-table tr.row-link:hover td {
+  background: var(--bg);
+}
+
+.row-link-title {
+  color: inherit;
+  text-decoration: none;
+}
+
+.row-link-title:hover,
+.row-link-title:focus-visible {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .section-card {
@@ -3442,100 +3456,7 @@ body.auth-page::after {
   }
 }
 
-.widget-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
-  margin-bottom: 20px;
-}
-
-.widget-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.widget-header .icon-badge {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.widget-header .icon-badge svg {
-  width: 15px;
-  height: 15px;
-}
-
-.widget-header h3 {
-  font-size: 14px;
-}
-
-.todo-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  font-size: 13px;
-  color: var(--text-heading);
-  border-bottom: 1px solid var(--border);
-}
-
-.todo-item:last-child {
-  border-bottom: none;
-}
-
-.todo-item input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--primary);
-  flex-shrink: 0;
-}
-
-.todo-item span {
-  flex: 1;
-}
-
-.todo-item.done span {
-  text-decoration: line-through;
-  color: var(--text-body);
-}
-
-.todo-empty {
-  font-size: 13px;
-  color: var(--text-body);
-  padding: 4px 0 8px;
-}
-
-.tip-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 13px;
-  padding: 6px 0;
-  color: var(--text-heading);
-  line-height: 1.4;
-}
-
-.tip-item svg {
-  width: 15px;
-  height: 15px;
-  color: var(--primary);
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
 @media (max-width: 1080px) {
-  .dash-grid {
-    grid-template-columns: 1fr;
-  }
   .stats-grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -5265,8 +5186,32 @@ body.owl-chat-shown .dash-main {
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-.folder-box:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -18px rgba(22, 35, 30, 0.45); }
+.folder-item { position: relative; display: grid; }
+.folder-item:hover .folder-box { transform: translateY(-3px); box-shadow: 0 14px 30px -18px rgba(22, 35, 30, 0.45); }
 .folder-box:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+/* Sits on the banner's corner and lifts with the box. */
+.folder-edit {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-heading);
+  font: 600 12.5px/1 var(--font);
+  box-shadow: 0 2px 8px -2px rgba(22, 35, 30, 0.25);
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.folder-edit svg { width: 15px; height: 15px; }
+.folder-item:hover .folder-edit { transform: translateY(-3px); }
+.folder-edit:hover { border-color: var(--primary); color: var(--primary); }
+.folder-edit:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 .folder-banner { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #E2EAE6; }
 .folder-text { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px 16px; }
 .folder-name { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--text-heading); }
@@ -5283,8 +5228,8 @@ body.owl-chat-shown .dash-main {
 .folder-form-error { margin: 0 0 8px; font-size: 13px; color: var(--danger); }
 .folder-form-actions { display: flex; justify-content: flex-end; gap: 10px; }
 @media (prefers-reduced-motion: reduce) {
-  .folder-box { transition: none; }
-  .folder-box:hover { transform: none; }
+  .folder-box, .folder-edit { transition: none; }
+  .folder-item:hover .folder-box, .folder-item:hover .folder-edit { transform: none; }
 }
 
 .guide-search {

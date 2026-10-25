@@ -152,10 +152,12 @@ const Api = {
     if (banner) form.append("banner", banner);
     return apiFetch("/api/course-guides/folders", { method: "POST", body: form });
   },
-  setGuideFolderBanner: (folderId, banner) => {
+  // Any folder's banner, by its type (built-in, "untyped" for Other, or a teacher's).
+  setGuideTypeBanner: (type, banner) => {
     const form = new FormData();
+    form.append("type", type);
     form.append("banner", banner);
-    return apiFetch(`/api/course-guides/folders/${folderId}/banner`, { method: "POST", body: form });
+    return apiFetch("/api/course-guides/types/banner", { method: "POST", body: form });
   },
   uploadCourseGuide: (file, subject, title, docType) => {
     const form = new FormData();

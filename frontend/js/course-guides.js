@@ -76,8 +76,34 @@ async function loadTypes() {
   renderFolders();
 }
 
+// Picks a picture and makes it the folder's banner; resolves once saved.
+function changeBanner(t, btn) {
+  const pick = Object.assign(document.createElement("input"), { type: "file", accept: "image/*" });
+  return new Promise((resolve) => {
+    pick.addEventListener("change", async () => {
+      if (!pick.files.length) return resolve(false);
+      setButtonLoading(btn, true, "Saving");
+      try {
+        const res = await Api.setGuideTypeBanner(t.value, pick.files[0]);
+        Object.assign(t, res.type);
+        showToast("Banner updated.");
+        loadTypes();
+        resolve(true);
+      } catch (err) {
+        showToast(err.message, true);
+        resolve(false);
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+    pick.click();
+  });
+}
+
 function renderFolders() {
   folderGrid.replaceChildren(...types.map((t) => {
+    const item = document.createElement("div");
+    item.className = "folder-item";
     const box = document.createElement("button");
     box.type = "button";
     box.className = "folder-box";
@@ -88,7 +114,17 @@ function renderFolders() {
     box.querySelector(".folder-count").textContent = `${t.count} document${t.count === 1 ? "" : "s"}`;
     box.setAttribute("aria-label", `${t.label}, ${t.count} document${t.count === 1 ? "" : "s"}`);
     box.addEventListener("click", () => openFolder(t, box));
-    return box;
+    item.append(box);
+    if (t.can_edit) {
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "folder-edit";
+      edit.innerHTML = `${Icons.image}<span>Change banner</span>`;
+      edit.setAttribute("aria-label", `Change the ${t.label} banner`);
+      edit.addEventListener("click", () => changeBanner(t, edit));
+      item.append(edit);
+    }
+    return item;
   }));
 }
 
@@ -138,30 +174,14 @@ async function openFolder(t) {
     actions.append(up);
   }
   if (t.can_edit) {
-    const pick = Object.assign(document.createElement("input"), { type: "file", accept: "image/*", hidden: true });
     const change = document.createElement("button");
     change.type = "button";
     change.className = "btn btn-secondary btn-sm";
     change.innerHTML = `${Icons.image}<span>Change banner</span>`;
-    change.addEventListener("click", () => pick.click());
-    pick.addEventListener("change", async () => {
-      if (!pick.files.length) return;
-      setButtonLoading(change, true, "Saving");
-      try {
-        const res = t.folder_id
-          ? await Api.setGuideFolderBanner(t.folder_id, pick.files[0])
-          : await Api.createGuideFolder(t.label, pick.files[0]);
-        Object.assign(t, res.type);
-        banner.src = t.banner_url;
-        showToast("Banner updated.");
-        loadTypes();
-      } catch (err) {
-        showToast(err.message, true);
-      } finally {
-        setButtonLoading(change, false);
-      }
+    change.addEventListener("click", async () => {
+      if (await changeBanner(t, change)) banner.src = t.banner_url;
     });
-    actions.append(change, pick);
+    actions.append(change);
   }
   const list = document.createElement("div");
   list.className = "guide-list folder-list";

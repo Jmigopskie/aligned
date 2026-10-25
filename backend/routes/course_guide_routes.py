@@ -114,12 +114,12 @@ def _banners_dir():
     return path
 
 def _can_edit_folder(user, key, folder):
-    """Admins change any banner; a teacher their own folder's, or one no
-    teacher owns yet (a type that so far only has uploads). The built-in two
-    are the admin's."""
+    """Admins change any banner. A teacher changes the built-in folders,
+    "Other", their own folders and ones no teacher owns yet (a type that so
+    far only has uploads); another teacher's folder stays theirs."""
     if user.role == "admin":
         return True
-    if user.role == "student" or key in TYPE_LABELS or key == _UNTYPED:
+    if user.role == "student":
         return False
     return folder is None or folder.created_by in (None, user.id)
 
@@ -154,12 +154,45 @@ def list_guide_types():
     user = current_user()
     counts = dict(db.session.query(CourseGuide.doc_type, func.count(CourseGuide.id)).group_by(CourseGuide.doc_type).all())
     folders = {f.type_key: f for f in GuideFolder.query.all()}
-    found = {t for t in counts if t} | set(folders)
+    found = ({t for t in counts if t} | set(folders)) - {_UNTYPED}
     ordered = [t for t in TYPE_LABELS if t in found] + sorted(found - set(TYPE_LABELS), key=str.lower)
     types = [_type_entry(t, type_label(t), counts.get(t, 0), folders.get(t), user) for t in ordered]
     if counts.get(None):
-        types.append(_type_entry(_UNTYPED, "Other", counts[None], None, user))
+        types.append(_type_entry(_UNTYPED, "Other", counts[None], folders.get(_UNTYPED), user))
     return jsonify({"status": "ok", "types": types})
+
+@course_guide_bp.post("/course-guides/types/banner")
+@staff_required
+def set_guide_type_banner():
+    """Change a folder's banner by its type. The built-in two, "Other" and
+    types that so far only have uploads get their folder row here."""
+    user = current_user()
+    raw = request.form.get("type")
+    key = _UNTYPED if raw == _UNTYPED else normalize_type(raw)
+    if not key:
+        return jsonify({"status": "error", "message": "Pick a folder."}), 400
+    folder = GuideFolder.query.filter(func.lower(GuideFolder.type_key) == key.lower()).first()
+    if not _can_edit_folder(user, key, folder):
+        return jsonify({"status": "error", "message": "Only the teacher who made this folder can change its banner."}), 403
+    if not request.files.get("banner"):
+        return jsonify({"status": "error", "message": "Choose a picture for the banner."}), 400
+    if folder is None:
+        # Built-in folders and "Other" belong to everyone; a typed-in one to
+        # the teacher who first gives it a banner.
+        owner = None if key in TYPE_LABELS or key == _UNTYPED else user.id
+        folder = GuideFolder(type_key=key, created_by=owner)
+        db.session.add(folder)
+        db.session.flush()
+    error = _save_banner(folder, request.files["banner"])
+    if error:
+        db.session.rollback()
+        return jsonify({"status": "error", "message": error}), 400
+    db.session.commit()
+    if key == _UNTYPED:
+        count = CourseGuide.query.filter(CourseGuide.doc_type.is_(None)).count()
+        return jsonify({"status": "ok", "type": _type_entry(key, "Other", count, folder, user)})
+    count = CourseGuide.query.filter(CourseGuide.doc_type == key).count()
+    return jsonify({"status": "ok", "type": _type_entry(key, type_label(key), count, folder, user)})
 
 @course_guide_bp.post("/course-guides/folders")
 @staff_required

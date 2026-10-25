@@ -94,6 +94,28 @@ def main():
         assert res.status_code == 200, res.get_json()
         print("  banner permissions OK")
 
+        # --- Any teacher changes the built-in and "Other" banners, by type ---
+        def set_type_banner(key):
+            return client.post("/api/course-guides/types/banner", content_type="multipart/form-data",
+                               data={"type": key, "banner": (png((40, 40, 200)), "t.png")})
+
+        before = len(types())
+        assert types()["Budget of Work"]["can_edit"] and types()["Other"]["can_edit"]
+        assert set_type_banner("budget_of_work").status_code == 200
+        res = set_type_banner("untyped")
+        assert res.status_code == 200 and res.get_json()["type"]["label"] == "Other", res.get_json()
+        t = types()
+        assert len(t) == before, t  # "Other" got a banner, not a second folder
+        assert "/api/course-guides/folders/" in t["Budget of Work"]["banner_url"], t
+        assert "/api/course-guides/folders/" in t["Other"]["banner_url"] and t["Other"]["count"] >= 1, t
+        login(oscar)
+        assert set_type_banner("budget_of_work").status_code == 200  # shared, not Tina's
+        assert set_type_banner("Learning Activity Sheets").status_code == 403  # Tina's own
+        login(sam)
+        assert not types()["Budget of Work"]["can_edit"]
+        assert set_type_banner("budget_of_work").status_code == 403
+        print("  built-in and Other banners OK")
+
     print("guide folders OK")
 
 

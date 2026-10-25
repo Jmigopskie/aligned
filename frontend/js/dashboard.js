@@ -1,7 +1,6 @@
 const errorBox = document.getElementById("error-box");
 const recentBody = document.getElementById("recent-plans-body");
 
-document.getElementById("icon-todo").innerHTML = Icons.checkSquare;
 document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("dashboard");
 
 // Hero action buttons keep their text label — this prepends the icon
@@ -19,58 +18,25 @@ function greetingForNow(firstName) {
   return `${time}, ${firstName}`;
 }
 
-const TODO_KEY = "aligned_todo_v1";
-
-function loadTodos() {
-  try {
-    const raw = localStorage.getItem(TODO_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (err) {
-
-  }
-  const defaults = [
-    { text: "Finish lesson plan for Computer Systems Servicing", done: false },
-    { text: "Review Web Development learning objectives", done: false },
-    { text: "Prepare TLE-ICT materials for next week", done: false },
-  ];
-  localStorage.setItem(TODO_KEY, JSON.stringify(defaults));
-  return defaults;
-}
-
-function saveTodos(todos) {
-  localStorage.setItem(TODO_KEY, JSON.stringify(todos));
-}
-
-function renderTodos() {
-  const todos = loadTodos();
-  const list = document.getElementById("todo-list");
-  if (!todos.length) {
-    list.innerHTML = `<p class="todo-empty">Nothing on your list yet.</p>`;
-    return;
-  }
-  list.innerHTML = todos
-    .map(
-      (t, i) => `
-      <div class="todo-item ${t.done ? "done" : ""}">
-        <input type="checkbox" data-idx="${i}" ${t.done ? "checked" : ""} />
-        <span>${escapeHtml(t.text)}</span>
-      </div>`
-    )
-    .join("");
-  list.querySelectorAll("input[type='checkbox']").forEach((cb) => {
-    cb.addEventListener("change", () => {
-      const todos2 = loadTodos();
-      todos2[+cb.dataset.idx].done = cb.checked;
-      saveTodos(todos2);
-      renderTodos();
-    });
-  });
-}
-
 function fmtDate(iso) {
   if (!iso) return "\u2013";
   return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
+
+// A draft opens where it was left off; a submitted plan is locked, so it
+// opens as a preview in the list instead.
+function planHref(p) {
+  return p.status && p.status !== "draft"
+    ? `lesson-plan-list.html?preview=${p.id}`
+    : `generator.html?plan_id=${p.id}`;
+}
+
+// The whole row opens the plan; the title link is the keyboard way in.
+recentBody.addEventListener("click", (e) => {
+  const row = e.target.closest("tr.row-link");
+  if (!row || e.target.closest("a, button, .row-menu")) return;
+  window.location.href = row.dataset.href;
+});
 
 function renderRecentPlans(plans) {
   // Column headings over nothing read as a broken table, so they only show
@@ -91,11 +57,11 @@ function renderRecentPlans(plans) {
   recentBody.innerHTML = recent
     .map(
       (p) => `
-      <tr>
+      <tr class="row-link" data-href="${planHref(p)}">
         <td>
           <div class="plan-title-cell">
             <span class="file-ico">${Icons.file}</span>
-            <span>${escapeHtml(p.title)}</span>
+            <a class="row-link-title" href="${planHref(p)}">${escapeHtml(p.title)}</a>
           </div>
         </td>
         <td>${escapeHtml(p.subject || "\u2013")}</td>
@@ -160,7 +126,6 @@ async function init() {
     return;
   }
   wireTopbar(user);
-  renderTodos();
 
   document.querySelectorAll(".js-role-action").forEach((el) => {
     el.hidden = el.dataset.role !== user.role;
