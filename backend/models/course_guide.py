@@ -67,3 +67,18 @@ class CourseGuide(db.Model):
             "source_url": self.source_url,
             "retrieved_at": self.retrieved_at.isoformat() if self.retrieved_at else None,
         }
+
+
+class GuideFolder(db.Model):
+    """A folder in the library: one per document type, carrying the banner
+    picture shown on its box. A teacher can make one before anything is filed
+    in it; types without a row (the built-in two, older uploads) still get a
+    box, with a default banner."""
+
+    __tablename__ = "guide_folders"
+
+    id = db.Column(db.Integer, primary_key=True)
+    type_key = db.Column(db.String(60), nullable=False, unique=True)  # a normalize_type() value
+    banner_path = db.Column(db.String(255))
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

@@ -97,7 +97,7 @@ export function createGuided(ui) {
 
   // A weekly part (one answer per day) gets one box and a day picker instead
   // of a box per day. "From … to …" lets one answer cover several days, for a
-  // part that repeats across the week; the chips show which days are written.
+  // part that repeats across the week.
   function dayEditor(p, opts = {}) {
     const days = p.days;
     const filled = (d) => !!dayText(G.fieldValue(p.key), d).trim();
@@ -108,7 +108,6 @@ export function createGuided(ui) {
     const fromSel = el("select", { id: `${id}-from` }, options());
     const toSel = el("select", { id: `${id}-to`, "aria-label": "Through" }, options());
     const input = el("textarea", { class: "flow-textarea", id, rows: opts.compact ? "2" : "5", maxlength: "6000" });
-    const chips = el("div", { class: "flow-day-chips", role: "group", "aria-label": "Days" });
 
     function paint() {
       fromSel.value = String(from);
@@ -116,17 +115,6 @@ export function createGuided(ui) {
       const text = dayText(G.fieldValue(p.key), from);
       if (input.value !== text) input.value = text;
       grow(input);
-      chips.replaceChildren(...days.map((d, i) => {
-        const chip = el("button", { type: "button", class: `flow-day-chip${filled(i) ? " is-filled" : ""}${i >= from && i <= to ? " is-current" : ""}`,
-          "aria-pressed": String(i >= from && i <= to) }, filled(i) ? icon("check") : "", d);
-        chip.addEventListener("click", () => {
-          from = to = i;
-          G.setGuidedDay(from);
-          paint();
-          input.focus();
-        });
-        return chip;
-      }));
     }
     fromSel.addEventListener("change", () => {
       from = parseInt(fromSel.value, 10);
@@ -152,7 +140,7 @@ export function createGuided(ui) {
       el("div", { class: "flow-field flow-select" }, fromSel),
       el("span", { class: "flow-day-to" }, "to"),
       el("div", { class: "flow-field flow-select" }, toSel));
-    return { node: [picker, chips, el("div", { class: "flow-field" }, input)], sync: paint };
+    return { node: [picker, el("div", { class: "flow-field" }, input)], sync: paint };
   }
 
   // Every box for one part: one, or the day editor for a weekly part.

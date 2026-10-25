@@ -4,12 +4,13 @@ import os
 from flask import Blueprint, request, jsonify, current_app, send_file
 from sqlalchemy import case, func, or_
 from werkzeug.utils import secure_filename
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from extensions import db
-from models.course_guide import CourseGuide, TYPE_LABELS, normalize_type, type_label
+from models.course_guide import CourseGuide, GuideFolder, TYPE_LABELS, normalize_type, type_label
 from models.supplementary_source import SupplementarySource
 import uuid
-from routes.auth_routes import login_required, current_user
+from routes.auth_routes import login_required, staff_required, current_user
 from services import text_extract
 
 course_guide_bp = Blueprint("course_guides", __name__)
@@ -78,7 +79,9 @@ def search_course_guides():
     if grade_band in GRADE_BANDS:
         query = query.filter(CourseGuide.grade_band.like(f"%{grade_band}%"))
     doc_type = normalize_type(doc_type)
-    if doc_type in DOC_TYPES:
+    if doc_type == _UNTYPED:
+        query = query.filter(CourseGuide.doc_type.is_(None))
+    elif doc_type in DOC_TYPES:
         # Uploads from before the Budget of Work / Curriculum Guide split carry
         # no type, so they stay findable from either picker.
         query = query.filter(or_(CourseGuide.doc_type == doc_type, CourseGuide.doc_type.is_(None)))
@@ -102,14 +105,109 @@ def search_course_guides():
     guides = query.order_by(*order).limit(50).all()
     return jsonify({"status": "ok", "course_guides": [g.to_dict() for g in guides]})
 
+_UNTYPED = "untyped"  # the folder for uploads that never got a type
+_BANNER_SIZE = (960, 540)
+
+def _banners_dir():
+    path = os.path.join(current_app.config["UPLOAD_FOLDER"], "guide_banners")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+def _can_edit_folder(user, key, folder):
+    """Admins change any banner; a teacher their own folder's, or one no
+    teacher owns yet (a type that so far only has uploads). The built-in two
+    are the admin's."""
+    if user.role == "admin":
+        return True
+    if user.role == "student" or key in TYPE_LABELS or key == _UNTYPED:
+        return False
+    return folder is None or folder.created_by in (None, user.id)
+
+def _save_banner(folder, file):
+    """Crop and size a banner picture for a folder box. Returns an error
+    message, or None once it is saved on the folder."""
+    try:
+        image = Image.open(file.stream)
+        image.load()
+    except (UnidentifiedImageError, OSError):
+        return "That doesn't look like a picture. Use a .jpg or .png."
+    image = ImageOps.fit(image.convert("RGB"), _BANNER_SIZE, Image.LANCZOS)
+    path = os.path.join(_banners_dir(), f"folder_{folder.id}.jpg")
+    image.save(path, "JPEG", quality=86)
+    folder.banner_path = path
+    return None
+
+def _type_entry(key, label, count, folder, user):
+    if folder and folder.banner_path and os.path.isfile(folder.banner_path):
+        banner = f"/api/course-guides/folders/{folder.id}/banner?v={int(os.path.getmtime(folder.banner_path))}"
+    else:
+        banner = f"img/guide-banners/{key if key in TYPE_LABELS else 'folder'}.svg"
+    return {"value": key, "label": label, "count": count, "banner_url": banner,
+            "folder_id": folder.id if folder else None, "can_edit": _can_edit_folder(user, key, folder)}
+
 @course_guide_bp.get("/course-guides/types")
 @login_required
 def list_guide_types():
-    """Every type in the library, the built-in two first, for the upload
-    form's suggestions and the type filter."""
-    found = {t for (t,) in db.session.query(CourseGuide.doc_type).distinct() if t}
+    """Every folder in the library, the built-in two first: each type in use,
+    each folder a teacher made (even before anything is in it), and "Other"
+    for untyped uploads, with how many documents it holds and its banner."""
+    user = current_user()
+    counts = dict(db.session.query(CourseGuide.doc_type, func.count(CourseGuide.id)).group_by(CourseGuide.doc_type).all())
+    folders = {f.type_key: f for f in GuideFolder.query.all()}
+    found = {t for t in counts if t} | set(folders)
     ordered = [t for t in TYPE_LABELS if t in found] + sorted(found - set(TYPE_LABELS), key=str.lower)
-    return jsonify({"status": "ok", "types": [{"value": t, "label": type_label(t)} for t in ordered]})
+    types = [_type_entry(t, type_label(t), counts.get(t, 0), folders.get(t), user) for t in ordered]
+    if counts.get(None):
+        types.append(_type_entry(_UNTYPED, "Other", counts[None], None, user))
+    return jsonify({"status": "ok", "types": types})
+
+@course_guide_bp.post("/course-guides/folders")
+@staff_required
+def create_guide_folder():
+    """A teacher's own folder (a new type), with an optional banner picture."""
+    user = current_user()
+    key = normalize_type(request.form.get("name"))
+    if not key:
+        return jsonify({"status": "error", "message": "Give the folder a name."}), 400
+    if key == _UNTYPED or GuideFolder.query.filter(func.lower(GuideFolder.type_key) == key.lower()).first():
+        return jsonify({"status": "error", "message": "A folder with that name already exists."}), 409
+    if key in TYPE_LABELS and user.role != "admin":
+        return jsonify({"status": "error", "message": "That folder is built in. Pick another name."}), 409
+    folder = GuideFolder(type_key=key, created_by=user.id)
+    db.session.add(folder)
+    db.session.flush()
+    if request.files.get("banner"):
+        error = _save_banner(folder, request.files["banner"])
+        if error:
+            db.session.rollback()
+            return jsonify({"status": "error", "message": error}), 400
+    db.session.commit()
+    count = CourseGuide.query.filter(CourseGuide.doc_type == key).count()
+    return jsonify({"status": "ok", "type": _type_entry(key, type_label(key), count, folder, user)}), 201
+
+@course_guide_bp.post("/course-guides/folders/<int:folder_id>/banner")
+@staff_required
+def set_guide_folder_banner(folder_id):
+    user = current_user()
+    folder = GuideFolder.query.get_or_404(folder_id)
+    if not _can_edit_folder(user, folder.type_key, folder):
+        return jsonify({"status": "error", "message": "Only the teacher who made this folder can change its banner."}), 403
+    if not request.files.get("banner"):
+        return jsonify({"status": "error", "message": "Choose a picture for the banner."}), 400
+    error = _save_banner(folder, request.files["banner"])
+    if error:
+        return jsonify({"status": "error", "message": error}), 400
+    db.session.commit()
+    count = CourseGuide.query.filter(CourseGuide.doc_type == folder.type_key).count()
+    return jsonify({"status": "ok", "type": _type_entry(folder.type_key, type_label(folder.type_key), count, folder, user)})
+
+@course_guide_bp.get("/course-guides/folders/<int:folder_id>/banner")
+@login_required
+def get_guide_folder_banner(folder_id):
+    folder = GuideFolder.query.get_or_404(folder_id)
+    if not folder.banner_path or not os.path.isfile(folder.banner_path):
+        return jsonify({"status": "error", "message": "No banner."}), 404
+    return send_file(folder.banner_path, mimetype="image/jpeg", max_age=86400)
 
 @course_guide_bp.get("/course-guides/<int:guide_id>/file")
 @login_required

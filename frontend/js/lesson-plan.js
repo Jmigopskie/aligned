@@ -13,6 +13,50 @@ const sections = {
 };
 const mineEmpty = document.getElementById("mine-empty");
 
+// Each shelf folds away under its heading (remembered in this browser), so the
+// page isn't one long wall of cards. Your own shelf starts open, the others
+// folded; a search opens every shelf it found something on.
+const FOLD_KEY = "alignedFormatShelves:v1";
+let folded = { builtin: true, mine: false, shared: true };
+try {
+  folded = { ...folded, ...JSON.parse(localStorage.getItem(FOLD_KEY) || "{}") };
+} catch (err) {
+  /* private mode: the defaults hold */
+}
+
+Object.entries(sections).forEach(([key, shelf]) => {
+  const head = shelf.section.querySelector(".format-section-head");
+  const title = head.querySelector(".section-title");
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "section-toggle";
+  btn.setAttribute("aria-controls", `${key}-shelf`);
+  btn.innerHTML = `<span class="section-toggle-text"></span><span class="section-count"></span>${Icons.chevronDown}`;
+  btn.querySelector(".section-toggle-text").textContent = title.textContent;
+  title.replaceChildren(btn);
+  const body = document.createElement("div");
+  body.id = `${key}-shelf`;
+  while (head.nextSibling) body.append(head.nextSibling);
+  shelf.section.append(body);
+  Object.assign(shelf, { btn, body, note: head.querySelector(".section-note") });
+  btn.addEventListener("click", () => {
+    folded[key] = btn.getAttribute("aria-expanded") === "true";
+    try {
+      localStorage.setItem(FOLD_KEY, JSON.stringify(folded));
+    } catch (err) {
+      /* the choice just won't be remembered */
+    }
+    showShelf(key, !folded[key]);
+  });
+});
+
+function showShelf(key, open) {
+  const { btn, body, note } = sections[key];
+  btn.setAttribute("aria-expanded", String(open));
+  body.hidden = !open;
+  if (note) note.hidden = !open;
+}
+
 let currentUser = null;
 let allFormats = [];
 
@@ -182,6 +226,8 @@ function renderFormats(formats) {
     } else {
       section.hidden = shown.length === 0;
     }
+    sections[key].btn.querySelector(".section-count").textContent = String(shelves[key].length);
+    showShelf(key, query ? shown.length > 0 : !folded[key]);
   });
 
   emptyState.hidden = !(query && shownAnywhere === 0);

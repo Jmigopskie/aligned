@@ -145,6 +145,18 @@ const Api = {
   courseGuideFileUrl: (guideId) => `${API_URL}/api/course-guides/${guideId}/file`,
   // docType: "budget_of_work" or "curriculum_guide", the picker it came from.
   courseGuideTypes: () => apiFetch("/api/course-guides/types"),
+  // A teacher's own library folder (a new document type), banner optional.
+  createGuideFolder: (name, banner) => {
+    const form = new FormData();
+    form.append("name", name);
+    if (banner) form.append("banner", banner);
+    return apiFetch("/api/course-guides/folders", { method: "POST", body: form });
+  },
+  setGuideFolderBanner: (folderId, banner) => {
+    const form = new FormData();
+    form.append("banner", banner);
+    return apiFetch(`/api/course-guides/folders/${folderId}/banner`, { method: "POST", body: form });
+  },
   uploadCourseGuide: (file, subject, title, docType) => {
     const form = new FormData();
     form.append("file", file);

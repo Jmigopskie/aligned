@@ -5025,6 +5025,36 @@ body.owl-chat-shown .dash-main {
   margin-bottom: var(--space-3);
 }
 
+/* A shelf heading that folds the shelf away. */
+.section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.section-toggle svg { width: 18px; height: 18px; color: var(--primary); transition: transform 0.2s ease; }
+.section-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.section-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 6px; }
+.section-count {
+  min-width: 24px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(28, 92, 78, 0.08);
+  font-family: var(--font);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-body);
+}
+@media (prefers-reduced-motion: reduce) {
+  .section-toggle svg { transition: none; }
+}
+
 .section-title {
   font-family: var(--font-display);
   font-size: var(--text-md);
@@ -5223,6 +5253,48 @@ body.owl-chat-shown .dash-main {
 
 .guide-filters .field {
   margin: 0;
+}
+
+/* The library's folders: a big box per document type, its banner on top. */
+.folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-5);
+  margin-top: var(--space-6);
+}
+.folder-box {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(22, 35, 30, 0.05);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.folder-box:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -18px rgba(22, 35, 30, 0.45); }
+.folder-box:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+.folder-banner { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #E2EAE6; }
+.folder-text { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px 16px; }
+.folder-name { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--text-heading); }
+.folder-count { font-size: 13px; color: var(--text-body); }
+
+/* A folder, opened: its banner, then what's in it. */
+.folder-dialog { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: hidden; }
+.folder-dialog .modal-body { overflow-y: auto; }
+.folder-dialog-banner { display: block; width: 100%; height: 150px; object-fit: cover; }
+.folder-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: var(--space-4); }
+.folder-actions .btn svg { width: 16px; height: 16px; }
+.folder-form-dialog { width: min(480px, calc(100vw - 32px)); }
+.folder-banner-preview { display: block; width: 100%; aspect-ratio: 16 / 9; margin-top: 10px; object-fit: cover; border-radius: 10px; }
+.folder-form-error { margin: 0 0 8px; font-size: 13px; color: var(--danger); }
+.folder-form-actions { display: flex; justify-content: flex-end; gap: 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .folder-box { transition: none; }
+  .folder-box:hover { transform: none; }
 }
 
 .guide-search {
@@ -6776,31 +6848,11 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
 .flow-clear { align-self: flex-start; height: 40px; padding: 0 12px; gap: 8px; }
 .flow-clear svg { width: 16px; height: 16px; }
 
-/* A weekly part: one box, a day picker ("from … to …") and day chips. */
+/* A weekly part: one box and a day picker ("from … to …"). */
 .flow-day-picker { display: grid; grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; }
 .flow-day-picker > .flow-label { margin: 0; }
 .flow-day-picker .flow-select select { height: 48px; font-size: 17px; }
 .flow-day-to { font-size: 15px; color: var(--text-body); }
-.flow-day-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.flow-day-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 32px;
-  padding: 4px 12px;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(28, 92, 78, 0.06);
-  box-shadow: inset 0 0 0 1px var(--border);
-  font: 500 13px var(--font);
-  color: var(--text-body);
-  cursor: pointer;
-}
-.flow-day-chip [aria-hidden] { width: 14px; height: 14px; }
-.flow-day-chip [aria-hidden] svg { width: 100%; height: 100%; }
-.flow-day-chip.is-filled { color: var(--primary); }
-.flow-day-chip.is-current { background: var(--primary); box-shadow: none; color: #fff; }
-.flow-day-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 /* The part's own tools: fill from the sources, clear. */
 .flow-part-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }

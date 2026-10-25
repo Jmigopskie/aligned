@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-10-25a" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-26e" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -63,6 +63,7 @@
             <p class="page-subtitle">DepEd's budgets of work and curriculum guides for ICT and Computer Programming, plus references other teachers shared. The generator can draw on any of them.</p>
           </div>
           <div class="page-actions">
+            <button class="btn btn-secondary" id="new-folder-btn" type="button" hidden><span data-icon="folder"></span>New folder</button>
             <button class="btn btn-secondary" id="upload-toggle-btn" type="button" aria-expanded="false" aria-controls="upload-panel"><span data-icon="upload"></span>Upload a guide</button>
           </div>
         </div>
@@ -94,29 +95,7 @@
         <div class="guide-filters" role="search" aria-label="Filter guides">
           <div class="field guide-search">
             <label for="subject-input">Search</label>
-            <input type="search" id="subject-input" placeholder="e.g. Computer Systems Servicing, HTML" autocomplete="off" />
-          </div>
-          <div class="guide-filter-group">
-            <span class="guide-filter-label" id="grade-label">Grade</span>
-            <div class="chip-row" id="grade-chips" role="group" aria-labelledby="grade-label">
-              <button type="button" class="chip" data-band="" aria-pressed="true">All</button>
-              <button type="button" class="chip" data-band="4-6" aria-pressed="false">4 to 6</button>
-              <button type="button" class="chip" data-band="7-8" aria-pressed="false">7 to 8</button>
-              <button type="button" class="chip" data-band="9-10" aria-pressed="false">9 to 10</button>
-              <button type="button" class="chip" data-band="SHS" aria-pressed="false">SHS</button>
-            </div>
-          </div>
-          <div class="guide-filter-group">
-            <span class="guide-filter-label" id="subject-label">Subject</span>
-            <div class="chip-row" id="subject-filter" role="group" aria-labelledby="subject-label">
-              <button type="button" class="chip" data-subject="" aria-pressed="true">All</button>
-              <button type="button" class="chip" data-subject="ICT" aria-pressed="false">ICT</button>
-              <button type="button" class="chip" data-subject="CP (ComProg)" aria-pressed="false">Computer Programming</button>
-              <button type="button" class="chip" data-subject="AFA" aria-pressed="false">AFA</button>
-              <button type="button" class="chip" data-subject="HE (FCS)" aria-pressed="false">HE (FCS)</button>
-              <button type="button" class="chip" data-subject="IA" aria-pressed="false">IA</button>
-              <button type="button" class="chip" data-subject="Electrical (EES)" aria-pressed="false">Electrical</button>
-            </div>
+            <input type="search" id="subject-input" placeholder="Title or subject, e.g. Computer Systems Servicing" autocomplete="off" />
           </div>
           <div class="field guide-type">
             <label for="type-filter">Type</label>
@@ -125,6 +104,9 @@
             </select>
           </div>
         </div>
+
+        <!-- One box per document type; opening one lists what's in it. -->
+        <div id="folder-grid" class="folder-grid" aria-label="Folders"></div>
 
         <div id="results-empty" class="empty-state" hidden>
           <h2>No course guides yet</h2>
@@ -150,8 +132,8 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-10-25a"></script>
+  <script src="js/api.js?v=2026-10-26e"></script>
   <script src="js/icons.js?v=2026-10-06c"></script>
-  <script src="js/course-guides.js?v=2026-10-25a"></script>
+  <script src="js/course-guides.js?v=2026-10-26e"></script>
 </body>
 </html>
