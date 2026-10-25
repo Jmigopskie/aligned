@@ -89,8 +89,10 @@ function renderPlans(plans) {
   document.querySelectorAll(".js-status-col").forEach((el) => (el.hidden = !showStatusScore));
   document.querySelectorAll(".js-score-col").forEach((el) => (el.hidden = !showStatusScore));
   document.querySelectorAll(".js-author-col").forEach((el) => (el.hidden = isMineTab));
+  document.querySelectorAll(".js-select-col").forEach((el) => (el.hidden = !isMineTab));
 
-  const visibleCols = 5 + (isMineTab ? 0 : 1) + (showStatusScore ? 2 : 0);
+  // Title, Lesson, Grade, Updated, Actions + (checkbox on Mine | Author on Public).
+  const visibleCols = 6 + (showStatusScore ? 2 : 0);
 
   if (!plans.length) {
     plansBody.innerHTML = `
@@ -101,6 +103,7 @@ function renderPlans(plans) {
             : `No public lesson plans yet.`
         }</td>
       </tr>`;
+    bulk.sync();
     return;
   }
 
@@ -108,6 +111,7 @@ function renderPlans(plans) {
     .map(
       (p) => `
       <tr>
+        ${isMineTab ? bulkCheckboxCell(p.id, p.title || "lesson plan") : ""}
         <td>
           <div class="plan-title-cell">
             <span class="file-ico">${Icons.file}</span>
@@ -150,7 +154,35 @@ function renderPlans(plans) {
 
   hydrateIcons(plansBody);
   wireRowActions();
+  bulk.sync();
 }
+
+// Bulk delete on My Lesson Plans: the admin tables' selection helper, with a
+// delete action of its own instead of archive/restore.
+const bulkDeleteBtn = document.getElementById("bulk-delete");
+const bulk = initBulkSelect({
+  tbody: plansBody,
+  selectAllEl: document.getElementById("bulk-select-all"),
+  barEl: document.getElementById("bulk-bar"),
+  countEl: document.getElementById("bulk-count"),
+  clearBtn: document.getElementById("bulk-clear-btn"),
+});
+
+bulkDeleteBtn.addEventListener("click", async () => {
+  const ids = bulk.selectedIds();
+  if (!ids.length) return;
+  const label = ids.length === 1 ? "this lesson plan" : `these ${ids.length} lesson plans`;
+  if (!confirm(`Delete ${label}? This can't be undone.`)) return;
+  setButtonLoading(bulkDeleteBtn, true, "Deleting");
+  const results = await Promise.allSettled(ids.map((id) => Api.deleteLessonPlan(id)));
+  setButtonLoading(bulkDeleteBtn, false);
+  const gone = new Set(ids.filter((_, i) => results[i].status === "fulfilled"));
+  allPlans = allPlans.filter((p) => !gone.has(Number(p.id)));
+  const failed = ids.length - gone.size;
+  if (failed) showToast(`${gone.size} deleted; ${failed} couldn't be deleted.`, true);
+  else showToast(gone.size === 1 ? "Lesson plan deleted." : `${gone.size} lesson plans deleted.`);
+  applyFilter();
+});
 
 function wireRowActions() {
   plansBody.querySelectorAll(".row-action-btn").forEach((btn) => {

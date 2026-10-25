@@ -2255,20 +2255,10 @@ body.auth-page::after {
   }
 }
 
-.settings-panel-head {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.settings-avatar {
-  width: 52px;
-  height: 52px;
-  font-size: 18px;
-}
-
-#profile-role-badge {
-  margin-right: 8px;
+.avatar-chip.settings-avatar {
+  width: 96px;
+  height: 96px;
+  font-size: 30px;
 }
 
 #profile-member-since {
@@ -5470,18 +5460,184 @@ body.owl-chat-shown .dash-main {
   margin-bottom: 0;
 }
 
+/* Settings: who you are on a rail at the left, the things you change in
+   collapsible sections filling the rest of the width. */
 .settings-main {
-  max-width: 680px;
+  max-width: 1200px;
 }
 
-.settings-panel + .settings-panel,
-.settings-panel + form.settings-panel,
-.settings-main > .panel + .panel {
-  margin-top: var(--space-5);
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 330px) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
 }
 
-.settings-panel .hint {
-  margin-top: var(--space-2);
+.settings-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.settings-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-block: var(--space-7) var(--space-6);
+}
+
+.settings-name {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-heading);
+  margin: var(--space-4) 0 var(--space-2);
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.settings-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.settings-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+
+.settings-identity .hint,
+.settings-section .hint {
+  margin: var(--space-2) 0 0;
+}
+
+.settings-session {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+}
+
+.settings-session .panel-title {
+  margin: 0 0 2px;
+}
+
+.settings-session p {
+  margin: 0;
+  color: var(--text-body);
+}
+
+.settings-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.settings-section {
+  padding: 0;
+}
+
+.settings-section > summary {
+  list-style: none;
+  cursor: pointer;
+  position: relative;
+  padding: var(--space-5) 56px var(--space-5) var(--space-6);
+  border-radius: var(--radius);
+  transition: background-color 0.15s ease;
+}
+
+.settings-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-section > summary:hover {
+  background: var(--bg);
+}
+
+.settings-section > summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+/* Same border-drawn chevron as the FAQ. */
+.settings-section > summary::after {
+  content: "";
+  position: absolute;
+  right: 26px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-body);
+  border-bottom: 2px solid var(--text-body);
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform 0.2s var(--flow-ease, ease-out);
+}
+
+.settings-section[open] > summary::after {
+  transform: translateY(-30%) rotate(225deg);
+}
+
+.settings-section[open] > summary {
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.settings-section-title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.settings-section-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--text-body);
+}
+
+.settings-section-body {
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  animation: settings-reveal 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes settings-reveal {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
+/* Two inputs side by side where there is room, stacked where there isn't. */
+.settings-field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.settings-field-half {
+  max-width: calc(50% - var(--space-2));
+}
+
+@media (max-width: 1000px) {
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-field-half {
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-section-body { animation: none; }
+  .settings-section > summary::after { transition: none; }
 }
 
 .banner-preview {

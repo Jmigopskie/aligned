@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-10-06c" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-26g" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -66,75 +66,99 @@
 
         <div id="settings-error" class="alert alert-error" hidden></div>
 
-        <div class="panel settings-panel">
-          <div class="settings-panel-head">
-            <span class="avatar-chip js-user-initials settings-avatar">&nbsp;</span>
-            <div>
-              <p class="js-user-name panel-title">&nbsp;</p>
-              <span class="badge" id="profile-role-badge">&nbsp;</span>
-              <span class="text-sm" id="profile-member-since"></span>
+        <div class="settings-layout">
+          <aside class="settings-rail">
+            <div class="panel settings-identity">
+              <span class="avatar-chip js-user-initials settings-avatar">&nbsp;</span>
+              <p class="js-user-name settings-name">&nbsp;</p>
+              <div class="settings-meta">
+                <span class="badge" id="profile-role-badge">&nbsp;</span>
+                <span class="text-sm" id="profile-member-since"></span>
+              </div>
+              <div class="settings-photo-actions">
+                <button type="button" class="btn btn-secondary btn-sm" id="avatar-upload-btn">Change photo</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="avatar-remove-btn" hidden>Remove photo</button>
+                <input type="file" id="avatar-file-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+              </div>
+              <p class="hint">PNG, JPG, WEBP, or GIF. It'll be cropped to a square.</p>
             </div>
-          </div>
-          <div class="flex gap-8 mt-16">
-            <button type="button" class="btn btn-secondary btn-sm" id="avatar-upload-btn">Change photo</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="avatar-remove-btn" hidden>Remove photo</button>
-            <input type="file" id="avatar-file-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
-          </div>
-          <p class="hint">PNG, JPG, WEBP, or GIF. It'll be cropped to a square.</p>
-        </div>
 
-        <div class="panel settings-panel js-role-action" data-role="teacher" hidden>
-          <h2 class="panel-title">Dashboard banner</h2>
-          <img id="banner-preview" class="banner-preview" alt="" />
-          <div class="flex gap-8">
-            <button type="button" class="btn btn-secondary btn-sm" id="banner-upload-btn">Change banner</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="banner-remove-btn" hidden>Remove banner</button>
-            <input type="file" id="banner-file-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
-          </div>
-          <p class="hint">Shown on your dashboard, and on the dashboard of every student in your sections.</p>
-        </div>
+            <div class="panel settings-session">
+              <div>
+                <h2 class="panel-title">Session</h2>
+                <p class="text-sm">Log out of AlignED on this device.</p>
+              </div>
+              <button class="btn btn-danger btn-sm" id="logout-btn2" type="button">Log out</button>
+            </div>
+          </aside>
 
-        <form id="profile-form" class="panel settings-panel">
-          <h2 class="panel-title">Profile</h2>
-          <div class="field">
-            <label for="profile-name">Full name</label>
-            <input type="text" id="profile-name" required />
-          </div>
-          <div class="field field-last">
-            <label for="profile-email">Email</label>
-            <input type="email" id="profile-email" required />
-          </div>
-          <div class="flex-between mt-16">
-            <span class="text-sm" id="profile-status"></span>
-            <button class="btn btn-primary" id="profile-save-btn" type="submit">Save profile</button>
-          </div>
-        </form>
+          <div class="settings-sections">
+            <details class="panel settings-section" open>
+              <summary>
+                <span class="settings-section-title">Profile</span>
+                <span class="settings-section-sub">Your name and the email you sign in with</span>
+              </summary>
+              <form id="profile-form" class="settings-section-body">
+                <div class="settings-field-row">
+                  <div class="field field-last">
+                    <label for="profile-name">Full name</label>
+                    <input type="text" id="profile-name" required />
+                  </div>
+                  <div class="field field-last">
+                    <label for="profile-email">Email</label>
+                    <input type="email" id="profile-email" required />
+                  </div>
+                </div>
+                <div class="flex-between mt-16">
+                  <span class="text-sm" id="profile-status"></span>
+                  <button class="btn btn-primary" id="profile-save-btn" type="submit">Save profile</button>
+                </div>
+              </form>
+            </details>
 
-        <form id="password-form" class="panel settings-panel">
-          <h2 class="panel-title">Change password</h2>
-          <p class="text-sm panel-note">Use at least 8 characters.</p>
-          <div class="field">
-            <label for="current-password">Current password</label>
-            <input type="password" id="current-password" autocomplete="current-password" required />
-          </div>
-          <div class="field">
-            <label for="new-password">New password</label>
-            <input type="password" id="new-password" autocomplete="new-password" minlength="8" required />
-          </div>
-          <div class="field field-last">
-            <label for="confirm-password">Confirm new password</label>
-            <input type="password" id="confirm-password" autocomplete="new-password" minlength="8" required />
-          </div>
-          <div class="flex-between mt-16">
-            <span class="text-sm" id="password-status"></span>
-            <button class="btn btn-primary" id="password-save-btn" type="submit">Update password</button>
-          </div>
-        </form>
+            <details class="panel settings-section">
+              <summary>
+                <span class="settings-section-title">Change password</span>
+                <span class="settings-section-sub">Use at least 8 characters</span>
+              </summary>
+              <form id="password-form" class="settings-section-body">
+                <div class="field settings-field-half">
+                  <label for="current-password">Current password</label>
+                  <input type="password" id="current-password" autocomplete="current-password" required />
+                </div>
+                <div class="settings-field-row">
+                  <div class="field field-last">
+                    <label for="new-password">New password</label>
+                    <input type="password" id="new-password" autocomplete="new-password" minlength="8" required />
+                  </div>
+                  <div class="field field-last">
+                    <label for="confirm-password">Confirm new password</label>
+                    <input type="password" id="confirm-password" autocomplete="new-password" minlength="8" required />
+                  </div>
+                </div>
+                <div class="flex-between mt-16">
+                  <span class="text-sm" id="password-status"></span>
+                  <button class="btn btn-primary" id="password-save-btn" type="submit">Update password</button>
+                </div>
+              </form>
+            </details>
 
-        <div class="panel">
-          <h2 class="panel-title">Session</h2>
-          <p class="text-sm panel-note">Log out of AlignED on this device.</p>
-          <button class="btn btn-danger" id="logout-btn2" type="button">Log out</button>
+            <details class="panel settings-section js-role-action" data-role="teacher" hidden>
+              <summary>
+                <span class="settings-section-title">Dashboard banner</span>
+                <span class="settings-section-sub">Shown on your dashboard and on every student's in your sections</span>
+              </summary>
+              <div class="settings-section-body">
+                <img id="banner-preview" class="banner-preview" alt="Your current dashboard banner" />
+                <div class="flex gap-8">
+                  <button type="button" class="btn btn-secondary btn-sm" id="banner-upload-btn">Change banner</button>
+                  <button type="button" class="btn btn-ghost btn-sm" id="banner-remove-btn" hidden>Remove banner</button>
+                  <input type="file" id="banner-file-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+                </div>
+                <p class="hint">PNG, JPG, WEBP, or GIF. A wide image works best.</p>
+              </div>
+            </details>
+          </div>
         </div>
       </main>
     </div>
@@ -142,6 +166,6 @@
 
   <script src="js/api.js?v=2026-10-26f"></script>
   <script src="js/icons.js?v=2026-10-26f"></script>
-  <script src="js/settings.js"></script>
+  <script src="js/settings.js?v=2026-10-26g"></script>
 </body>
 </html>
