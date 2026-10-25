@@ -194,32 +194,6 @@ export function createGuided(ui) {
         const ed = editors(p);
         showing = { key: p.key, sync: ed.sync };
         const tools = el("div", { class: "flow-part-tools" });
-        const note = el("p", { class: "flow-help flow-fill-note", role: "status", hidden: true });
-        // Standards and competencies are copied from the student's own Budget of
-        // Work / Curriculum Guide, word for word, instead of typed by hand.
-        if (p.fromGuide && !p.locked && G.hasSources()) {
-          const fill = el("button", { type: "button", class: "flow-fill" }, icon("bookOpen"), "Fill from my sources");
-          fill.addEventListener("click", async () => {
-            fill.disabled = true;
-            note.hidden = true;
-            fill.lastChild.textContent = "Reading your sources…";
-            say("Looking this up in your sources…", "reading");
-            try {
-              await G.autofillFromSources(p.key);
-              ed.sync();
-              ui.refresh();
-              note.textContent = "Copied from your sources, word for word. Change anything you need.";
-              say("Found it in your sources. Check it over, then go on.", "check");
-            } catch (err) {
-              note.textContent = err.message;
-              say("I couldn't find that one. Want to ask me in the chat?", "unsure");
-            }
-            note.hidden = false;
-            fill.disabled = false;
-            fill.lastChild.textContent = "Fill from my sources";
-          });
-          tools.append(fill);
-        }
         const clear = el("button", { type: "button", class: "flow-back flow-more flow-clear" }, icon("eraser"), "Clear this part");
         clear.addEventListener("click", () => {
           if (p.days) p.days.forEach((_, d) => G.setGuidedValue(p.key, "", d));
@@ -228,7 +202,7 @@ export function createGuided(ui) {
           ui.refresh();
         });
         tools.append(clear);
-        answer.append(...[].concat(ed.node), tools, note);
+        answer.append(...[].concat(ed.node), tools);
       },
       next: last ? "Done with the parts" : "Next part",
       canNext: () => G.isFieldComplete(p.key),

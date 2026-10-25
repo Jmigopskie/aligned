@@ -118,6 +118,43 @@ def check_select_fields_helper():
     print("  select_fields OK")
 
 
+def check_standards_only_from_a_guide():
+    """Standards and competencies are copied from a Budget of Work or
+    Curriculum Guide or left blank: with no guide they are never asked of the
+    model, and the page is told why they are blank. With one, they are the
+    guide's own words."""
+    fields = FIELDS + [Field("cs", "Content Standard"), Field("lc", "Learning Competency")]
+    guide = ("Content Standard The learners demonstrate an understanding of basic spreadsheet "
+             "formulas and functions. Learning Competency 1. create simple formulas to compute totals and averages.")
+    seen = []
+
+    def fake_call(system_instruction, parts, label):
+        asked = [f.field_key for f in fields if f.field_key in " ".join(parts)]
+        seen.extend(asked)
+        made = {"cs": "demonstrate understanding of spreadsheet formulas and functions",
+                "lc": "create simple formulas to compute totals and averages",
+                "objectives": "Identify the parts\nExplain their use\nValue careful work"}
+        return {k: made.get(k, f"content for {k}") for k in asked}
+
+    ai_service._call = fake_call
+    final = [e for e in ai_service.generate_full_streaming({"topic": "Spreadsheets"}, fields, course_guide_text="")
+             if e["type"] == "complete"][-1]
+    assert "cs" not in seen and "lc" not in seen, seen
+    assert not final["values"].get("cs") and not final["values"].get("lc"), final["values"]
+    assert final["needs_guide"] == ["cs", "lc"] and "cs" not in final["missing"], final
+    assert final["values"].get("objectives"), final["values"]  # objectives are still written
+    assert "cs" not in ai_service.generate_full({"topic": "Spreadsheets"}, fields, course_guide_text="")
+
+    final = [e for e in ai_service.generate_full_streaming({"topic": "Spreadsheets"}, fields,
+                                                           course_guide_text=[("BoW", guide)])
+             if e["type"] == "complete"][-1]
+    assert final["needs_guide"] == [], final
+    assert final["values"]["cs"] == "The learners demonstrate an understanding of basic spreadsheet formulas and functions.", final["values"]
+    assert final["values"]["lc"] == "create simple formulas to compute totals and averages.", final["values"]
+    print("  standards only from a guide OK")
+
+
+check_standards_only_from_a_guide()
 check_subset_only()
 check_missing_counts_requested_only()
 check_absent_means_everything()

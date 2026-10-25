@@ -37,6 +37,13 @@ def is_verbatim_field(field) -> bool:
     return bool(_VERBATIM_FIELD.search(_haystack(field)))
 
 
+def is_copy_only_field(field) -> bool:
+    """Standards and competencies: only ever copied from a Budget of Work or
+    Curriculum Guide, never written. Objectives are unpacked from the
+    competency (DO 016), so they are written, then held to the guide."""
+    return is_verbatim_field(field) and not re.search(r"objective", _haystack(field), re.I)
+
+
 def is_reference_field(field) -> bool:
     return bool(_REFERENCE_FIELD.search(_haystack(field)))
 
@@ -94,7 +101,9 @@ _HEADINGS = (
 # Where one statement ends and the next begins inside a run of table text: a
 # numbered competency ("10. perform food preservation ...") and a content
 # standard ("demonstrate an understanding of ...") both start a new statement.
-_STATEMENT_START = r"(?<=\s)(?=\d{1,2}\.\s+[a-z])|(?<=\s)(?=demonstrates? an understanding\b)"
+# A standard's own "The learners" lead-in stays with it, so the copy is word for word.
+_STATEMENT_START = (r"(?<=\s)(?=\d{1,2}\.\s+[a-z])"
+                    r"|(?<=\s)(?<!The learners )(?=(?:The learners )?demonstrates? an understanding\b)")
 # Running page headers that land mid-sentence wherever a statement crosses a page.
 _PAGE_NOISE = re.compile(
     r"Page \d+ of \d+|Last updated [A-Z][a-z]+ \d{1,2}, \d{4}"

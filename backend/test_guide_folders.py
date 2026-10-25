@@ -1,6 +1,7 @@
 """Self-check for the library's folders: one per document type, each with a
-banner. Teachers make folders (a name and a banner picture) and change the
-banner of their own; the built-in types and untyped uploads have folders too.
+banner. Teachers make folders (a name and a banner picture) and change any
+folder's banner; students and admins don't. The built-in types and untyped
+uploads have folders too.
 
 Run it directly: `python test_guide_folders.py`.
 """
@@ -35,9 +36,10 @@ def main():
         tina = User(full_name="Tina Teacher", email="tina@example.test", role="teacher")
         oscar = User(full_name="Oscar Other", email="oscar@example.test", role="teacher")
         sam = User(full_name="Sam Student", email="sam@example.test", role="student")
-        for u in (tina, oscar, sam):
+        ada = User(full_name="Ada Admin", email="ada@example.test", role="admin")
+        for u in (tina, oscar, sam, ada):
             u.set_password("password123")
-        db.session.add_all([tina, oscar, sam])
+        db.session.add_all([tina, oscar, sam, ada])
         db.session.commit()
         db.session.add_all([
             CourseGuide(uploader_id=tina.id, subject="Zeta", title="Zeta BoW", file_path="x", doc_type="budget_of_work"),
@@ -78,9 +80,14 @@ def main():
         assert bad.status_code == 400
         print("  teacher folder with banner OK")
 
-        # --- Only its maker (or an admin) changes the banner; students make none ---
+        # --- Any teacher changes any banner; students and admins don't ---
         folder_id = las["folder_id"]
         login(oscar)
+        assert types()["Learning Activity Sheets"]["can_edit"]
+        res = client.post(f"/api/course-guides/folders/{folder_id}/banner", content_type="multipart/form-data",
+                          data={"banner": (png((200, 40, 40)), "r.png")})
+        assert res.status_code == 200, res.get_json()
+        login(ada)
         assert not types()["Learning Activity Sheets"]["can_edit"]
         res = client.post(f"/api/course-guides/folders/{folder_id}/banner", content_type="multipart/form-data",
                           data={"banner": (png((200, 40, 40)), "r.png")})
@@ -109,8 +116,10 @@ def main():
         assert "/api/course-guides/folders/" in t["Budget of Work"]["banner_url"], t
         assert "/api/course-guides/folders/" in t["Other"]["banner_url"] and t["Other"]["count"] >= 1, t
         login(oscar)
-        assert set_type_banner("budget_of_work").status_code == 200  # shared, not Tina's
-        assert set_type_banner("Learning Activity Sheets").status_code == 403  # Tina's own
+        assert set_type_banner("budget_of_work").status_code == 200
+        assert set_type_banner("Learning Activity Sheets").status_code == 200  # Tina's folder, still a teacher's to change
+        login(ada)
+        assert set_type_banner("budget_of_work").status_code == 403
         login(sam)
         assert not types()["Budget of Work"]["can_edit"]
         assert set_type_banner("budget_of_work").status_code == 403

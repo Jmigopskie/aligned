@@ -298,8 +298,9 @@ export const POSES = [
   // Raised wing with the feathers fanned: an open "aha", never a single raised digit.
   { key: "idea", label: "Idea", spec: P({ wL: [-0.62, 1.08, 0.1, 0, 0, -1.94, 0.22, 0], wR: HOLD_R, board: held(0.14, 0.56), cap: [1, -0.2], bulb: [1], look: [-10, -16], move: M({ hop: 0.05, flapL: 0.06 }) }) },
   { key: "proud", label: "Proud", spec: P({ wL: HOLD_L, wR: HOLD_R, board: held(0, 0.62), cap: [1, 0], eyes: "happy", beak: "smile", move: M({ tilt: 0.07 }) }) },
-  // Writing the plan: board tilted up to him, pen in the right wing scribbling.
-  { key: "write", label: "Writing", spec: P({ wL: HOLD_L, wR: [0.66, 1.0, 0.82, 0, 0, -0.85, 0, 0], board: [-0.06, 0.64, 0.74, -0.18, 0, 0.06, 1], cap: [1, 0], pen: PEN_AT(0.16, 0.6, 0.86, -0.5), look: [6, 26], move: M({ sway: 0.04, nod: 0.025, write: 0.07 }) }) },
+  // Writing the plan: the clipboard faces him (its back to us, spun so the
+  // page reads the right way up for him) and the pen scribbles over its top edge.
+  { key: "write", label: "Writing", spec: P({ wL: HOLD_L, wR: [0.6, 0.92, 0.8, 0, 0, -1.62, 0, 0], board: [-0.04, 0.72, 0.8, -2.4, 0, Math.PI, 1], cap: [1, 0], pen: PEN_AT(0.2, 1.05, 0.84, -0.55), look: [4, 24], move: M({ sway: 0.04, nod: 0.025, write: 0.07 }) }) },
   // more looks in the same style
   { key: "cheer", label: "Cheering", spec: P({ wL: UP_L, wR: UP_R, cap: [1, 0], eyes: "happy", beak: "laugh", move: M({ hop: 0.12, flapL: 0.25, flapR: 0.25 }) }) },
   { key: "hi", label: "Saying hi", spec: P({ wL: UP_L, cap: [1, 0], eyes: "happy", move: M({ flapL: 0.3 }) }) },
@@ -444,11 +445,13 @@ export function createAlan() {
     ray.rotation.z = -a;
     bulb.add(ray);
   });
+  // The dot sits on the bar's own line, a small gap below it, whatever the slant.
+  const slant = 0.12, half = 0.035 + 0.08, gap = 0.035 + 0.045;
   const bang = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.16, 4, 12), flat(C.ink));
-  bang.position.set(-0.42, 0.08, 0);
-  bang.rotation.z = 0.15;
+  bang.position.set(-0.38, 0.1, 0);
+  bang.rotation.z = slant;
   const dot = mesh(SPHERE, flat(C.ink), [0.045, 0.045, 0.045]);
-  dot.position.set(-0.47, -0.13, 0);
+  dot.position.set(-0.38 + Math.sin(slant) * (half + gap), 0.1 - Math.cos(slant) * (half + gap), 0);
   bulb.add(bang, dot);
   root.add(bulb);
 

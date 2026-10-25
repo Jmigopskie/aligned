@@ -114,14 +114,9 @@ def _banners_dir():
     return path
 
 def _can_edit_folder(user, key, folder):
-    """Admins change any banner. A teacher changes the built-in folders,
-    "Other", their own folders and ones no teacher owns yet (a type that so
-    far only has uploads); another teacher's folder stays theirs."""
-    if user.role == "admin":
-        return True
-    if user.role == "student":
-        return False
-    return folder is None or folder.created_by in (None, user.id)
+    """Banners are the teachers': any teacher changes any folder's banner,
+    built-in, "Other" or one another teacher made. Students and admins don't."""
+    return user.role == "teacher"
 
 def _save_banner(folder, file):
     """Crop and size a banner picture for a folder box. Returns an error
@@ -173,12 +168,11 @@ def set_guide_type_banner():
         return jsonify({"status": "error", "message": "Pick a folder."}), 400
     folder = GuideFolder.query.filter(func.lower(GuideFolder.type_key) == key.lower()).first()
     if not _can_edit_folder(user, key, folder):
-        return jsonify({"status": "error", "message": "Only the teacher who made this folder can change its banner."}), 403
+        return jsonify({"status": "error", "message": "Only teachers can change folder banners."}), 403
     if not request.files.get("banner"):
         return jsonify({"status": "error", "message": "Choose a picture for the banner."}), 400
     if folder is None:
-        # Built-in folders and "Other" belong to everyone; a typed-in one to
-        # the teacher who first gives it a banner.
+        # Who made it, for the record: no one for the built-in folders and "Other".
         owner = None if key in TYPE_LABELS or key == _UNTYPED else user.id
         folder = GuideFolder(type_key=key, created_by=owner)
         db.session.add(folder)
@@ -224,7 +218,7 @@ def set_guide_folder_banner(folder_id):
     user = current_user()
     folder = GuideFolder.query.get_or_404(folder_id)
     if not _can_edit_folder(user, folder.type_key, folder):
-        return jsonify({"status": "error", "message": "Only the teacher who made this folder can change its banner."}), 403
+        return jsonify({"status": "error", "message": "Only teachers can change folder banners."}), 403
     if not request.files.get("banner"):
         return jsonify({"status": "error", "message": "Choose a picture for the banner."}), 400
     error = _save_banner(folder, request.files["banner"])

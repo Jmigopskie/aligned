@@ -992,6 +992,22 @@ def _complete_batch(lesson, chunk, values, label, guide_text, citation, context)
     return values
 
 
+def _has_guide(course_guide_text) -> bool:
+    if isinstance(course_guide_text, (list, tuple)):
+        return any((x or "").strip() for _, x in course_guide_text)
+    return bool((course_guide_text or "").strip())
+
+
+def _split_uncopyable(fields, course_guide_text):
+    """(fields to write, standards/competencies left blank). With no Budget
+    of Work or Curriculum Guide there is nothing to copy those from word for
+    word, and a model asked anyway makes them up, so they are left blank."""
+    if _has_guide(course_guide_text):
+        return list(fields), []
+    skipped = [f for f in fields if grounding.is_copy_only_field(f)]
+    return [f for f in fields if f not in skipped], skipped
+
+
 def select_fields(fields, include_keys):
     """The fields to generate, in document order.
 
@@ -1008,7 +1024,7 @@ def select_fields(fields, include_keys):
 
 def generate_full(context: dict, fields, course_guide_text: str = "", include_keys=None,
                   course_guide_citation: str = "") -> dict:
-    targets = select_fields(fields, include_keys)
+    targets, _ = _split_uncopyable(select_fields(fields, include_keys), course_guide_text)
     if not targets:
         return {}
     cite = course_guide_citation
@@ -1041,9 +1057,10 @@ def generate_full_streaming(context: dict, fields, course_guide_text: str = "", 
     progressively rather than one big call that arrives all at once."""
     # Only the requested fields are generated, and only they are held to account
     # in the completeness report at the end.
-    fields = select_fields(fields, include_keys)
+    fields, skipped = _split_uncopyable(select_fields(fields, include_keys), course_guide_text)
+    needs_guide = {"needs_guide": [f.field_key for f in skipped], "needs_guide_labels": [f.label for f in skipped]}
     if not fields:
-        yield {"type": "complete", "values": {}, "missing": [], "missing_labels": []}
+        yield {"type": "complete", "values": {}, "missing": [], "missing_labels": [], **needs_guide}
         return
     chunks = [fields[i:i + _STREAM_CHUNK_SIZE] for i in range(0, len(fields), _STREAM_CHUNK_SIZE)]
     # Built once per plan: every chunk shares this exact prefix.
@@ -1113,6 +1130,7 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
         "values": all_values,
         "missing": missing,
         "missing_labels": [f.label for f in fields if f.field_key in set(missing)],
+        **needs_guide,
     }
 
 

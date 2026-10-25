@@ -2,7 +2,7 @@
 // big 3D Alan reacts on the right. The answers go to generator.js through
 // window.Generator; the step order and rules come from setup-flow-steps.js.
 // Guided mode continues on the same shell (guided-flow.js).
-import { createGuided } from "./guided-flow.js?v=2026-10-26e";
+import { createGuided } from "./guided-flow.js?v=2026-10-26i";
 
 const flow = document.getElementById("flow");
 const G = window.Generator;
@@ -931,7 +931,7 @@ async function mountAlan(host) {
   const usePng = { setPose: (pose) => (img.src = `img/owl/alan-${PNG_FOR_POSE[pose] || "idle"}.png`) };
   try {
     const THREE = await import("three");
-    const { createAlan } = await import("./alan3d.js?v=2026-10-25a");
+    const { createAlan } = await import("./alan3d.js?v=2026-10-26i");
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     const scene = new THREE.Scene();

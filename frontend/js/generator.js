@@ -3089,7 +3089,11 @@ reviewConfirm.addEventListener("click", () => {
 // so both have to be said and both have to be highlighted.
 function reportGenerationOutcome(finalEvent, requestedKeys) {
   const missingLabels = (finalEvent && finalEvent.missing_labels) || [];
-  const missingKeys = (finalEvent && finalEvent.missing) || [];
+  // Standards and competencies with no Budget of Work or Curriculum Guide to
+  // copy them from: left blank rather than made up.
+  const guideLabels = (finalEvent && finalEvent.needs_guide_labels) || [];
+  const guideKeys = (finalEvent && finalEvent.needs_guide) || [];
+  const missingKeys = ((finalEvent && finalEvent.missing) || []).concat(guideKeys);
   const asked = new Set(requestedKeys || []);
   // Fields the teacher deliberately unticked: not a generation failure, so
   // they get their own wording rather than being folded into "couldn't
@@ -3112,7 +3116,7 @@ function reportGenerationOutcome(finalEvent, requestedKeys) {
     ownFieldsNote.hidden = true;
   }
 
-  if (!missingLabels.length && !yoursKeys.length) {
+  if (!missingLabels.length && !yoursKeys.length && !guideLabels.length) {
     if (ownKeys.length) {
       setOwlState("guide", `I wrote everything else. ${ownFieldsNoteText.textContent}`);
       highlightEmptyFields(ownKeys);
@@ -3138,6 +3142,13 @@ function reportGenerationOutcome(finalEvent, requestedKeys) {
       `${missingLabels.length} field${missingLabels.length === 1 ? "" : "s"} couldn't be generated and ${
         missingLabels.length === 1 ? "is" : "are"
       } still empty: ${missingLabels.join(", ")}.`
+    );
+  }
+
+  if (guideLabels.length) {
+    const one = guideLabels.length === 1;
+    messages.push(
+      `${joinLabels(guideLabels)} ${one ? "is" : "are"} copied word for word from a Budget of Work or Curriculum Guide, and you didn't add one, so I left ${one ? "it" : "them"} blank instead of making ${one ? "it" : "them"} up. Add one in Supplementary sources and generate again, or copy ${one ? "it" : "them"} in yourself.`
     );
   }
 
@@ -3678,20 +3689,8 @@ function partInfo(key) {
   const f = fieldByKey(key);
   return {
     key, label: f.label, type: f.field_type, group: f.section_group || "",
-    days: partCount(key) ? f.parts : null, locked: !!f.locked, fromGuide: !!f.from_guide,
+    days: partCount(key) ? f.parts : null, locked: !!f.locked,
   };
-}
-
-// Fills a curriculum part (standards, competencies) straight from the
-// student's Budget of Work / Curriculum Guide: the same grounded generation
-// Building Proficiency uses, for this one field, so the wording is the guide's.
-async function autofillFromSources(key) {
-  const data = await Api.generateFull({ ...baseGenerationPayload(), include_keys: [key] });
-  const value = (data.field_values || {})[key];
-  if (!hasValue(value)) throw new Error("I couldn't find this in your sources. Write it yourself, or ask me in the chat.");
-  const count = partCount(key);
-  if (count) weeklyArray(value, count).forEach((text, i) => setGuidedValue(key, formatGeneratedValue(text), i));
-  else setGuidedValue(key, formatGeneratedValue(value));
 }
 
 // Writes one part's answer (or one day of a weekly part) and shows it in the
@@ -3812,8 +3811,6 @@ window.Generator = {
   guidedParts: () => stepFieldKeys.map(partInfo),
   quickParts: () => incompleteEasyFieldKeys().map(partInfo),
   fieldValue: (key) => fieldValues[key],
-  autofillFromSources,
-  hasSources: () => flowFlags.guides.length + (flowFlags.sources || []).length > 0,
   isFieldComplete,
   setGuidedValue,
   setGuidedDay: (i) => { guidedPart = i; },
