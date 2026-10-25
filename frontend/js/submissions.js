@@ -131,7 +131,7 @@ function renderSubmissions(plans) {
         ${p.teacher_feedback ? `<div class="feedback-box"><strong>Your feedback:</strong> ${escapeHtml(p.teacher_feedback)}</div>` : ""}
         <div class="row-actions" style="margin-top:12px;">
           <button class="btn btn-secondary" type="button" data-action="review" data-plan="${p.id}">Open &amp; review</button>
-          <button class="btn btn-secondary" type="button" data-action="export" data-plan="${p.id}">Download</button>
+          <button class="btn btn-secondary" type="button" data-action="export" data-plan="${p.id}" data-title="${escapeHtml(p.title || "")}">Download</button>
         </div>
       </div>`
     )
@@ -142,7 +142,7 @@ function renderSubmissions(plans) {
   });
   submissionsList.querySelectorAll("[data-action='export']").forEach((btn) => {
     btn.addEventListener("click", () => {
-      window.open(Api.exportUrl(btn.dataset.plan), "_blank", "noopener");
+      exportPlan(btn.dataset.plan, btn.dataset.title);
     });
   });
 }

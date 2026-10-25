@@ -105,7 +105,7 @@ function renderRecentPlans(plans) {
           <div class="row-menu">
             <button class="row-menu-btn" type="button" data-plan="${p.id}" aria-label="More actions" title="More actions">${Icons.moreHorizontal}</button>
             <div class="row-menu-dropdown" data-menu="${p.id}">
-              <button type="button" data-action="export" data-plan="${p.id}">Export as Word</button>
+              <button type="button" data-action="export" data-plan="${p.id}" data-title="${escapeHtml(p.title || "")}">Export as Word</button>
               <button type="button" data-action="delete" data-plan="${p.id}" class="danger">Delete</button>
             </div>
           </div>
@@ -133,7 +133,7 @@ function wireRowMenus() {
     btn.addEventListener("click", async () => {
       const planId = btn.dataset.plan;
       if (btn.dataset.action === "export") {
-        window.open(Api.exportUrl(planId), "_blank", "noopener");
+        exportPlan(planId, btn.dataset.title);
       } else if (btn.dataset.action === "delete") {
         if (!confirm("Delete this lesson plan? This can't be undone.")) return;
         try {

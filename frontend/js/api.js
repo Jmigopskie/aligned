@@ -351,6 +351,82 @@ const Api = {
     apiFetch("/api/notifications/read-all", { method: "POST" }),
 };
 
+// Export a plan as Word, asking for the file name first. Every export button
+// (the plan page, the dashboard, the plan list, submissions) goes through here.
+function exportPlan(planId, suggestedName) {
+  const clean = (name) => name.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay export-name-overlay";
+  overlay.innerHTML = `
+    <form class="modal-dialog export-name-dialog" role="dialog" aria-modal="true" aria-labelledby="export-name-title" novalidate>
+      <div class="modal-header">
+        <h2 id="export-name-title">Export as Word</h2>
+        <button type="button" class="modal-close" aria-label="Cancel export">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label for="export-name-input">File name</label>
+        <div class="export-name-field">
+          <input type="text" id="export-name-input" maxlength="120" autocomplete="off" />
+          <span>.docx</span>
+        </div>
+        <p class="export-name-error" role="alert" hidden></p>
+        <div class="export-name-actions">
+          <button type="button" class="btn btn-secondary export-name-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary export-name-go">Export</button>
+        </div>
+      </div>
+    </form>`;
+  document.body.appendChild(overlay);
+  const form = overlay.querySelector("form");
+  const input = overlay.querySelector("input");
+  const error = overlay.querySelector(".export-name-error");
+  const go = overlay.querySelector(".export-name-go");
+  const opener = document.activeElement;
+  input.value = clean(suggestedName || "") || "Lesson plan";
+  const close = () => {
+    overlay.remove();
+    if (opener && opener.focus) opener.focus();
+  };
+  overlay.querySelector(".modal-close").addEventListener("click", close);
+  overlay.querySelector(".export-name-cancel").addEventListener("click", close);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  overlay.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = clean(input.value.replace(/\.docx$/i, ""));
+    if (!name) {
+      error.textContent = "Give the file a name.";
+      error.hidden = false;
+      input.focus();
+      return;
+    }
+    go.disabled = true;
+    go.textContent = "Exporting…";
+    try {
+      const res = await fetch(Api.exportUrl(planId), { credentials: "include" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "The plan couldn't be exported.");
+      }
+      const url = URL.createObjectURL(await res.blob());
+      const a = Object.assign(document.createElement("a"), { href: url, download: `${name}.docx` });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      close();
+      showToast(`Saved as ${name}.docx`);
+    } catch (err) {
+      error.textContent = err.message;
+      error.hidden = false;
+      go.disabled = false;
+      go.textContent = "Export";
+    }
+  });
+  input.focus();
+  input.select();
+}
+
 function showToast(message, isError = false) {
   let el = document.getElementById("toast");
   if (!el) {

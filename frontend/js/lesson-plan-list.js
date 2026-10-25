@@ -134,7 +134,7 @@ function renderPlans(plans) {
                 : ""
             }
             <button class="row-action-btn" type="button" data-action="preview" data-plan="${p.id}" title="Preview" aria-label="Preview">${Icons.eye}</button>
-            <button class="row-action-btn" type="button" data-action="export" data-plan="${p.id}" title="Download" aria-label="Download">${Icons.download}</button>
+            <button class="row-action-btn" type="button" data-action="export" data-plan="${p.id}" data-title="${escapeHtml(p.title || "")}" title="Download" aria-label="Download">${Icons.download}</button>
             ${
               isMineTab
                 ? `<button class="row-action-btn" type="button" data-action="visibility" data-plan="${p.id}" data-public="${p.is_public ? "1" : "0"}" title="${p.is_public ? "Make private" : "Make public"}" aria-label="${p.is_public ? "Make private" : "Make public"}">${p.is_public ? Icons.globe : Icons.lock}</button>`
@@ -159,7 +159,7 @@ function wireRowActions() {
       if (btn.dataset.action === "preview") {
         openPreview(planId);
       } else if (btn.dataset.action === "export") {
-        window.open(Api.exportUrl(planId), "_blank", "noopener");
+        exportPlan(planId, btn.dataset.title);
       } else if (btn.dataset.action === "submit") {
         openSubmitModal(planId);
       } else if (btn.dataset.action === "visibility") {
@@ -332,14 +332,8 @@ function renderPlanPreviewModal(fmt, plan, templateData, docAvailable) {
     }
     ${plan.teacher_feedback ? `<div class="feedback-box"><strong>Teacher feedback:</strong> ${escapeHtml(plan.teacher_feedback)}</div>` : ""}`;
 
-  const toolbar = docAvailable
-    ? `<div class="doc-toolbar">
-        <div class="doc-toolbar-views">
-          <button type="button" class="doc-view-btn ${previewViewMode === "doc" ? "active" : ""}" data-view="doc">Document view</button>
-          <button type="button" class="doc-view-btn ${previewViewMode === "list" ? "active" : ""}" data-view="list">Field list view</button>
-        </div>
-      </div>`
-    : "";
+  // Document view only; a format with no reference document shows the plain list.
+  const toolbar = "";
 
   const warning =
     docAvailable && templateData.unmatched_fields.length
@@ -356,14 +350,6 @@ function renderPlanPreviewModal(fmt, plan, templateData, docAvailable) {
 
   previewBody.innerHTML = meta + toolbar + warning + content;
   previewBody.querySelectorAll(".lp-doc-wrap").forEach(fitDocPage);
-
-  previewBody.querySelectorAll(".doc-view-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      if (btn.dataset.view === previewViewMode) return;
-      previewViewMode = btn.dataset.view;
-      renderPlanPreviewModal(fmt, plan, templateData, docAvailable);
-    });
-  });
 
   if (previewViewMode === "doc") fillAndLockDocCanvas(plan);
 }

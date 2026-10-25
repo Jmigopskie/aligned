@@ -33,6 +33,55 @@ function emitGeneration(type, detail = {}) {
   generationEvents.dispatchEvent(new CustomEvent(type, { detail }));
 }
 
+// Confetti when a lesson plan is finished: a short burst from the top of the
+// screen in Alan's colours, drawn on a canvas that never takes a click.
+// Reduced motion skips it.
+function celebrate() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const cv = Object.assign(document.createElement("canvas"), { className: "confetti" });
+  cv.setAttribute("aria-hidden", "true");
+  document.body.append(cv);
+  const ctx = cv.getContext("2d");
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const W = innerWidth, H = innerHeight;
+  cv.width = W * dpr;
+  cv.height = H * dpr;
+  ctx.scale(dpr, dpr);
+  const colors = ["#1C5C4E", "#2E8B6F", "#FFE200", "#ED1C24", "#F7B32B", "#FFFFFF"];
+  const bits = Array.from({ length: 150 }, () => ({
+    x: W * (0.15 + Math.random() * 0.7),
+    y: -20 - Math.random() * H * 0.25,
+    vx: (Math.random() - 0.5) * 7,
+    vy: 2 + Math.random() * 4,
+    size: 6 + Math.random() * 7,
+    spin: Math.random() * Math.PI,
+    turn: (Math.random() - 0.5) * 0.3,
+    color: colors[Math.floor(Math.random() * colors.length)],
+  }));
+  const start = performance.now();
+  const frame = (now) => {
+    const t = now - start;
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalAlpha = Math.max(0, Math.min(1, (2600 - t) / 600));
+    bits.forEach((b) => {
+      b.vy += 0.12;
+      b.vx *= 0.99;
+      b.x += b.vx;
+      b.y += b.vy;
+      b.spin += b.turn;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.spin);
+      ctx.fillStyle = b.color;
+      ctx.fillRect(-b.size / 2, -b.size / 4, b.size, b.size / 2);
+      ctx.restore();
+    });
+    if (t < 2600) requestAnimationFrame(frame);
+    else cv.remove();
+  };
+  requestAnimationFrame(frame);
+}
+
 // Guided mode: the flat, ordered list of every field on this format
 // (document order via sort_order) and which one is currently unlocked.
 let stepFieldKeys = [];
@@ -2281,11 +2330,17 @@ async function runServerSave() {
 function enableExport() {
   if (!planId) return;
   exportBtn.href = Api.exportUrl(planId);
-  exportBtn.target = "_blank";
-  exportBtn.rel = "noopener";
   exportBtn.style.pointerEvents = "auto";
   exportBtn.style.opacity = "1";
 }
+
+// Export asks for the file name first (api.js exportPlan).
+exportBtn.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (!planId) return;
+  const topic = topicInput.value.trim() || mainTopicInput.value.trim();
+  exportPlan(planId, [topic, fmt && fmt.name].filter(Boolean).join(" - "));
+});
 
 // ---- Same plan on two devices ----------------------------------------------
 // A stale save is refused by the server (see update_lesson_plan), and this is
@@ -2865,6 +2920,7 @@ async function runGeneration(includeKeys) {
     generateFullBtn.dataset.originalLabel = "Regenerate full plan";
     reportGenerationOutcome(finalEvent, payload.include_keys);
     emitGeneration("done");
+    celebrate();
   } catch (err) {
     showError(err.message);
     emitGeneration("error", { message: err.message });
@@ -3326,18 +3382,9 @@ function renderPreviewModal(templateData, docAvailable) {
   const dialogEl = previewOverlay.querySelector(".modal-dialog");
   dialogEl.classList.toggle("modal-dialog-doc", previewViewMode === "doc");
 
-  const toolbar = `
-    <div class="doc-toolbar">
-      <div class="doc-toolbar-views">
-        <button type="button" class="doc-view-btn ${previewViewMode === "doc" ? "active" : ""}"
-          data-view="doc" ${docAvailable ? "" : "disabled title=\"No reference file to render for this format\""}>
-          Document view
-        </button>
-        <button type="button" class="doc-view-btn ${previewViewMode === "list" ? "active" : ""}" data-view="list">
-          Field list view
-        </button>
-      </div>
-    </div>`;
+  // Document view only; a format with no reference document falls back to the
+  // plain list, since there is no page to show.
+  const toolbar = "";
 
   const warning =
     docAvailable && templateData.unmatched_fields.length
@@ -3355,14 +3402,6 @@ function renderPreviewModal(templateData, docAvailable) {
 
   previewBody.innerHTML = renderPreviewMeta() + toolbar + warning + content;
   previewBody.querySelectorAll(".lp-doc-wrap").forEach(fitDocPage);
-
-  previewBody.querySelectorAll(".doc-view-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      if (btn.disabled || btn.dataset.view === previewViewMode) return;
-      previewViewMode = btn.dataset.view;
-      renderPreviewModal(templateData, docAvailable);
-    });
-  });
 
   if (previewViewMode === "doc") {
     fillDocCanvas();
@@ -3393,9 +3432,15 @@ async function openGeneratorPreview() {
   renderPreviewModal(templateData, docAvailable);
 }
 
+let previewClosed = null; // what to do when the preview closes (the Guided screens redraw)
 function closeGeneratorPreview() {
   previewOverlay.hidden = true;
   previewOverlay.querySelector(".modal-dialog").classList.remove("modal-dialog-doc");
+  if (previewClosed) {
+    const done = previewClosed;
+    previewClosed = null;
+    done();
+  }
 }
 
 previewBtn.addEventListener("click", openGeneratorPreview);
@@ -3803,6 +3848,12 @@ window.Generator = {
   },
   mountChat,
   unmountChat,
+  celebrate,
+  // The plan so far, in its document, from the Guided screens.
+  openPreview: (onClose) => {
+    previewClosed = onClose || null;
+    openGeneratorPreview();
+  },
   openChat: () => setOwlChatCollapsed(false),
   showDocument,
   hideDocument,

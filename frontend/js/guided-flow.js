@@ -9,6 +9,13 @@ export function createGuided(ui) {
   const { G, el, icon, twoLine, stageEl, alanHost, say } = ui;
   let active = false;
   let showing = null; // { key, sync() } for the part on screen
+  let redraw = null; // shows the current screen again (after the preview closes)
+  let celebrated = false;
+
+  // Preview: the plan so far, in its real document, from any Guided screen.
+  const previewBtn = el("button", { type: "button", class: "flow-preview-btn", title: "Preview your plan", "aria-label": "Preview your plan" },
+    icon("eye"), el("span", {}, "Preview"));
+  previewBtn.addEventListener("click", () => G.openPreview(() => redraw && redraw()));
   const touch = matchMedia("(hover: none)").matches;
   const ASK = touch ? "Tap me" : "Click me";
 
@@ -44,6 +51,8 @@ export function createGuided(ui) {
     active = true;
     G.mountChat(stageEl);
     stageEl.classList.add("is-guided");
+    const top = document.querySelector(".flow-top");
+    if (top) top.append(previewBtn);
     alanHost.setAttribute("role", "button");
     alanHost.setAttribute("tabindex", "0");
     alanHost.setAttribute("aria-label", "Ask Alan for help with this part");
@@ -54,6 +63,7 @@ export function createGuided(ui) {
     active = false;
     showing = null;
     G.unmountChat();
+    previewBtn.remove();
     stageEl.classList.remove("is-guided", "is-chatting");
     ["role", "tabindex", "aria-label"].forEach((a) => alanHost.removeAttribute(a));
   }
@@ -122,6 +132,7 @@ export function createGuided(ui) {
     enter();
     i = Math.max(0, Math.min(i, parts.length - 1));
     const p = parts[i];
+    redraw = () => part(i);
     G.setGuidedIndex(i);
     G.setAnswers({ guidedAt: "part" });
     const last = i === parts.length - 1;
@@ -169,6 +180,7 @@ export function createGuided(ui) {
     if (!blanks.length) return review();
     enter();
     showing = null;
+    redraw = quick;
     G.setAnswers({ guidedAt: "quick" });
     ui.screen({
       count: "Quick details",
@@ -199,8 +211,14 @@ export function createGuided(ui) {
     const parts = G.guidedParts();
     enter();
     showing = null;
+    redraw = review;
     G.setAnswers({ guidedAt: "review" });
     const done = parts.every((p) => G.isFieldComplete(p.key));
+    // Every part written: the plan is made, so celebrate (once per visit).
+    if (done && !celebrated) {
+      celebrated = true;
+      G.celebrate();
+    }
     ui.screen({
       count: "Review",
       at: 1,
