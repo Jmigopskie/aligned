@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 
 from extensions import db, iso_utc
-from services import field_roles
+from services import field_roles, grounding
 
 class LessonPlanFormat(db.Model):
     __tablename__ = "lesson_plan_formats"
@@ -127,4 +127,7 @@ class FormatField(db.Model):
             "parts": self.parts_list,
             "locked": bool(self.locked),
             "manual": bool(self.manual),
+            # A curriculum statement (standards, competencies, objectives): Guided
+            # can fill it straight from the student's Budget of Work / CG.
+            "from_guide": grounding.is_verbatim_field(self),
         }

@@ -95,18 +95,77 @@ export function createGuided(ui) {
     return input;
   }
 
-  // Every box for one part: one, or one per day for a weekly part.
+  // A weekly part (one answer per day) gets one box and a day picker instead
+  // of a box per day. "From … to …" lets one answer cover several days, for a
+  // part that repeats across the week; the chips show which days are written.
+  function dayEditor(p, opts = {}) {
+    const days = p.days;
+    const filled = (d) => !!dayText(G.fieldValue(p.key), d).trim();
+    let from = Math.max(0, days.findIndex((_, d) => !filled(d)));
+    let to = from;
+    const id = `guided-${p.key}`;
+    const options = () => days.map((d, i) => el("option", { value: String(i) }, d));
+    const fromSel = el("select", { id: `${id}-from` }, options());
+    const toSel = el("select", { id: `${id}-to`, "aria-label": "Through" }, options());
+    const input = el("textarea", { class: "flow-textarea", id, rows: opts.compact ? "2" : "5", maxlength: "6000" });
+    const chips = el("div", { class: "flow-day-chips", role: "group", "aria-label": "Days" });
+
+    function paint() {
+      fromSel.value = String(from);
+      toSel.value = String(to);
+      const text = dayText(G.fieldValue(p.key), from);
+      if (input.value !== text) input.value = text;
+      grow(input);
+      chips.replaceChildren(...days.map((d, i) => {
+        const chip = el("button", { type: "button", class: `flow-day-chip${filled(i) ? " is-filled" : ""}${i >= from && i <= to ? " is-current" : ""}`,
+          "aria-pressed": String(i >= from && i <= to) }, filled(i) ? icon("check") : "", d);
+        chip.addEventListener("click", () => {
+          from = to = i;
+          G.setGuidedDay(from);
+          paint();
+          input.focus();
+        });
+        return chip;
+      }));
+    }
+    fromSel.addEventListener("change", () => {
+      from = parseInt(fromSel.value, 10);
+      if (to < from) to = from;
+      G.setGuidedDay(from);
+      paint();
+    });
+    toSel.addEventListener("change", () => {
+      to = Math.max(from, parseInt(toSel.value, 10));
+      paint();
+    });
+    input.addEventListener("focus", () => G.setGuidedDay(from));
+    input.addEventListener("input", () => {
+      for (let d = from; d <= to; d++) G.setGuidedValue(p.key, input.value, d);
+      grow(input);
+      paint();
+      ui.refresh();
+    });
+    G.setGuidedDay(from);
+    requestAnimationFrame(paint);
+    const picker = el("div", { class: "flow-day-picker" },
+      el("label", { class: "flow-label", for: fromSel.id }, opts.label ? `${p.label}: day` : "Day"),
+      el("div", { class: "flow-field flow-select" }, fromSel),
+      el("span", { class: "flow-day-to" }, "to"),
+      el("div", { class: "flow-field flow-select" }, toSel));
+    return { node: [picker, chips, el("div", { class: "flow-field" }, input)], sync: paint };
+  }
+
+  // Every box for one part: one, or the day editor for a weekly part.
   function editors(p, opts = {}) {
+    if (p.days && p.days.length > 1) return dayEditor(p, opts);
     const boxes = [];
     const id = (i) => `guided-${p.key}${i === null ? "" : `-${i}`}`;
     let node;
     if (p.days) {
-      node = el("div", { class: "flow-row flow-days" }, p.days.map((day, i) => {
-        const input = box(p, i, opts);
-        input.id = id(i);
-        boxes.push([input, i]);
-        return el("div", { class: "flow-cell" }, el("label", { class: "flow-label", for: input.id }, day), el("div", { class: "flow-field" }, input));
-      }));
+      const input = box(p, 0, opts);
+      input.id = id(0);
+      boxes.push([input, 0]);
+      node = [opts.label ? el("label", { class: "flow-label", for: input.id }, p.label) : "", el("div", { class: "flow-field" }, input)];
     } else {
       const input = box(p, null, opts);
       input.id = id(null);
@@ -144,16 +203,35 @@ export function createGuided(ui) {
         ? `Your teacher locked this part, so it's yours to write. ${ASK} if you'd like help thinking it through.`
         : `${p.type === "list" ? "One item per line. " : ""}Write it in your own words, or ${ASK.toLowerCase()} for ideas.`,
       body: (answer) => {
-        // Where the teacher's field sits in the plan, so the answer goes in the right blank.
-        const snippet = G.fieldSnippet(p.key);
-        if (snippet) {
-          const where = el("details", { class: "flow-where" },
-            el("summary", {}, icon("eye"), "Where it goes in your plan"), snippet);
-          where.open = innerHeight >= 860;
-          answer.append(where);
-        }
         const ed = editors(p);
         showing = { key: p.key, sync: ed.sync };
+        const tools = el("div", { class: "flow-part-tools" });
+        const note = el("p", { class: "flow-help flow-fill-note", role: "status", hidden: true });
+        // Standards and competencies are copied from the student's own Budget of
+        // Work / Curriculum Guide, word for word, instead of typed by hand.
+        if (p.fromGuide && !p.locked && G.hasSources()) {
+          const fill = el("button", { type: "button", class: "flow-fill" }, icon("bookOpen"), "Fill from my sources");
+          fill.addEventListener("click", async () => {
+            fill.disabled = true;
+            note.hidden = true;
+            fill.lastChild.textContent = "Reading your sources…";
+            say("Looking this up in your sources…", "reading");
+            try {
+              await G.autofillFromSources(p.key);
+              ed.sync();
+              ui.refresh();
+              note.textContent = "Copied from your sources, word for word. Change anything you need.";
+              say("Found it in your sources. Check it over, then go on.", "check");
+            } catch (err) {
+              note.textContent = err.message;
+              say("I couldn't find that one. Want to ask me in the chat?", "unsure");
+            }
+            note.hidden = false;
+            fill.disabled = false;
+            fill.lastChild.textContent = "Fill from my sources";
+          });
+          tools.append(fill);
+        }
         const clear = el("button", { type: "button", class: "flow-back flow-more flow-clear" }, icon("eraser"), "Clear this part");
         clear.addEventListener("click", () => {
           if (p.days) p.days.forEach((_, d) => G.setGuidedValue(p.key, "", d));
@@ -161,7 +239,8 @@ export function createGuided(ui) {
           ed.sync();
           ui.refresh();
         });
-        answer.append(...[].concat(ed.node), clear);
+        tools.append(clear);
+        answer.append(...[].concat(ed.node), tools, note);
       },
       next: last ? "Done with the parts" : "Next part",
       canNext: () => G.isFieldComplete(p.key),

@@ -3676,44 +3676,22 @@ function startGuided() {
 // ---- for the Guided screens ----
 function partInfo(key) {
   const f = fieldByKey(key);
-  return { key, label: f.label, type: f.field_type, group: f.section_group || "", days: partCount(key) ? f.parts : null, locked: !!f.locked };
+  return {
+    key, label: f.label, type: f.field_type, group: f.section_group || "",
+    days: partCount(key) ? f.parts : null, locked: !!f.locked, fromGuide: !!f.from_guide,
+  };
 }
 
-// Where a part's input sits in the plan: its table row (or its line with the
-// label above it), copied from the document with the input itself marked, so
-// the student sees exactly which blank the teacher's field fills.
-function fieldSnippet(key) {
-  const canvas = liveDocWrap.querySelector(".lp-doc");
-  const slot = canvas && canvas.querySelector(`[data-field-key="${CSS.escape(key)}"]`);
-  if (!slot) return null;
-  const row = slot.closest("tr");
-  let piece;
-  if (row) {
-    piece = document.createElement("table");
-    piece.className = row.closest("table").className;
-    piece.append(document.createElement("tbody"));
-    piece.firstChild.append(row.cloneNode(true));
-  } else {
-    // An input inline in its label's line brings the label along; one on its
-    // own line below takes the label line above it too.
-    const line = slot.closest("[data-anchor-index]") || slot;
-    piece = document.createElement("div");
-    const before = line.previousElementSibling;
-    if (line === slot && before && !before.querySelector("[data-field-key]")) piece.append(before.cloneNode(true));
-    piece.append(line.cloneNode(true));
-  }
-  piece.querySelectorAll("[contenteditable]").forEach((el) => el.removeAttribute("contenteditable"));
-  piece.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
-  piece.querySelectorAll("[data-field-key]").forEach((el) => {
-    const here = el.dataset.fieldKey === key;
-    el.classList.toggle("lp-here", here);
-    if (here) el.setAttribute("data-placeholder", "Your answer goes here");
-  });
-  const wrap = document.createElement("div");
-  wrap.className = "lp-doc lp-snippet";
-  wrap.setAttribute("aria-hidden", "true");
-  wrap.append(piece);
-  return wrap;
+// Fills a curriculum part (standards, competencies) straight from the
+// student's Budget of Work / Curriculum Guide: the same grounded generation
+// Building Proficiency uses, for this one field, so the wording is the guide's.
+async function autofillFromSources(key) {
+  const data = await Api.generateFull({ ...baseGenerationPayload(), include_keys: [key] });
+  const value = (data.field_values || {})[key];
+  if (!hasValue(value)) throw new Error("I couldn't find this in your sources. Write it yourself, or ask me in the chat.");
+  const count = partCount(key);
+  if (count) weeklyArray(value, count).forEach((text, i) => setGuidedValue(key, formatGeneratedValue(text), i));
+  else setGuidedValue(key, formatGeneratedValue(value));
 }
 
 // Writes one part's answer (or one day of a weekly part) and shows it in the
@@ -3834,7 +3812,8 @@ window.Generator = {
   guidedParts: () => stepFieldKeys.map(partInfo),
   quickParts: () => incompleteEasyFieldKeys().map(partInfo),
   fieldValue: (key) => fieldValues[key],
-  fieldSnippet,
+  autofillFromSources,
+  hasSources: () => flowFlags.guides.length + (flowFlags.sources || []).length > 0,
   isFieldComplete,
   setGuidedValue,
   setGuidedDay: (i) => { guidedPart = i; },

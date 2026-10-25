@@ -154,6 +154,12 @@ def main():
         assert keys == ["topic", "remarks"], keys  # its line was deleted, so the field goes with it
         print("  document edits keep the teacher's fields OK")
 
+    # Curriculum statements can be filled from the student's sources.
+    with app.app_context():
+        assert FormatField(field_key="content_standards", label="Content Standards").to_dict()["from_guide"] is True
+        assert FormatField(field_key="topic", label="Topic").to_dict()["from_guide"] is False
+    print("  curriculum fields marked OK")
+
     print("field setup OK")
 
 
