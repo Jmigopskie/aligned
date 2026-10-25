@@ -6614,6 +6614,50 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
 .flow-alan canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .flow-alan img { position: absolute; inset: 0; max-width: 80%; max-height: 70%; margin: auto; object-fit: contain; }
 
+/* ---- Guided mode: Alan writes beside the student; he is the chat's button ---- */
+.flow-stage.is-guided .flow-alan { cursor: pointer; transition: opacity 0.3s var(--flow-ease), transform 0.3s var(--flow-ease); }
+.flow-stage.is-guided .flow-alan:hover { transform: translateY(-4px); }
+.flow-stage.is-guided .flow-alan:focus-visible { outline: 3px solid var(--primary); outline-offset: -12px; border-radius: 24px; }
+.flow-stage.is-guided .flow-say { transition: opacity 0.2s var(--flow-ease); }
+/* The chat takes his place; he keeps animating underneath, ready to return. */
+.flow-stage.is-chatting .flow-alan,
+.flow-stage.is-chatting .flow-say { opacity: 0; pointer-events: none; }
+.flow-stage .owl-chat.is-staged {
+  position: absolute;
+  inset: clamp(12px, 2.4vh, 24px);
+  z-index: 3;
+  width: auto;
+  height: auto;
+  flex: none;
+  box-shadow: 0 1px 2px rgba(22, 35, 30, 0.05), 0 24px 48px -24px rgba(22, 35, 30, 0.35);
+  animation: chat-in 0.32s var(--flow-ease);
+}
+.flow-stage .owl-chat.is-staged .owl-chat-resizer { display: none; }
+@keyframes chat-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+}
+
+/* An answer that grows with what is typed. */
+.flow-textarea {
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(22, 35, 30, 0.06);
+  font: 400 18px/1.5 var(--font);
+  color: var(--text-heading);
+  resize: none;
+  overflow: hidden;
+}
+.flow-textarea:focus { outline: none; }
+.flow-textarea::placeholder { color: #66736b; }
+.flow-clear { align-self: flex-start; height: 40px; padding: 0 12px; gap: 8px; }
+.flow-clear svg { width: 16px; height: 16px; }
+.flow-detail.is-missing .flow-format-text small { color: var(--danger); }
+
 @media (min-width: 861px) and (max-height: 820px) {
   .flow-ask { gap: 18px; padding-block: 20px; }
   .flow-body { gap: 22px; }
@@ -6630,9 +6674,15 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
   .flow-ask { gap: 22px; padding: 22px 16px 32px; }
   .flow-question { font-size: 26px; }
   .flow-hint { display: none; }
+  /* On a phone the chat needs more than Alan's band: it opens taller. */
+  .flow-stage.is-chatting { height: 72svh; }
+  .flow-stage .owl-chat.is-staged { inset: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .flow-step, .flow-progress > span, .flow-choice, .flow-next, .flow-next-icon, .flow-field { transition: none; }
+  .flow-stage.is-guided .flow-alan, .flow-stage.is-guided .flow-say { transition: none; }
+  .flow-stage.is-guided .flow-alan:hover { transform: none; }
+  .flow-stage .owl-chat.is-staged { animation: none; }
 }
 
 /* Larger type and fields for the flow (the user's request, 2026-10-24):
@@ -6681,7 +6731,9 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
   .flow-answer { gap: 18px; margin-top: 10px; }
   .flow-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    /* 200px keeps two answers side by side on a laptop with a scrollbar, where
+       the column is just under 500px wide. */
+    grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
     gap: 16px 22px;
     align-items: start;
   }

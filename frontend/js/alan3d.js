@@ -265,14 +265,19 @@ function wing() {
 // move: amplitudes of the looping motion each pose plays (frequencies are fixed in update()).
 const HANG_L = [-0.57, 1.1, -0.04, 0, 0, -0.07, 0, 0];
 const HANG_R = [0.57, 1.1, -0.04, 0, 0, 0.07, 0, 0];
-const HOLD_R = [0.6, 0.98, 0.62, 0, 0, -1.22, 0.22, 1]; // across the belly, finger on the board
+// Holding the board from behind its edge, as on the character sheet: the wing
+// angles in and its tip tucks behind the board, so no dark blob sits on the paper.
+const HOLD_R = [0.6, 1.0, 0.42, 0, 0, -0.62, 0.12, 0];
+const HOLD_L = [-0.6, 1.0, 0.42, 0, 0, 0.62, 0.12, 0];
 const UP_L = [-0.6, 1.12, 0.05, 0, 0, -2.52, 0.2, 0]; // raised, feathers fanned
 const UP_R = [0.6, 1.12, 0.05, 0, 0, 2.52, 0.2, 0];
 const OFF = [0, 0.62, 0.58, 0, 0, 0, 0];
 const MOVES = ["sway", "hop", "flapL", "flapR", "shrug", "nod", "shake", "tilt", "write", "jab"];
 const M = (o = {}) => MOVES.map((k) => o[k] ?? (k === "sway" ? 0.16 : 0));
+// Pen: [shown, x, y, z, rotZ]; it scribbles with the "write" motion.
+const PEN_AT = (x, y, z, rz) => [1, x, y, z, rz];
 const REST = {
-  body: [0, 0], wL: HANG_L, wR: HANG_R, board: OFF, cap: [0, 0], glasses: [0], pen: [0],
+  body: [0, 0], wL: HANG_L, wR: HANG_R, board: OFF, cap: [0, 0], glasses: [0], pen: [0, 0.23, 0.64, 0.7, -0.62],
   bulb: [0], spinner: [0], tuft: [1], look: [0, 0], move: M(), eyes: "open", beak: "normal",
 };
 const held = (x, y = 0.62, rz = 0) => [x, y, 0.58, 0, 0, rz, 1];
@@ -283,18 +288,22 @@ export const POSES = [
   { key: "idle", label: "Idle", spec: P({ move: M({ tilt: 0.03 }) }) },
   { key: "present", label: "Presenting", spec: P({ wR: HOLD_R, board: held(0.08, 0.66), move: M({ nod: 0.03 }) }) },
   { key: "point", label: "Pointing", spec: P({ wL: [-0.62, 1.05, 0.1, 0, 0, -1.77, 0, 1], wR: HOLD_R, board: held(0, 0.62, 0.35), cap: [1, -0.3], look: [-14, -10], move: M({ jab: 0.08 }) }) },
-  { key: "think", label: "Thinking", spec: P({ wL: [-0.6, 0.55, 0.5, 0, 0, 2.23, 0.15, 1], wR: [0.62, 1.02, 0.08, 0, 0, 1.0, 0, 0], board: [0.98, 0.9, 0.25, 0, -0.15, 0.04, 1], cap: [1, 0], look: [0, -14], move: M({ sway: 0.1, tilt: 0.05 }) }) },
+  // Wing tip up at the chin (no raised finger), the other wing at rest.
+  { key: "think", label: "Thinking", spec: P({ wL: [-0.5, 0.64, 0.6, 0, 0, 2.62, 0.1, 0], cap: [1, 0], look: [0, -14], move: M({ sway: 0.1, tilt: 0.05 }) }) },
   { key: "doubt", label: "Doubtful", spec: P({ body: [0.3, -0.14], wR: HOLD_R, board: held(0.18), cap: [1, 0.42], eyes: "doubt", move: M({ sway: 0.05, shake: 0.12 }) }) },
   { key: "celebrate", label: "Celebrating", spec: P({ wL: UP_L, wR: [0.62, 1.15, 0.05, 0, 0, 2.3, 0, 0], board: [1.0, 1.38, 0.25, 0, -0.2, 0.05, 1], cap: [1, 0], eyes: "happy", beak: "laugh", move: M({ hop: 0.1, flapL: 0.22 }) }) },
   { key: "wave", label: "Waving", spec: P({ wL: UP_L, wR: HOLD_R, board: held(0.17, 0.6), cap: [1, 0], eyes: "happy", move: M({ flapL: 0.28 }) }) },
   { key: "loading", label: "Loading", spec: P({ wR: HOLD_R, board: held(0.19, 0.6), cap: [1, -0.35], spinner: [1], look: [-18, 0], move: M({ tilt: 0.03 }) }) },
-  { key: "check", label: "Checking", spec: P({ wL: [-0.6, 1.0, 0.3, 0, 0, -0.95, 0, 0], wR: [0.62, 0.95, 0.62, 0, 0, -1.0, 0, 1], board: [-0.62, 0.67, 0.45, 0, 0.2, 0.42, 1], cap: [1, 0], glasses: [1], pen: [1], look: [0, -16], move: M({ nod: 0.02, write: 0.06 }) }) },
-  { key: "idea", label: "Idea", spec: P({ wL: [-0.62, 1.08, 0.1, 0, 0, -1.94, 0, 1], wR: HOLD_R, board: held(0.14, 0.56), cap: [1, -0.2], bulb: [1], look: [-10, -16], move: M({ hop: 0.05, jab: 0.05 }) }) },
-  { key: "proud", label: "Proud", spec: P({ wL: [-0.62, 0.98, 0.62, 0, 0, 1.25, 0, 0], wR: [0.62, 0.98, 0.64, 0, 0, -1.25, 0, 0], board: held(0, 0.62), cap: [1, 0], eyes: "happy", beak: "smile", move: M({ tilt: 0.07 }) }) },
+  { key: "check", label: "Checking", spec: P({ wL: [-0.6, 1.0, 0.3, 0, 0, -0.95, 0, 0], wR: [0.62, 0.95, 0.62, 0, 0, -1.0, 0, 1], board: [-0.62, 0.67, 0.45, 0, 0.2, 0.42, 1], cap: [1, 0], glasses: [1], pen: PEN_AT(0.23, 0.64, 0.7, -0.62), look: [0, -16], move: M({ nod: 0.02, write: 0.06 }) }) },
+  // Raised wing with the feathers fanned: an open "aha", never a single raised digit.
+  { key: "idea", label: "Idea", spec: P({ wL: [-0.62, 1.08, 0.1, 0, 0, -1.94, 0.22, 0], wR: HOLD_R, board: held(0.14, 0.56), cap: [1, -0.2], bulb: [1], look: [-10, -16], move: M({ hop: 0.05, flapL: 0.06 }) }) },
+  { key: "proud", label: "Proud", spec: P({ wL: HOLD_L, wR: HOLD_R, board: held(0, 0.62), cap: [1, 0], eyes: "happy", beak: "smile", move: M({ tilt: 0.07 }) }) },
+  // Writing the plan: board tilted up to him, pen in the right wing scribbling.
+  { key: "write", label: "Writing", spec: P({ wL: HOLD_L, wR: [0.66, 1.0, 0.82, 0, 0, -0.85, 0, 0], board: [-0.06, 0.64, 0.74, -0.18, 0, 0.06, 1], cap: [1, 0], pen: PEN_AT(0.16, 0.6, 0.86, -0.5), look: [6, 26], move: M({ sway: 0.04, nod: 0.025, write: 0.07 }) }) },
   // more looks in the same style
   { key: "cheer", label: "Cheering", spec: P({ wL: UP_L, wR: UP_R, cap: [1, 0], eyes: "happy", beak: "laugh", move: M({ hop: 0.12, flapL: 0.25, flapR: 0.25 }) }) },
   { key: "hi", label: "Saying hi", spec: P({ wL: UP_L, cap: [1, 0], eyes: "happy", move: M({ flapL: 0.3 }) }) },
-  { key: "wink", label: "Winking", spec: P({ wR: [0.6, 1.0, 0.25, 0, 0, 2.5, 0, 1], cap: [1, 0.15], eyes: "wink", beak: "smile", move: M({ tilt: 0.06 }) }) },
+  { key: "wink", label: "Winking", spec: P({ wR: [0.6, 1.0, 0.25, 0, 0, 2.5, 0.2, 0], cap: [1, 0.15], eyes: "wink", beak: "smile", move: M({ tilt: 0.06 }) }) },
   { key: "surprised", label: "Surprised", spec: P({ wL: [-0.6, 1.05, 0.05, 0, 0, -0.6, 0.2, 0], wR: [0.6, 1.05, 0.05, 0, 0, 0.6, 0.2, 0], cap: [1, 0], eyes: "wide", beak: "laugh", move: M({ sway: 0.08, hop: 0.04 }) }) },
   { key: "reading", label: "Reading", spec: P({ wL: [-0.6, 0.95, 0.5, 0, 0, 0.88, 0, 0], wR: [0.6, 0.95, 0.5, 0, 0, -0.88, 0, 0], board: [0, 0.63, 0.68, -0.25, 0, 0, 1], cap: [1, 0], glasses: [1], look: [0, 24], move: M({ sway: 0.08, nod: 0.025 }) }) },
   { key: "unsure", label: "Unsure", spec: P({ body: [0, 0.06], wL: [-0.62, 1.0, 0.05, 0, 0, -1.75, 0.25, 0], wR: [0.62, 1.0, 0.05, 0, 0, 1.75, 0.25, 0], cap: [1, -0.15], look: [-10, -18], move: M({ sway: 0.06, shrug: 0.18 }) }) },
@@ -420,8 +429,6 @@ export function createAlan() {
   const capTop = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.07, 24), toon(C.eye));
   capTop.position.y = 0.2;
   pen.add(barrel, nib, capTop);
-  pen.position.set(0.23, 0.64, 0.7);
-  pen.rotation.z = -0.62;
   body.add(pen);
 
   // light bulb + "!" for "idea"
@@ -504,6 +511,9 @@ export function createAlan() {
     cap.position.x = -cur.cap[1] * 0.18;
     show(glasses, cur.glasses[0]);
     show(pen, cur.pen[0]);
+    // The pen scribbles across the page with the "write" motion.
+    pen.position.set(cur.pen[1] + write * 0.9 * Math.sin(t * 10), cur.pen[2] + write * 0.25 * Math.sin(t * 20), cur.pen[3]);
+    pen.rotation.z = cur.pen[4];
     show(bulb, cur.bulb[0]);
     show(spinner, cur.spinner[0]);
     show(tuft, cur.tuft[0]);

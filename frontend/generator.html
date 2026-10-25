@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-10-25b" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-25c" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -280,11 +280,14 @@
               </section>
 
               <section id="step-controls" class="mt-24" hidden>
-                <p class="text-sm mt-0" style="margin-bottom:12px;">
-                  Walk through the fields that need real thinking, one at a time. Ask Alan in the chat
-                  for help, and tap a suggestion to add it to the field. The rest are quick fields you can
-                  fill in directly, in any order, whenever you like.
-                </p>
+                <!-- Guided writing happens on its own screens beside Alan; here the
+                     document is for reviewing and editing. -->
+                <div class="guided-return">
+                  <p class="text-sm mt-0">You're writing this plan with Alan, one part at a time. Carry on with him, or edit the document directly below.</p>
+                  <button type="button" id="guided-return-btn" class="btn btn-primary"><span data-icon="edit"></span>Continue writing with Alan</button>
+                </div>
+                <!-- The old field-by-field controls, kept for the code that still reads them. -->
+                <div hidden>
                 <div class="step-nav-row">
                   <span class="text-sm" id="step-progress-label">Field 1 of 1</span>
                   <select class="step-nav-select" id="section-nav"></select>
@@ -292,6 +295,7 @@
                 <div class="generator-actions">
                   <button type="button" id="step-continue-btn" class="btn btn-primary">Submit &amp; continue</button>
                   <button type="button" id="step-clear-btn" class="btn btn-secondary">Clear &amp; ask again</button>
+                </div>
                 </div>
               </section>
 
@@ -456,10 +460,10 @@
   <script src="js/icons.js?v=2026-10-06c"></script>
   <script src="js/doc-toolbar.js?v=2026-10-06c"></script>
   <script src="js/setup-flow-steps.js?v=2026-10-25b"></script>
-  <script src="js/generator.js?v=2026-10-25a"></script>
+  <script src="js/generator.js?v=2026-10-25c"></script>
   <script type="importmap">
     { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
   </script>
-  <script type="module" src="js/setup-flow.js?v=2026-10-25b"></script>
+  <script type="module" src="js/setup-flow.js?v=2026-10-25c"></script>
 </body>
 </html>

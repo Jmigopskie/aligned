@@ -37,6 +37,9 @@ function emitGeneration(type, detail = {}) {
 // (document order via sort_order) and which one is currently unlocked.
 let stepFieldKeys = [];
 let stepIndex = 0;
+// The day box last typed in on the Guided screens, so Alan's suggestion for a
+// weekly field lands in that day; null when the part has one box.
+let guidedPart = null;
 
 // One slot per mode. The two modes have different purposes, so work in one is
 // not work in the other: Building Proficiency's draft and Guided's walkthrough
@@ -170,7 +173,7 @@ const mainTopicInput = document.getElementById("ctx-main-topic");
 // The flow's own state, saved with the setup so a refresh lands on the same step.
 // guides: the library documents picked in step 6, any number of either kind;
 // sources: the student's own private uploads.
-let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [], guides: [], term: "", week: "" };
+let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [], guides: [], term: "", week: "", guidedAt: "part" };
 // One run = one pass through the flow; its draft is keyed by run, not by
 // format, so picking a format never silently brings back an older draft.
 let currentRunId = new URLSearchParams(window.location.search).get("run");
@@ -441,7 +444,9 @@ function insertIntoActiveField(text) {
   let target = slots[0] || null;
   if (partCount(key) && slots.length) {
     const focused = slots.find((el) => el === document.activeElement || el.contains(document.activeElement));
-    target = focused || slots.find((el) => !valueForSlot(el).trim()) || slots[0];
+    // On the Guided screens the day being written is the one last typed in.
+    const onScreen = guidedPart !== null ? slots.find((el) => slotPart(el) === guidedPart) : null;
+    target = focused || onScreen || slots.find((el) => !valueForSlot(el).trim()) || slots[0];
   }
 
   const current = target ? valueForSlot(target).trim() : String(fieldValues[key] || "").trim();
@@ -465,6 +470,7 @@ function insertIntoActiveField(text) {
   }
   markDirty();
   renderStepFieldNav();
+  generationEvents.dispatchEvent(new CustomEvent("field", { detail: { key } }));
   return field.label;
 }
 
@@ -479,7 +485,7 @@ function pickOwlChoice(choice, btn) {
   btn.disabled = true;
   const action = btn.querySelector(".owl-choice-action");
   if (action) action.textContent = "Added";
-  addChatNote(`Added to "${label}". You can still edit it in the document.`);
+  addChatNote(`Added to "${label}". You can still change it.`);
 }
 
 function updateChatRoom() {
@@ -501,7 +507,10 @@ let chatUnread = false;
 
 function setChatUnread(unread) {
   chatUnread = !!unread;
-  OwlGuide.setChatState({ open: !owlChat.classList.contains("is-collapsed"), unread: chatUnread });
+  const state = { open: !owlChat.classList.contains("is-collapsed"), unread: chatUnread };
+  // On the Guided screens the stage swaps Alan and the chat itself.
+  if (owlChat.classList.contains("is-staged")) generationEvents.dispatchEvent(new CustomEvent("chat", { detail: state }));
+  else OwlGuide.setChatState(state);
 }
 
 function setOwlChatCollapsed(collapsed) {
@@ -512,8 +521,9 @@ function setOwlChatCollapsed(collapsed) {
   updateChatRoom();
   if (!collapsed) {
     scrollChatToEnd();
+    if (owlChat.classList.contains("is-staged")) owlChatInput.focus({ preventScroll: true });
     // Stacked under the plan on a narrow screen, it may open out of view.
-    owlChat.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    else owlChat.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 }
 
@@ -714,6 +724,8 @@ owlChatToggle.addEventListener("click", (e) => {
 });
 
 function setOwlState(state, message) {
+  // The flow's big Alan does the talking while its screens are up.
+  if (!flowEl.hidden) return;
   OwlGuide.show({ pose: OWL_POSES[state] || "idle", text: message });
 }
 
@@ -782,11 +794,18 @@ function isEditorUnlocked() {
 // because the tabs live inside the gated content and switching them does not
 // change that flag. One predicate now answers the question, and everything
 // that can change the answer calls syncOwlVisibility().
+// Guided writing now happens on its own screens beside the big 3D Alan, with
+// the chat taking his place on the stage (setup-flow.js / guided-flow.js), so
+// the document never gets the docked corner chat any more.
 function shouldShowOwlChat() {
-  return mode === "step" && isEditorUnlocked() && !tabPanelGenerate.hidden;
+  return false;
 }
 
 function syncOwlVisibility() {
+  if (owlChat.classList.contains("is-staged")) {
+    OwlGuide.undock();
+    return;
+  }
   showOwlChat(shouldShowOwlChat());
 }
 
@@ -2624,11 +2643,10 @@ function restoreDraft() {
       if (stepBtn) stepBtn.click();
       // Entering guided mode jumps to the first unfinished field, which is
       // right when you switch modes but wrong when resuming: it would drop
-      // the teacher somewhere other than where they actually stopped. Put
-      // the saved position back and re-lock around it.
+      // the teacher somewhere other than where they actually stopped.
       if (typeof draft.stepIndex === "number" && draft.stepIndex < stepFieldKeys.length) {
         stepIndex = draft.stepIndex;
-        applyStepLocks();
+        renderStepFieldNav();
       }
     }
   } finally {
@@ -2677,20 +2695,11 @@ function syncModeUI() {
     stepIndex = incompleteGuided.length === 0
       ? stepFieldKeys.length - 1
       : stepFieldKeys.indexOf(incompleteGuided[0]);
-    applyStepLocks();
-    let guideMessage;
-    if (incompleteGuided.length === 0) {
-      const outsideIncomplete = incompleteEasyFieldKeys();
-      if (outsideIncomplete.length === 0) {
-        guideMessage = "Every field already has an answer. Review them below, or click a pill to revise one.";
-      } else {
-        const n = outsideIncomplete.length;
-        guideMessage = `The guided fields are done. ${n} quick field${n === 1 ? "" : "s"} outside the walkthrough ${n === 1 ? "is" : "are"} still blank. Fill ${n === 1 ? "it" : "them"} in directly below.`;
-      }
-    } else {
-      guideMessage = `Let's start with "${fieldByKey(stepFieldKeys[stepIndex]).label}." Type your answer, then Submit & continue.`;
-    }
-    setOwlState("guide", guideMessage + otherNote);
+    // Guided writing happens on its own screens with Alan; in the document
+    // every field stays open for reviewing and editing.
+    clearStepLocks();
+    renderStepFieldNav();
+    if (otherHasWork) setOwlState("guide", `Switched to Guided mode.${otherNote}`);
   } else {
     clearStepLocks();
     maybeRenderResults();
@@ -2727,6 +2736,8 @@ modeSwitchBtns.forEach((btn) => {
     }
     saveDraft();
     syncModeUI();
+    // Picking Guided from the document goes back to writing it with Alan.
+    if (mode === "step" && !restoringDraft && !content.hidden) window.dispatchEvent(new Event("aligned:guided"));
   });
 });
 
@@ -3110,6 +3121,10 @@ function startGenerateCooldown() {
     generateFullBtn.innerHTML = label;
   }, 1000);
 }
+
+document.getElementById("guided-return-btn").addEventListener("click", () => {
+  window.dispatchEvent(new Event("aligned:guided"));
+});
 
 stepContinueBtn.addEventListener("click", () => {
   syncActiveStepValue();
@@ -3519,7 +3534,7 @@ const ANSWER_INPUTS = {
   section: sectionInput, previousTopic: prevTopicInput, topic: topicInput, nextTopic: nextTopicInput,
   mainTopic: mainTopicInput,
 };
-const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "term", "week"];
+const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "term", "week", "guidedAt"];
 
 function getAnswers() {
   const answers = {};
@@ -3582,9 +3597,61 @@ function startFull() {
   runGeneration(selectedGenerateKeys());
 }
 
+// Guided mode is written on the flow's own screens (guided-flow.js), one part
+// at a time beside Alan; the document only opens at the end, for review.
 function startGuided() {
   useMode("step");
-  showDocument();
+  flowFlags.stage = "guided";
+  saveDraft();
+}
+
+// ---- for the Guided screens ----
+function partInfo(key) {
+  const f = fieldByKey(key);
+  return { key, label: f.label, type: f.field_type, group: f.section_group || "", days: partCount(key) ? f.parts : null };
+}
+
+// Writes one part's answer (or one day of a weekly part) and shows it in the
+// hidden document too, so saving and exporting see exactly what was typed.
+function setGuidedValue(key, text, part = null) {
+  if (part === null) {
+    fieldValues[key] = text;
+    delete fieldRichValues[key];
+  } else {
+    const parts = weeklyArray(fieldValues[key], partCount(key));
+    parts[part] = text;
+    fieldValues[key] = parts;
+    if (Array.isArray(fieldRichValues[key])) fieldRichValues[key][part] = "";
+  }
+  const canvas = liveDocWrap.querySelector(".lp-doc");
+  if (canvas) {
+    slotsFor(key, canvas).forEach((el) => {
+      if (part !== null && slotPart(el) !== part) return;
+      el.textContent = valueForSlot(el);
+      el.classList.toggle("lp-filled", !!el.textContent.trim());
+    });
+  } else {
+    slotsFor(key, resultsEl).forEach((el) => { el.value = valueForSlot(el); });
+  }
+  markDirty();
+}
+
+let chatHome = null;
+function mountChat(host) {
+  if (!chatHome) chatHome = { parent: owlChat.parentNode, next: owlChat.nextSibling };
+  owlChat.classList.add("is-staged");
+  host.append(owlChat);
+  owlChat.hidden = false;
+  OwlGuide.undock();
+  setOwlChatCollapsed(true);
+}
+
+function unmountChat() {
+  if (!chatHome || !owlChat.classList.contains("is-staged")) return;
+  setOwlChatCollapsed(true);
+  owlChat.classList.remove("is-staged");
+  owlChat.hidden = true;
+  chatHome.parent.insertBefore(owlChat, chatHome.next);
 }
 
 function showDocument() {
@@ -3657,6 +3724,25 @@ window.Generator = {
   mountReview,
   startFull,
   startGuided,
+  // The Guided screens: the parts Alan walks through, the quick blanks left
+  // over, and reading/writing their answers.
+  guidedParts: () => stepFieldKeys.map(partInfo),
+  quickParts: () => incompleteEasyFieldKeys().map(partInfo),
+  fieldValue: (key) => fieldValues[key],
+  isFieldComplete,
+  setGuidedValue,
+  setGuidedDay: (i) => { guidedPart = i; },
+  guidedIndex: () => stepIndex,
+  setGuidedIndex: (i) => {
+    stepIndex = Math.max(0, Math.min(i, stepFieldKeys.length - 1));
+    guidedPart = null;
+    renderStepFieldNav();
+    introduceFieldInChat();
+    saveDraft();
+  },
+  mountChat,
+  unmountChat,
+  openChat: () => setOwlChatCollapsed(false),
   showDocument,
   hideDocument,
   unfinishedRun,

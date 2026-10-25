@@ -1,6 +1,8 @@
 // Create Lesson Plan: Alan asks one question at a time on the left while the
 // big 3D Alan reacts on the right. The answers go to generator.js through
 // window.Generator; the step order and rules come from setup-flow-steps.js.
+// Guided mode continues on the same shell (guided-flow.js).
+import { createGuided } from "./guided-flow.js?v=2026-10-25c";
 
 const flow = document.getElementById("flow");
 const G = window.Generator;
@@ -9,7 +11,7 @@ const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
 // The 2D picture that stands in for each pose when three.js can't load.
 const PNG_FOR_POSE = {
   hi: "wave", wave: "wave", present: "idle", idle: "idle", point: "point", check: "check",
-  think: "think", reading: "check", idea: "idea", loading: "loading", celebrate: "celebrate",
+  think: "think", reading: "check", idea: "idea", loading: "loading", celebrate: "celebrate", write: "check",
 };
 
 const COPY = {
@@ -655,9 +657,10 @@ function recall() {
 // Next/Back handlers.
 let screenNext = null;
 let screenBack = null;
+let screenCanNext = null;
 let detailsMode = false;
 
-function screen({ count, at, q, help, body, next = "Next", onNext = null, onBack = null, showActions = true, showBack = true, sayText, pose }) {
+function screen({ count, at, q, help, body, next = "Next", onNext = null, onBack = null, canNext = null, showActions = true, showBack = true, sayText, pose }) {
   errorEl.hidden = true;
   countEl.textContent = count;
   progress.setAttribute("aria-valuemax", String(steps.length));
@@ -665,6 +668,7 @@ function screen({ count, at, q, help, body, next = "Next", onNext = null, onBack
   bar.style.transform = `scaleX(${at})`;
   screenNext = onNext;
   screenBack = onBack;
+  screenCanNext = canNext;
   nextLabel.textContent = next;
   actions.hidden = !showActions;
   backBtn.hidden = !showBack;
@@ -679,7 +683,7 @@ function screen({ count, at, q, help, body, next = "Next", onNext = null, onBack
   }
   say(sayText, pose);
   refresh();
-  const first = answer.querySelector("input:not(:disabled):not([type=file])");
+  const first = answer.querySelector("input:not(:disabled):not([type=file]), textarea");
   (first || heading).focus({ preventScroll: true });
 }
 
@@ -705,7 +709,7 @@ function render() {
 
 refresh = () => {
   if (screenNext) {
-    nextBtn.disabled = false;
+    nextBtn.disabled = screenCanNext ? !screenCanNext() : false;
     return;
   }
   const id = steps[index];
@@ -713,7 +717,7 @@ refresh = () => {
 };
 
 async function go(delta) {
-  if (delta > 0 && screenNext) return screenNext();
+  if (delta > 0 && screenNext) return nextBtn.disabled ? undefined : screenNext();
   if (delta < 0 && screenBack) return screenBack();
   const id = steps[index];
   if (delta > 0 && id === "format") {
@@ -754,10 +758,30 @@ nextBtn.addEventListener("click", (e) => {
 });
 backBtn.addEventListener("click", () => go(-1));
 
+// ---- Guided mode: one part at a time, on this same shell ----
+const guided = createGuided({
+  G, el, icon, twoLine, stageEl, alanHost, say, screen,
+  refresh: () => refresh(),
+  backToMode: () => {
+    index = steps.indexOf("mode");
+    render();
+  },
+});
+
+// "Continue writing with Alan" (or picking Guided) from the document.
+window.addEventListener("aligned:guided", () => {
+  ensureShell();
+  detailsMode = false;
+  G.hideDocument();
+  G.setAnswers({ stage: "guided" });
+  guided.resume();
+});
+
 // ---- after the last question ----
 function finish() {
   if (G.getAnswers().mode === "step") {
     G.startGuided();
+    guided.start();
     return;
   }
   // Prefill now so the review already shows the answered blanks as kept.
@@ -862,6 +886,7 @@ const DETAIL_ROWS = [
 
 function showDetails() {
   ensureShell();
+  guided.leave();
   detailsMode = true;
   G.hideDocument();
   const a = G.getAnswers();
@@ -906,7 +931,7 @@ async function mountAlan(host) {
   const usePng = { setPose: (pose) => (img.src = `img/owl/alan-${PNG_FOR_POSE[pose] || "idle"}.png`) };
   try {
     const THREE = await import("three");
-    const { createAlan } = await import("./alan3d.js?v=2026-10-22a");
+    const { createAlan } = await import("./alan3d.js?v=2026-10-25a");
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     const scene = new THREE.Scene();
@@ -985,6 +1010,13 @@ async function start() {
   const ready = await G.ready;
   user = ready.user;
   steps = flowSteps(user.role);
+  // A run that was part-way through Guided mode picks up where it stopped.
+  if (ready.kind === "flow" && ready.stage === "guided" && G.getAnswers().formatId) {
+    ensureShell();
+    flow.hidden = false;
+    guided.resume();
+    return;
+  }
   // A saved plan (or a run already in its document) only needs Lesson details.
   if (ready.kind !== "flow" || ready.stage === "doc") return;
 
