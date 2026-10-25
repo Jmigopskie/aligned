@@ -128,6 +128,9 @@ const Api = {
       method: "PATCH",
       body: JSON.stringify({ roles }),
     }),
+  // The teacher's whole field list: [{field_key?, label, anchor_index, guided, locked}].
+  saveFieldSetup: (formatId, fields) =>
+    apiFetch(`/api/formats/${formatId}/field-setup`, { method: "PUT", body: JSON.stringify({ fields }) }),
 
   formatSourceUrl: (formatId) => `${API_URL}/api/formats/${formatId}/source`,
 

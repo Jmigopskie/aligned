@@ -75,6 +75,7 @@ def _build_format_fields(format_id, fields_payload):
             anchor_index=anchor_index,
             role=role,
             parts=parts,
+            locked=bool(f.get("locked")),
         ))
     return rows
 
@@ -514,10 +515,25 @@ def edit_format_content(format_id):
         return jsonify({"status": "error", "message": "This format has no reference file to edit."}), 400
 
     try:
-        _deletions, applied = docx_service.apply_content_edits(template_path, edits)
+        deletions, applied = docx_service.apply_content_edits(template_path, edits)
     except Exception:
         current_app.logger.exception("Failed to apply content edits for format %s", format_id)
         return jsonify({"status": "error", "message": "Couldn't save changes to the document."}), 500
+
+    # Once the teacher has reviewed the fields they are theirs: shift each to
+    # where its line now is, and drop one whose line was deleted, rather than
+    # detecting everything again and losing their names, picks and locks.
+    if fmt.fields_reviewed:
+        gone = set(deletions or [])
+        for field in list(fmt.fields):
+            moved = _shift_anchor(field.anchor_index, gone)
+            if moved is None:
+                db.session.delete(field)
+            else:
+                field.anchor_index = moved
+        db.session.commit()
+        db.session.refresh(fmt)
+        return jsonify({"status": "ok", "applied": applied, "format": fmt.to_dict(include_fields=True)})
 
     detected_fields, ai_error = _suggest_fields(template_path)
     if not detected_fields:
@@ -532,12 +548,14 @@ def edit_format_content(format_id):
     # relies on, so an override survives as long as the field itself does; one
     # that no longer exists after re-detection has nothing to restore onto.
     kept_roles = {f.field_key: f.role for f in fmt.fields if f.role}
+    kept_locks = {f.field_key for f in fmt.fields if f.locked}
 
     for existing_field in list(fmt.fields):
         db.session.delete(existing_field)
     db.session.flush()
     for row in _build_format_fields(fmt.id, detected_fields):
         row.role = kept_roles.get(row.field_key, row.role)
+        row.locked = row.field_key in kept_locks
         db.session.add(row)
 
     db.session.commit()
@@ -586,6 +604,88 @@ def set_field_roles(format_id):
 
     db.session.commit()
     return jsonify({"status": "ok", "fields": [f.to_dict() for f in fmt.fields]})
+
+@format_bp.put("/formats/<int:format_id>/field-setup")
+@staff_required
+def set_field_setup(format_id):
+    """The teacher's own field list for a document-based format: the fields
+    AlignED detected, reviewed (renamed, removed, set Guided or Locked), plus
+    any the teacher placed by hand at a line of the document.
+
+    Sent whole: [{field_key?, label, anchor_index, guided, locked}, ...]. A
+    known field_key keeps that field's type, day names and hint; a row with no
+    key is a new field placed by hand. Guided walks exactly the fields marked
+    guided (and the locked ones); nothing is left to keyword guesses.
+    """
+    user = current_user()
+    fmt = LessonPlanFormat.query.get_or_404(format_id)
+    blocked = _reject_if_builtin(fmt)
+    if blocked:
+        return blocked
+    if fmt.owner_id != user.id:
+        return jsonify({"status": "error", "message": "Only the teacher who created this format can change its fields."}), 403
+    template_path = docx_service.resolve_template_path(fmt)
+    if not template_path:
+        return jsonify({"status": "error", "message": "This format has no document to place fields in."}), 400
+
+    wanted = (request.get_json(silent=True) or {}).get("fields")
+    if not isinstance(wanted, list) or not wanted:
+        return jsonify({"status": "error", "message": "A format needs at least one field."}), 400
+    count, weekly = docx_service.anchor_info(template_path)
+    existing = {f.field_key: f for f in fmt.fields}
+    rows, used_anchors = [], set()
+    for item in wanted:
+        if not isinstance(item, dict):
+            continue
+        label = " ".join(str(item.get("label") or "").split())[:200]
+        try:
+            anchor = int(item.get("anchor_index"))
+        except (TypeError, ValueError):
+            anchor = -1
+        if not label:
+            return jsonify({"status": "error", "message": "Every field needs a name."}), 400
+        if not 0 <= anchor < count:
+            return jsonify({"status": "error", "message": f'"{label}" points at a spot that isn\'t in the document.'}), 400
+        if anchor in used_anchors:
+            return jsonify({"status": "error", "message": f'Two fields are on the same line ("{label}"). Give each field its own line.'}), 400
+        used_anchors.add(anchor)
+        rows.append((anchor, label, existing.get(str(item.get("field_key") or "")), item))
+
+    rows.sort(key=lambda r: r[0])
+    keep = {old.field_key for _, _, old, _ in rows if old}
+    for f in list(fmt.fields):
+        if f.field_key not in keep:
+            db.session.delete(f)
+    db.session.flush()
+    used_keys = set(keep)
+    for order, (anchor, label, old, item) in enumerate(rows):
+        field = old
+        if field is None:
+            key = base = _slugify(label)
+            n = 2
+            while key in used_keys:
+                key, n = f"{base}_{n}", n + 1
+            used_keys.add(key)
+            days = weekly.get(anchor)
+            field = FormatField(format_id=fmt.id, field_key=key, manual=True,
+                                field_type="weekly" if days else "textarea",
+                                parts=json.dumps(days) if days else None)
+            db.session.add(field)
+        field.label = label
+        field.anchor_index = anchor
+        field.sort_order = order
+        field.role = "heavy" if item.get("guided") else "easy"
+        field.locked = bool(item.get("locked"))
+    fmt.fields_reviewed = True
+    db.session.commit()
+    db.session.refresh(fmt)
+    return jsonify({"status": "ok", "format": fmt.to_dict(include_fields=True)})
+
+def _shift_anchor(idx, deletions):
+    """A position after some lines were deleted: None when its own line went."""
+    if idx is None or idx in deletions:
+        return None
+    return idx - sum(1 for d in deletions if d < idx)
 
 def _resolve_temp_renderable_path(token):
     """The same file scan_format() rendered for this token: the pre-converted

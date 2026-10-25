@@ -1142,6 +1142,11 @@ def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
                        "Every \"use\" choice is the answer for a single day, not the whole week.")
     turns = "\n".join(f"{'Teacher' if t.get('role') == 'teacher' else 'Owl'}: {t.get('text', '')}" for t in history)
     typed = f'What the teacher has typed in it so far: "{current}"' if str(current).strip() else "The field is still empty."
+    locked = bool(getattr(field, "locked", False))
+    if locked:
+        weekly_note += ("\nThe supervising teacher locked this field: the student must write it in their own words. "
+                        "Coach them instead: say what it should contain, ask guiding questions, point to the guide. "
+                        "Never write the field's content for them; offer only \"ask\" choices.")
     task = f"""
 Fields already written (do not repeat them):
 {json.dumps(written)}
@@ -1153,7 +1158,11 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
 {f"Conversation so far:{chr(10)}{turns}{chr(10)}" if turns else ""}Teacher: {message}
 """
     data = _call(_OWL_SYSTEM_INSTRUCTION, [lesson, task], "Owl chat")
-    return _ground_choices(_clean_owl_reply(data), field, course_guide_text, course_guide_citation)
+    answer = _clean_owl_reply(data)
+    if locked:
+        # Whatever the model sends, nothing ready-made goes into a locked field.
+        return {**answer, "choices": [c for c in answer["choices"] if c["type"] == "ask"]}
+    return _ground_choices(answer, field, course_guide_text, course_guide_citation)
 
 
 def _ground_choices(answer, field, guide_text, citation):

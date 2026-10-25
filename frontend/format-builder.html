@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-10-06c" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-26a" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -125,8 +125,8 @@
         <div id="doc-field-editor" hidden>
           <p class="text-sm mt-0">
             Click into the document, then use the toolbar to format text, restyle headings and
-            lists, or delete a leftover line entirely. Fields are figured out automatically when
-            you save, so there's nothing to define here.
+            lists, or delete a leftover line entirely. AlignED finds the fields when you save; you
+            then check them, and add any it missed, under Fields.
           </p>
 
           <div id="doc-stage" class="doc-stage">
@@ -134,18 +134,30 @@
             <div class="lp-doc-wrap doc-builder-canvas" id="doc-builder-canvas"></div>
           </div>
 
+          <!-- The teacher's fields: what AlignED detected, reviewed, plus any
+               placed by hand. Guided walks students through exactly the
+               Guided and Locked ones; Alan never writes a Locked one. -->
           <section id="field-roles-panel" class="field-roles-panel" hidden>
-            <h2 class="field-roles-title">Which mode writes each field</h2>
-            <p class="text-sm mt-0">
-              Guided walks you through the fields that need real thinking. The rest are filled in
-              automatically when you generate a plan. Adjust any field whose wording we read wrongly.
+            <div class="field-setup-head">
+              <div>
+                <h2 class="field-roles-title">Fields</h2>
+                <p class="text-sm mt-0">
+                  Check each field AlignED found: its name, where students write it, whether Guided walks
+                  students through it, and whether it's locked so Alan never writes it. Remove any that are
+                  wrong, or add one it missed.
+                </p>
+              </div>
+              <button type="button" id="field-add-btn" class="btn btn-secondary btn-sm"><span data-icon="plus"></span>Add a field</button>
+            </div>
+            <p id="field-place-hint" class="field-place-hint" role="status" hidden>
+              Click the line in the document where the new field's input goes.
+              <button type="button" id="field-place-cancel" class="btn btn-ghost btn-sm">Cancel</button>
             </p>
-            <div id="field-roles-list"></div>
-            <div class="flex gap-8 mt-16" style="align-items:center;">
+            <div class="field-setup-cols" aria-hidden="true"><span>Field and where it's written</span><span>Guided</span><span>Locked</span><span></span></div>
+            <div id="field-roles-list" class="field-setup-list"></div>
+            <div class="field-setup-foot">
               <span class="text-sm" id="field-roles-status"></span>
-              <button type="button" id="field-roles-save-btn" class="btn btn-secondary btn-sm" disabled>
-                Save field roles
-              </button>
+              <button type="button" id="field-roles-save-btn" class="btn btn-primary btn-sm" disabled>Save fields</button>
             </div>
           </section>
         </div>
@@ -203,12 +215,16 @@
         <input type="checkbox" class="field-required" checked />
         <label>Required</label>
       </div>
+      <div class="checkbox-row">
+        <input type="checkbox" class="field-locked" />
+        <label>Locked (Alan never writes it; students do)</label>
+      </div>
     </div>
   </template>
 
-  <script src="js/api.js?v=2026-10-06c"></script>
+  <script src="js/api.js?v=2026-10-26a"></script>
   <script src="js/icons.js?v=2026-10-06c"></script>
   <script src="js/doc-toolbar.js?v=2026-10-06c"></script>
-  <script src="js/format-builder.js?v=2026-10-06c"></script>
+  <script src="js/format-builder.js?v=2026-10-26a"></script>
 </body>
 </html>

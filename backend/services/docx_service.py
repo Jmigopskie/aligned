@@ -457,6 +457,21 @@ def candidate_label_lines(source_path):
 
     return lines
 
+def anchor_info(source_path):
+    """(how many positions the document has, {position: day names}) for
+    checking a field the teacher places by hand: the position must exist, and
+    a label with a row of day cells beside it is a weekly field."""
+    doc = Document(source_path)
+    items = _iter_items(doc)
+    header = _day_header(doc)
+    weekly = {}
+    for idx, item in enumerate(items):
+        if item["cell"] is not None:
+            cells = _weekly_cells(item)
+            if len(cells) >= 2:
+                weekly[idx] = weekly_part_labels(doc, cells, header)
+    return len(items), weekly
+
 def _next_cell_has_text(item):
     """Whether the cell right after this one in its row already holds text."""
     row_cells, col_idx, cell = item["row_cells"], item["col_idx"], item["cell"]

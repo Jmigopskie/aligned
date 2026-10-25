@@ -2,7 +2,7 @@
 // big 3D Alan reacts on the right. The answers go to generator.js through
 // window.Generator; the step order and rules come from setup-flow-steps.js.
 // Guided mode continues on the same shell (guided-flow.js).
-import { createGuided } from "./guided-flow.js?v=2026-10-25c";
+import { createGuided } from "./guided-flow.js?v=2026-10-26a";
 
 const flow = document.getElementById("flow");
 const G = window.Generator;

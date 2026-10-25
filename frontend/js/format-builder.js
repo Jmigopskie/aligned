@@ -50,16 +50,86 @@ const fieldRolesList = document.getElementById("field-roles-list");
 const fieldRolesStatus = document.getElementById("field-roles-status");
 const fieldRolesSaveBtn = document.getElementById("field-roles-save-btn");
 
-// Pending overrides, keyed by field_key: only what the teacher actually changed
-// is sent, so an untouched field keeps whatever it has.
-let pendingRoles = {};
+// ---- Fields: review what AlignED detected, and place missing ones by hand ----
+// setupFields is the whole list the teacher sees, in document order; saving
+// sends it whole. A field placed by hand has no field_key until it is saved.
+const fieldAddBtn = document.getElementById("field-add-btn");
+const fieldPlaceHint = document.getElementById("field-place-hint");
+let setupFields = [];
+let setupDirty = false;
+let placing = false;
 
-// Same teacher-facing wording as the two manual options below, so the
-// "Decide automatically" row doesn't print the internal heavy/easy tokens.
-function roleLabel(role) {
-  if (role === "heavy") return "Guided walks me through it";
-  if (role === "self") return "Students fill it in themselves";
-  return "Filled in automatically";
+function anchorEl(idx) {
+  return docBuilderCanvas.querySelector(`[data-anchor-index="${idx}"]`);
+}
+
+// The line a field's input sits beside, as the teacher reads it on the page.
+function anchorText(idx) {
+  const el = anchorEl(idx);
+  const text = el ? normalizeAnchorText(lineTextWithoutImages(el)) : "";
+  return text.length > 70 ? `${text.slice(0, 67)}…` : text;
+}
+
+function markSetupDirty() {
+  setupDirty = true;
+  fieldRolesSaveBtn.disabled = false;
+  fieldRolesStatus.textContent = "Unsaved changes";
+}
+
+// Scroll to a field's line and flash it, with its input if the document has one.
+function showFieldInDoc(f) {
+  const line = anchorEl(f.anchor_index);
+  const slots = f.field_key ? [...docBuilderCanvas.querySelectorAll(`[data-field-key="${CSS.escape(f.field_key)}"]`)] : [];
+  if (!line) return;
+  line.scrollIntoView({ behavior: "smooth", block: "center" });
+  [line, ...slots].forEach((el) => {
+    el.classList.remove("field-flash");
+    void el.offsetWidth;
+    el.classList.add("field-flash");
+  });
+}
+
+function renderFieldSetup() {
+  fieldRolesPanel.hidden = false;
+  fieldRolesSaveBtn.disabled = !setupDirty;
+  if (!setupDirty) fieldRolesStatus.textContent = `${setupFields.length} field${setupFields.length === 1 ? "" : "s"}`;
+  fieldRolesList.replaceChildren(...setupFields.map((f, i) => {
+    const row = document.createElement("div");
+    row.className = `field-setup-row${f.locked ? " is-locked" : ""}`;
+    const where = anchorText(f.anchor_index);
+    row.innerHTML = `
+      <div class="field-setup-main">
+        <input type="text" class="field-setup-name" maxlength="200" aria-label="Field name" />
+        <button type="button" class="field-setup-where"><span data-icon="eye"></span><span class="field-setup-where-text"></span></button>
+      </div>
+      <label class="field-setup-check"><input type="checkbox" data-flag="guided" /><span>Guided</span></label>
+      <label class="field-setup-check"><input type="checkbox" data-flag="locked" /><span>Locked</span></label>
+      <button type="button" class="field-setup-remove" aria-label="Remove this field"><span data-icon="x"></span></button>`;
+    row.querySelectorAll("[data-icon]").forEach((el) => { el.innerHTML = Icons[el.dataset.icon] || ""; });
+    const name = row.querySelector(".field-setup-name");
+    name.value = f.label;
+    name.addEventListener("input", () => {
+      f.label = name.value;
+      markSetupDirty();
+    });
+    row.querySelector(".field-setup-where-text").textContent =
+      `${f.manual && !f.field_key ? "New · " : ""}Written beside “${where || "this line"}” · Show`;
+    row.querySelector(".field-setup-where").addEventListener("click", () => showFieldInDoc(f));
+    row.querySelectorAll("[data-flag]").forEach((box) => {
+      box.checked = !!f[box.dataset.flag];
+      box.addEventListener("change", () => {
+        f[box.dataset.flag] = box.checked;
+        row.classList.toggle("is-locked", !!f.locked);
+        markSetupDirty();
+      });
+    });
+    row.querySelector(".field-setup-remove").addEventListener("click", () => {
+      setupFields.splice(i, 1);
+      markSetupDirty();
+      renderFieldSetup();
+    });
+    return row;
+  }));
 }
 
 function renderFieldRoles(fields) {
@@ -67,48 +137,92 @@ function renderFieldRoles(fields) {
     fieldRolesPanel.hidden = true;
     return;
   }
-  pendingRoles = {};
-  fieldRolesPanel.hidden = false;
-  fieldRolesSaveBtn.disabled = true;
-  fieldRolesStatus.textContent = "";
-
-  fieldRolesList.innerHTML = fields
-    .map(
-      (f) => `
-      <label class="field-role-row">
-        <span class="field-role-label">${escapeHtml(f.label)}</span>
-        <select class="field-role-select" data-field-key="${escapeHtml(f.field_key)}">
-          <option value=""${f.role_override ? "" : " selected"}>Decide automatically (${escapeHtml(roleLabel(f.role))})</option>
-          <option value="heavy"${f.role_override === "heavy" ? " selected" : ""}>Guided walks me through it</option>
-          <option value="easy"${f.role_override === "easy" ? " selected" : ""}>Filled in automatically</option>
-        </select>
-      </label>`
-    )
-    .join("");
-
-  fieldRolesList.querySelectorAll(".field-role-select").forEach((sel) => {
-    sel.addEventListener("change", () => {
-      pendingRoles[sel.dataset.fieldKey] = sel.value || null;
-      fieldRolesSaveBtn.disabled = false;
-      const count = Object.keys(pendingRoles).length;
-      fieldRolesStatus.textContent = `${count} unsaved ${count === 1 ? "change" : "changes"}`;
-    });
-  });
+  setupFields = fields
+    .filter((f) => f.anchor_index !== null && f.anchor_index !== undefined)
+    .map((f) => ({ field_key: f.field_key, label: f.label, anchor_index: f.anchor_index, guided: f.role === "heavy", locked: !!f.locked, manual: !!f.manual }))
+    .sort((a, b) => a.anchor_index - b.anchor_index);
+  setupDirty = false;
+  renderFieldSetup();
 }
 
-fieldRolesSaveBtn.addEventListener("click", async () => {
-  if (!editingFormatId || !Object.keys(pendingRoles).length) return;
+// ---- placing a field by hand: the next click on a line picks its spot ----
+function setPlacing(on) {
+  placing = on;
+  docBuilderCanvas.classList.toggle("is-placing", on);
+  fieldPlaceHint.hidden = !on;
+  fieldAddBtn.disabled = on;
+  if (on) docBuilderCanvas.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+fieldAddBtn.addEventListener("click", () => setPlacing(true));
+document.getElementById("field-place-cancel").addEventListener("click", () => setPlacing(false));
+document.addEventListener("keydown", (e) => {
+  if (placing && e.key === "Escape") setPlacing(false);
+});
+
+// Capture phase, so the pick never also starts editing the line.
+docBuilderCanvas.addEventListener("click", (e) => {
+  if (!placing) return;
+  const line = e.target.closest("[data-anchor-index]");
+  if (!line) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const idx = parseInt(line.dataset.anchorIndex, 10);
+  if (setupFields.some((f) => f.anchor_index === idx)) {
+    showToast("That line already has a field. Pick another line.", true);
+    return;
+  }
+  const label = anchorText(idx).replace(/[:\s]+$/, "").slice(0, 60) || "New field";
+  setupFields.push({ field_key: null, label, anchor_index: idx, guided: true, locked: false, manual: true });
+  setupFields.sort((a, b) => a.anchor_index - b.anchor_index);
+  setPlacing(false);
+  markSetupDirty();
+  renderFieldSetup();
+  const added = setupFields.findIndex((f) => f.anchor_index === idx);
+  const input = fieldRolesList.querySelectorAll(".field-setup-name")[added];
+  if (input) {
+    input.scrollIntoView({ behavior: "smooth", block: "center" });
+    input.focus();
+    input.select();
+  }
+}, true);
+docBuilderCanvas.addEventListener("mouseover", (e) => {
+  if (!placing) return;
+  docBuilderCanvas.querySelectorAll(".field-place-target").forEach((el) => el.classList.remove("field-place-target"));
+  const line = e.target.closest("[data-anchor-index]");
+  if (line) line.classList.add("field-place-target");
+});
+
+// Returns false when there was something to save and it didn't happen.
+async function saveFieldSetup() {
+  if (!editingFormatId || !setupDirty) return true;
+  if (!setupFields.length) {
+    showToast("A format needs at least one field.", true);
+    return false;
+  }
+  if (setupFields.some((f) => !f.label.trim())) {
+    showToast("Every field needs a name.", true);
+    return false;
+  }
   setButtonLoading(fieldRolesSaveBtn, true, "Saving");
   try {
-    const data = await Api.setFieldRoles(editingFormatId, pendingRoles);
-    showToast("Field roles saved.");
-    renderFieldRoles(data.fields);
+    const data = await Api.saveFieldSetup(editingFormatId, setupFields.map(({ field_key, label, anchor_index, guided, locked }) =>
+      ({ field_key, label: label.trim(), anchor_index, guided, locked })));
+    // Redraw the document so each field's input shows where it now goes.
+    const refreshed = await Api.getFormatTemplateHtml(editingFormatId);
+    renderDocCanvas(refreshed.html);
+    renderFieldRoles(data.format.fields);
+    showToast("Fields saved.");
+    return true;
   } catch (err) {
     showToast(err.message, true);
+    return false;
   } finally {
     setButtonLoading(fieldRolesSaveBtn, false);
   }
-});
+}
+
+fieldRolesSaveBtn.addEventListener("click", saveFieldSetup);
 
 document.querySelectorAll("[data-icon]").forEach((el) => {
   const icon = Icons[el.dataset.icon] || "";
@@ -526,6 +640,11 @@ if (docToolbar) {
 async function flushContentEdits() {
   const edits = buildContentEdits();
   if (!edits.length) return true;
+  // Unsaved field changes point at lines as they are now; an edit could move them.
+  if (editingFormatId && setupDirty) {
+    showToast("Save your field changes first, then save the document.", true);
+    return false;
+  }
 
   const deleteCount = edits.filter((e) => e.action === "delete").length;
   const warning = deleteCount
@@ -536,10 +655,11 @@ async function flushContentEdits() {
   setButtonLoading(docSaveContentBtn, true, "Saving");
   try {
     if (editingFormatId) {
-      await Api.editFormatContent(editingFormatId, edits);
+      const res = await Api.editFormatContent(editingFormatId, edits);
       const refreshed = await Api.getFormatTemplateHtml(editingFormatId);
       renderDocCanvas(refreshed.html);
-      showToast("Document updated. Fields refreshed automatically.");
+      renderFieldRoles(res.format.fields);
+      showToast(res.format.fields_reviewed ? "Document updated. Your fields moved with their lines." : "Document updated. Fields refreshed automatically.");
     } else {
       const data = await Api.editScannedContent(sourceTempToken, edits);
       renderDocCanvas(data.preview_html);
@@ -595,6 +715,7 @@ function addFieldRow(initial, container) {
     // The stored override, not the resolved role: "decide automatically" has to
     // stay distinguishable from an explicit choice that happens to agree.
     roleSelect.value = initial.role_override || "";
+    row.querySelector(".field-locked").checked = !!initial.locked;
   }
 
   labelInput.addEventListener("input", () => {
@@ -640,6 +761,7 @@ function collectManualFields() {
       is_required: row.querySelector(".field-required").checked,
       sort_order: i,
       role: row.querySelector(".field-role").value || null,
+      locked: row.querySelector(".field-locked").checked,
     });
   });
 
@@ -680,6 +802,7 @@ createFormatBtn.addEventListener("click", async () => {
   const isDocBased = !docFieldEditor.hidden;
   // Edits still waiting behind "Save changes to document" are applied first;
   // saving the format must never quietly leave them behind.
+  if (isDocBased && !(await saveFieldSetup())) return;
   if (isDocBased && !(await flushContentEdits())) return;
   const fields = isDocBased ? undefined : collectManualFields();
   if (!isDocBased && !fields.length) {
@@ -695,13 +818,18 @@ createFormatBtn.addEventListener("click", async () => {
       await Api.updateFormat(editingFormatId, payload);
       showToast("Format updated.");
     } else {
-      await Api.createFormat({
+      const created = await Api.createFormat({
         name,
         is_public: document.getElementById("is-public").checked,
         fields,
         source_temp_token: sourceTempToken || undefined,
         source_filename: sourceFilename || undefined,
       });
+      // A document-based format opens straight into reviewing what was detected.
+      if (isDocBased && created.format) {
+        window.location.href = `format-builder.html?format_id=${created.format.id}&review=1`;
+        return;
+      }
       showToast("Format created.");
     }
     window.location.href = "lesson-plan.html";
@@ -754,9 +882,16 @@ async function enterEditMode(fmt) {
       docBuilderCanvas.innerHTML = '<p class="hint">This format\'s reference file couldn\'t be rendered.</p>';
     }
 
-    // Only for a format that already exists: roles are saved against a format id,
-    // so a brand-new format gets this panel after its first save.
+    // Only for a format that already exists: fields are saved against a format
+    // id, so a brand-new format opens here right after its first save.
     renderFieldRoles(fmt.fields || []);
+    if (new URLSearchParams(location.search).get("review")) {
+      const n = (fmt.fields || []).length;
+      fieldRolesStatus.textContent = `AlignED found ${n} field${n === 1 ? "" : "s"}. Check them, then save.`;
+      fieldRolesSaveBtn.disabled = false;
+      setupDirty = true;
+      requestAnimationFrame(() => fieldRolesPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
   } else {
     manualFieldEditor.hidden = false;
     docFieldEditor.hidden = true;

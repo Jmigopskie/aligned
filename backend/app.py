@@ -178,6 +178,7 @@ def _migrate_format_columns():
     _add_column("lesson_plan_formats", "is_builtin", "BOOLEAN NOT NULL DEFAULT 0")
     _add_column("lesson_plan_formats", "builtin_key", "VARCHAR(64)")
     _add_column("lesson_plan_formats", "description", "VARCHAR(255)")
+    _add_column("lesson_plan_formats", "fields_reviewed", "BOOLEAN NOT NULL DEFAULT 0")
     _add_unique_index("lesson_plan_formats", "uq_lesson_plan_formats_builtin_key", "builtin_key")
 
 
@@ -305,6 +306,9 @@ def _migrate_format_field_columns():
     _add_column("format_fields", "role", "VARCHAR(10)")
     # The day names of a weekly field; see FormatField.parts.
     _add_column("format_fields", "parts", "TEXT")
+    # The teacher's field setup: locked (never generated) and placed by hand.
+    _add_column("format_fields", "locked", "BOOLEAN NOT NULL DEFAULT 0")
+    _add_column("format_fields", "manual", "BOOLEAN NOT NULL DEFAULT 0")
 
 
 def _migrate_section_columns():

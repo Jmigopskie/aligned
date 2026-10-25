@@ -101,6 +101,16 @@ def _include_keys(data, fmt):
     valid = {f.field_key for f in fmt.fields}
     return [str(k) for k in raw if str(k) in valid]
 
+def _generatable_keys(include_keys, fmt):
+    """What may actually be generated: never a field the teacher locked, which
+    the student writes (in Guided, with Alan's help in the chat). None still
+    means every field when nothing is locked."""
+    locked = {f.field_key for f in fmt.fields if f.locked}
+    if not locked:
+        return include_keys
+    keys = include_keys if include_keys is not None else [f.field_key for f in fmt.fields]
+    return [k for k in keys if k not in locked]
+
 @generate_bp.post("/generate/full")
 @login_required
 def generate_full():
@@ -115,7 +125,7 @@ def generate_full():
 
     field_values = ai_service.generate_full(
         context, fmt.fields, course_guide_text=_guide_sources(guides) + _resolve_sources(data, current_user()),
-        include_keys=_include_keys(data, fmt), course_guide_citation=_guide_citation(guides),
+        include_keys=_generatable_keys(_include_keys(data, fmt), fmt), course_guide_citation=_guide_citation(guides),
     )
     return jsonify({"status": "ok", "field_values": field_values})
 
@@ -134,7 +144,7 @@ def generate_full_stream():
     fields = fmt.fields
     # Read here, not inside _stream(): the generator runs after the request
     # context is gone, so `request`/`data` can't be touched from inside it.
-    include_keys = _include_keys(data, fmt)
+    include_keys = _generatable_keys(_include_keys(data, fmt), fmt)
     citation = _guide_citation(guides)
 
     def _stream():

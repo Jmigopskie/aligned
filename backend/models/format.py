@@ -25,6 +25,10 @@ class LessonPlanFormat(db.Model):
     builtin_key = db.Column(db.String(64))
     description = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # The teacher has reviewed this format's fields in the builder. From then on
+    # the field list is theirs: editing the document shifts the fields'
+    # positions instead of detecting them all over again.
+    fields_reviewed = db.Column(db.Boolean, nullable=False, default=False)
 
     fields = db.relationship(
         "FormatField",
@@ -50,6 +54,7 @@ class LessonPlanFormat(db.Model):
             "field_count": len(self.fields),
             "thumbnail": f"img/formats/{self.builtin_key}.webp" if self.is_builtin and self.builtin_key else None,
             "created_at": iso_utc(self.created_at),
+            "fields_reviewed": bool(self.fields_reviewed),
         }
         if include_fields:
             data["fields"] = [f.to_dict() for f in self.fields]
@@ -84,6 +89,11 @@ class FormatField(db.Model):
     # cell; this is the JSON list naming those parts ("Monday", ...). Null for
     # every other field type.
     parts = db.Column(db.Text)
+    # Locked by the teacher: Alan never generates it; the student writes it
+    # (in Guided, with Alan's help).
+    locked = db.Column(db.Boolean, nullable=False, default=False)
+    # Placed by the teacher at a line of the document, not detected.
+    manual = db.Column(db.Boolean, nullable=False, default=False)
 
     @property
     def parts_list(self):
@@ -115,4 +125,6 @@ class FormatField(db.Model):
             # that happens to match what the keywords would have picked.
             "role_override": self.role,
             "parts": self.parts_list,
+            "locked": bool(self.locked),
+            "manual": bool(self.manual),
         }

@@ -129,8 +129,18 @@ export function createGuided(ui) {
       count: `Part ${i + 1} of ${parts.length}`,
       at: (i + 1) / (parts.length + 2),
       q: p.label,
-      help: `${p.type === "list" ? "One item per line. " : ""}Write it in your own words, or ${ASK.toLowerCase()} for ideas.`,
+      help: p.locked
+        ? `Your teacher locked this part, so it's yours to write. ${ASK} if you'd like help thinking it through.`
+        : `${p.type === "list" ? "One item per line. " : ""}Write it in your own words, or ${ASK.toLowerCase()} for ideas.`,
       body: (answer) => {
+        // Where the teacher's field sits in the plan, so the answer goes in the right blank.
+        const snippet = G.fieldSnippet(p.key);
+        if (snippet) {
+          const where = el("details", { class: "flow-where" },
+            el("summary", {}, icon("eye"), "Where it goes in your plan"), snippet);
+          where.open = innerHeight >= 860;
+          answer.append(where);
+        }
         const ed = editors(p);
         showing = { key: p.key, sync: ed.sync };
         const clear = el("button", { type: "button", class: "flow-back flow-more flow-clear" }, icon("eraser"), "Clear this part");
@@ -146,8 +156,10 @@ export function createGuided(ui) {
       canNext: () => G.isFieldComplete(p.key),
       onNext: () => (last ? quick() : part(i + 1)),
       onBack: () => (i > 0 ? part(i - 1) : backToSetup()),
-      sayText: `Your turn: ${p.label}. ${ASK} if you'd like ideas.`,
-      pose: "write",
+      sayText: p.locked
+        ? `${p.label} is yours to write. I'll help you think it through.`
+        : `Your turn: ${p.label}. ${ASK} if you'd like ideas.`,
+      pose: p.locked ? "think" : "write",
     });
   }
 

@@ -222,6 +222,11 @@ const OWL_STARTERS = [
   { type: "ask", label: "What should this field include?", text: "What should this field include?" },
   { type: "ask", label: "Show me an example", text: "Show me an example for this field." },
 ];
+const OWL_COACH_STARTERS = [
+  { type: "ask", label: "What should this part include?", text: "What should this part include?" },
+  { type: "ask", label: "Ask me questions to get started", text: "Ask me a few questions to help me start writing this part." },
+  { type: "ask", label: "Check what I wrote", text: "Read what I wrote so far and tell me how to improve it, without rewriting it." },
+];
 const CHAT_TURNS_SENT = 8;
 
 // One conversation per field, not one long stream. Switching field (or
@@ -386,6 +391,10 @@ function introduceFieldInChat() {
   const hadTurns = renderThread(key, `Earlier conversation about "${field.label}".`);
   if (hadTurns) {
     scrollChatToEnd();
+  } else if (field.locked) {
+    // Locked by the teacher: Alan coaches, he doesn't write it.
+    addOwlMessage(`Your teacher wants "${field.label}" in your own words, so I won't write it for you. I can help you think it through.`,
+      OWL_COACH_STARTERS, { unread: false });
   } else {
     addOwlMessage(`I can help with "${field.label}". Ask a question or tap an option.`, OWL_STARTERS, { unread: false });
   }
@@ -1235,7 +1244,12 @@ function loadStaticKeys() {
   all.forEach((k) => {
     if (!seen.has(k) && own.has(k)) stat.add(k);
   });
-  staticKeys = new Set(all.filter((k) => stat.has(k)));
+  staticKeys = new Set(all.filter((k) => stat.has(k)).concat(lockedKeys()));
+}
+
+// Fields the format's teacher locked: never generated, whatever is chosen here.
+function lockedKeys() {
+  return fieldsInDocumentOrder().filter((f) => f.locked).map((f) => f.field_key);
 }
 
 function saveStaticKeys() {
@@ -1266,7 +1280,8 @@ function selectedGenerateKeys() {
 // the teacher can see which blanks are theirs to write.
 // The placeholder says so too, instead of a tag that would sit on top of it.
 function setStaticLook(el, isStatic) {
-  el.setAttribute("data-placeholder", isStatic ? "Static: yours to fill in" : "Not generated yet");
+  const locked = (fieldByKey(el.dataset.fieldKey) || {}).locked;
+  el.setAttribute("data-placeholder", locked ? "Locked by your teacher: yours to write" : isStatic ? "Static: yours to fill in" : "Not generated yet");
 }
 
 function paintStaticMarks() {
@@ -1287,7 +1302,7 @@ function isFieldComplete(key) {
 // fix. Every place that needs to say so calls this one check, so the messages
 // can't drift apart and start disagreeing about what "done" means.
 function incompleteEasyFieldKeys() {
-  return easyFieldKeys().concat(selfFieldKeys()).filter((k) => !isFieldComplete(k));
+  return easyFieldKeys().concat(selfFieldKeys()).filter((k) => !isFieldComplete(k) && !stepFieldKeys.includes(k));
 }
 
 // The guided side of the same problem: Task 7 left already-stepped-past
@@ -2881,6 +2896,13 @@ function reviewRowMarkup(f) {
   const label = escapeHtml(f.label || f.field_key);
   const isStatic = staticKeys.has(f.field_key);
   const filled = isFieldComplete(f.field_key) ? '<span class="gen-review-note">has content</span>' : "";
+  if (f.locked) {
+    return `
+    <div class="gen-review-row" data-review-key="${key}">
+      <span class="gen-review-label">${label}${filled}</span>
+      <span class="gen-review-locked">${Icons.lock}Locked by your teacher</span>
+    </div>`;
+  }
   return `
     <div class="gen-review-row" data-review-key="${key}">
       <span class="gen-review-label">${label}${filled}</span>
@@ -2892,11 +2914,13 @@ function reviewRowMarkup(f) {
 }
 
 function renderReviewList() {
-  const fields = fieldsInDocumentOrder();
+  const all = fieldsInDocumentOrder();
+  const fields = all.filter((f) => !f.locked);
   const groups = [
     ["Quick fields", fields.filter((f) => f.role !== "heavy" && f.role !== "self")],
     ["Needs real thinking", fields.filter((f) => f.role === "heavy")],
     ["Yours to fill in", fields.filter((f) => f.role === "self")],
+    ["You write these (locked by your teacher)", all.filter((f) => f.locked)],
   ].filter(([, list]) => list.length);
   reviewList.innerHTML = groups
     .map(([title, list]) => `<fieldset class="gen-review-group"><legend>${title}</legend>${list.map(reviewRowMarkup).join("")}</fieldset>`)
@@ -2952,7 +2976,7 @@ document.querySelectorAll("[data-review-all]").forEach((btn) => {
   btn.addEventListener("click", () => {
     staticKeys = btn.dataset.reviewAll === "static"
       ? new Set(fieldsInDocumentOrder().map((f) => f.field_key))
-      : new Set();
+      : new Set(lockedKeys());
     saveStaticKeys();
     renderReviewList();
   });
@@ -3508,14 +3532,13 @@ async function loadFormat(formatId) {
   sections = buildSections(fmt.fields);
   document.title = `${fmt.name} | AlignED`;
   document.getElementById("format-name").textContent = fmt.name;
-  // Guided walks the fields that need real thinking. The quick ones are left
-  // out of the walkthrough entirely: a teacher does not need to be guided
-  // through their own name, and locking those behind a step was most of why
-  // fields felt uneditable.
-  const heavy = heavyFieldKeys();
-  // A format with no heavy fields would leave Guided with nothing to do, so it
-  // falls back to walking everything.
-  stepFieldKeys = heavy.length ? heavy : fieldsInDocumentOrder().map((f) => f.field_key);
+  // Guided walks exactly the fields the format's teacher marked Guided, plus
+  // the ones they locked (which Alan never writes, so the student does, with
+  // his help), in document order. Quick facts stay out of the walkthrough.
+  const walked = fieldsInDocumentOrder().filter((f) => f.role === "heavy" || f.locked).map((f) => f.field_key);
+  // A format with none would leave Guided with nothing to do, so it falls
+  // back to walking everything.
+  stepFieldKeys = walked.length ? walked : fieldsInDocumentOrder().map((f) => f.field_key);
   stepIndex = 0;
   loadStaticKeys();
   await initLiveDocView();
@@ -3608,7 +3631,44 @@ function startGuided() {
 // ---- for the Guided screens ----
 function partInfo(key) {
   const f = fieldByKey(key);
-  return { key, label: f.label, type: f.field_type, group: f.section_group || "", days: partCount(key) ? f.parts : null };
+  return { key, label: f.label, type: f.field_type, group: f.section_group || "", days: partCount(key) ? f.parts : null, locked: !!f.locked };
+}
+
+// Where a part's input sits in the plan: its table row (or its line with the
+// label above it), copied from the document with the input itself marked, so
+// the student sees exactly which blank the teacher's field fills.
+function fieldSnippet(key) {
+  const canvas = liveDocWrap.querySelector(".lp-doc");
+  const slot = canvas && canvas.querySelector(`[data-field-key="${CSS.escape(key)}"]`);
+  if (!slot) return null;
+  const row = slot.closest("tr");
+  let piece;
+  if (row) {
+    piece = document.createElement("table");
+    piece.className = row.closest("table").className;
+    piece.append(document.createElement("tbody"));
+    piece.firstChild.append(row.cloneNode(true));
+  } else {
+    // An input inline in its label's line brings the label along; one on its
+    // own line below takes the label line above it too.
+    const line = slot.closest("[data-anchor-index]") || slot;
+    piece = document.createElement("div");
+    const before = line.previousElementSibling;
+    if (line === slot && before && !before.querySelector("[data-field-key]")) piece.append(before.cloneNode(true));
+    piece.append(line.cloneNode(true));
+  }
+  piece.querySelectorAll("[contenteditable]").forEach((el) => el.removeAttribute("contenteditable"));
+  piece.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+  piece.querySelectorAll("[data-field-key]").forEach((el) => {
+    const here = el.dataset.fieldKey === key;
+    el.classList.toggle("lp-here", here);
+    if (here) el.setAttribute("data-placeholder", "Your answer goes here");
+  });
+  const wrap = document.createElement("div");
+  wrap.className = "lp-doc lp-snippet";
+  wrap.setAttribute("aria-hidden", "true");
+  wrap.append(piece);
+  return wrap;
 }
 
 // Writes one part's answer (or one day of a weekly part) and shows it in the
@@ -3729,6 +3789,7 @@ window.Generator = {
   guidedParts: () => stepFieldKeys.map(partInfo),
   quickParts: () => incompleteEasyFieldKeys().map(partInfo),
   fieldValue: (key) => fieldValues[key],
+  fieldSnippet,
   isFieldComplete,
   setGuidedValue,
   setGuidedDay: (i) => { guidedPart = i; },
