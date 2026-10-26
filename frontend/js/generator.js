@@ -2276,6 +2276,8 @@ function planPayload() {
     doc_edits: collectDocEdits(),
     generation_mode: mode,
     is_public: visibilityCheckbox.checked,
+    // The paid build a student's new plan belongs to (see payForBuild).
+    run_key: currentRunId,
   };
 }
 
@@ -2902,6 +2904,9 @@ function baseGenerationPayload() {
     source_ids: (flowFlags.sources || []).map((s) => s.id),
     // A finished sample plan: shows Alan what goes in each part.
     sample_id: flowFlags.sample ? flowFlags.sample.id : null,
+    // Which paid plan this is: its run, or the saved plan itself.
+    run_key: currentRunId,
+    plan_id: planId || null,
   };
 }
 
@@ -3770,6 +3775,30 @@ function useMode(name) {
   applyPrefill();
 }
 
+// A student's lesson plan costs 30 points, once: the first start of a run
+// pays; coming back to the same run or a saved plan is free (the server
+// decides). Throws the reason when there aren't enough points.
+async function payForBuild() {
+  if (!currentUser || currentUser.role !== "student" || flowFlags.paid) return;
+  const data = await Api.startBuild({ run_key: currentRunId, plan_id: planId || null });
+  flowFlags.paid = true;
+  if (typeof data.points === "number") {
+    currentUser.points = data.points;
+    cacheUser(currentUser);
+  }
+  saveDraft();
+}
+
+// What starting this plan costs a student, for the mode step; "" for teachers.
+function pointsNote() {
+  if (!currentUser || currentUser.role !== "student") return "";
+  if (flowFlags.paid || planId) return "This lesson plan is already paid for, so carrying on is free.";
+  const have = currentUser.points || 0;
+  return have >= 30
+    ? `Starting this lesson plan uses 30 of your ${have} points.`
+    : `Starting a lesson plan uses 30 points and you have ${have}. Ask your teacher for more points.`;
+}
+
 function startFull() {
   useMode("full");
   runGeneration(selectedGenerateKeys());
@@ -3942,6 +3971,8 @@ window.Generator = {
   mountReview,
   startFull,
   startGuided,
+  payForBuild,
+  pointsNote,
   // The Guided screens: the parts Alan walks through, the quick blanks left
   // over, and reading/writing their answers.
   guidedParts: () => stepFieldKeys.map(partInfo),

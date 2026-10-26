@@ -120,6 +120,8 @@ def _migrate_lesson_plan_columns():
         "doc_edits": "TEXT",
         # Save counter for the stale-device check; see LessonPlan.revision.
         "revision": "INTEGER NOT NULL DEFAULT 0",
+        # The paid build a student's plan was started with; see models/points.py.
+        "build_id": "INTEGER",
     }
 
     for col_name, col_type in new_columns.items():
@@ -133,6 +135,7 @@ def _migrate_user_columns():
     _add_column("users", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
     _add_column("users", "avatar_path", "VARCHAR(255)")
     _add_column("users", "banner_path", "VARCHAR(255)")
+    _add_column("users", "points", "INTEGER NOT NULL DEFAULT 0")
 
     # The owl's onboarding tour is for accounts made from now on. Only when the
     # column is first added are the accounts already there marked as done: on
@@ -375,6 +378,7 @@ def create_app():
     from routes.generate_routes import generate_bp
     from routes.course_guide_routes import course_guide_bp
     from routes.section_routes import section_bp
+    from routes.points_routes import points_bp
     from routes.admin_routes import admin_bp
     from routes.announcement_routes import announcement_bp
     from routes.notification_routes import notification_bp
@@ -385,6 +389,7 @@ def create_app():
     app.register_blueprint(generate_bp, url_prefix="/api")
     app.register_blueprint(course_guide_bp, url_prefix="/api")
     app.register_blueprint(section_bp, url_prefix="/api")
+    app.register_blueprint(points_bp, url_prefix="/api")
     app.register_blueprint(admin_bp, url_prefix="/api")
     app.register_blueprint(announcement_bp, url_prefix="/api")
     app.register_blueprint(notification_bp, url_prefix="/api")
@@ -395,7 +400,7 @@ def create_app():
         # including the newer sections / section_memberships / announcements /
         # notifications tables.
         from models import user, format, lesson_plan, course_guide, section, announcement, notification  # noqa: F401
-        from models import supplementary_source, password_reset  # noqa: F401
+        from models import supplementary_source, password_reset, points  # noqa: F401
 
         _create_tables()
         _migrate_lesson_plan_columns()

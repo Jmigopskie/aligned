@@ -28,6 +28,8 @@ class User(db.Model):
     # When the owl's first-sign-in tour was finished or skipped; blank means a
     # new account that hasn't seen it yet.
     onboarded_at = db.Column(db.DateTime, nullable=True)
+    # Students: points left for starting lesson plans (see models/points.py).
+    points = db.Column(db.Integer, nullable=False, default=0)
 
     formats = db.relationship("LessonPlanFormat", backref="owner", lazy=True)
     lesson_plans = db.relationship("LessonPlan", backref="user", lazy=True)
@@ -73,4 +75,6 @@ class User(db.Model):
             "onboarded": self.onboarded_at is not None,
             # Students only: whether they may make lesson plans yet.
             "enrolled": self.is_enrolled() if self.role == "student" else True,
+            # Students only: points left for starting lesson plans.
+            **({"points": self.points or 0} if self.role == "student" else {}),
         }

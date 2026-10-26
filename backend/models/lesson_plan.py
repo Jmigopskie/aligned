@@ -35,6 +35,9 @@ class LessonPlan(db.Model):
     # Any author (student or teacher) can share their own plan publicly so
     # it shows up for everyone in the "Public plans" list.
     is_public = db.Column(db.Boolean, nullable=False, default=False)
+    # The paid build a student's plan was started with (models/points.py).
+    # NULL for teachers' plans and for plans made before points existed.
+    build_id = db.Column(db.Integer, db.ForeignKey("builds.id"), nullable=True)
 
     # The mode the teacher is NOT currently in. field_values/rich_field_values
     # always hold the active mode's content, which is what export, submission and
@@ -147,6 +150,7 @@ class LessonPlan(db.Model):
             "user_id": self.user_id,
             "author_name": self.user.full_name if self.user else None,
             "format_id": self.format_id,
+            "build_id": self.build_id,
             "title": self.title,
             "subject": self.subject,
             "grade_level": self.grade_level,

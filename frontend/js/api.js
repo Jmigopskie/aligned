@@ -245,6 +245,9 @@ const Api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  // Starting a lesson plan: a student pays 30 points once per plan ({run_key} or {plan_id}).
+  startBuild: (payload) =>
+    apiFetch("/api/builds", { method: "POST", body: JSON.stringify(payload) }),
   getLessonPlan: (planId) => apiFetch(`/api/lesson-plans/${planId}`),
   deleteLessonPlan: (planId) =>
     apiFetch(`/api/lesson-plans/${planId}`, { method: "DELETE" }),
@@ -279,6 +282,13 @@ const Api = {
     apiFetch(`/api/sections/${sectionId}/regenerate-code`, { method: "POST" }),
   removeStudent: (sectionId, studentId) =>
     apiFetch(`/api/sections/${sectionId}/students/${studentId}`, { method: "DELETE" }),
+  // Points: each lesson plan a student starts costs some; the section's teacher gives them.
+  sectionPoints: (sectionId) => apiFetch(`/api/sections/${sectionId}/points`),
+  givePoints: (sectionId, studentIds, add) =>
+    apiFetch(`/api/sections/${sectionId}/points`, {
+      method: "POST",
+      body: JSON.stringify({ student_ids: studentIds.map(Number), add }),
+    }),
   sectionSubmissions: (sectionId, status) =>
     apiFetch(`/api/sections/${sectionId}/submissions${status ? `?status=${status}` : ""}`),
 
@@ -1280,6 +1290,20 @@ const OwlGuide = {
     if (!this._moveListeners.includes(fn)) this._moveListeners.push(fn);
   },
 };
+
+// A student's points, shown on My Classes and the dashboard: the balance and
+// what it buys. Teachers and admins have no balance (they are never charged).
+const POINTS_PER_PLAN = 30;
+function pointsBalanceHtml(points) {
+  const n = Number(points) || 0;
+  const plans = Math.floor(n / POINTS_PER_PLAN);
+  return `<div class="points-balance" role="status">
+    <span class="points-balance-icon" aria-hidden="true">${Icons.coins}</span>
+    <span class="points-balance-text"><strong>${n}</strong> point${n === 1 ? "" : "s"}
+      <small>${plans ? `Enough for ${plans} lesson plan${plans === 1 ? "" : "s"}.` : "Not enough to start a lesson plan yet."}
+      Each lesson plan you start uses ${POINTS_PER_PLAN} points. Ask your teacher for more.</small></span>
+  </div>`;
+}
 
 function escapeHtml(str) {
   const div = document.createElement("div");

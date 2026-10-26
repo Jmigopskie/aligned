@@ -11,6 +11,7 @@ from models.course_guide import CourseGuide
 from models.supplementary_source import SupplementarySource
 from models.section import Section, SectionMembership
 from routes.auth_routes import login_required, enrollment_required, current_user
+from routes import points_routes
 from services import ai_service, docx_service, field_roles, grounding
 from services.notify import notify
 
@@ -135,6 +136,9 @@ def _generatable_keys(include_keys, fmt):
 @enrollment_required
 def generate_full():
     data = request.get_json(silent=True) or {}
+    unpaid = points_routes.require_paid_build(current_user(), data)
+    if unpaid:
+        return unpaid
     fmt = LessonPlanFormat.query.get_or_404(data.get("format_id"))
 
     guides, err = _resolve_guides(data)
@@ -155,6 +159,9 @@ def generate_full():
 @enrollment_required
 def generate_full_stream():
     data = request.get_json(silent=True) or {}
+    unpaid = points_routes.require_paid_build(current_user(), data)
+    if unpaid:
+        return unpaid
     fmt = LessonPlanFormat.query.get_or_404(data.get("format_id"))
 
     guides, err = _resolve_guides(data)
@@ -194,6 +201,9 @@ def owl_chat():
     field they're currently writing. The owl answers briefly and offers
     choices, some of which the page can insert straight into the field."""
     data = request.get_json(silent=True) or {}
+    unpaid = points_routes.require_paid_build(current_user(), data)
+    if unpaid:
+        return unpaid
     fmt = LessonPlanFormat.query.get_or_404(data.get("format_id"))
     field = next((f for f in grounding.competency_view(fmt.fields) if f.field_key == data.get("field_key")), None)
     if not field:
@@ -336,9 +346,14 @@ def update_lesson_plan(plan_id):
 def save_lesson_plan():
     user = current_user()
     data = request.get_json(silent=True) or {}
+    # A student's new plan needs its build paid first (routes/points_routes.py).
+    build = points_routes.build_for(user, data)
+    if user.role == "student" and not build:
+        return points_routes.require_paid_build(user, {"run_key": ""})
 
     plan = LessonPlan(
         user_id=user.id,
+        build_id=build.id if build else None,
         format_id=data.get("format_id"),
         title=data.get("title", "Untitled Lesson Plan"),
         subject=data.get("subject"),

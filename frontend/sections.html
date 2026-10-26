@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-10-26o" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-26p" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -115,14 +115,27 @@
           <button class="btn btn-secondary" type="button" id="regen-code-btn">Regenerate code</button>
           <button class="btn btn-secondary danger" type="button" id="delete-section-btn">Delete section</button>
         </div>
-        <h3 style="font-size:14px; margin-bottom:8px;">Enrolled students</h3>
+        <div class="points-head">
+          <h3>Enrolled students</h3>
+          <p class="points-note">Each lesson plan a student starts uses 30 points.</p>
+        </div>
+        <div class="points-bulk" id="points-bulk" hidden>
+          <label class="points-check"><input type="checkbox" id="points-select-all" /><span>Select all</span></label>
+          <div class="points-bulk-actions">
+            <label class="sr-only" for="points-bulk-amount">Points for the selected students</label>
+            <input type="number" id="points-bulk-amount" class="points-amount" value="30" min="1" step="1" inputmode="numeric" />
+            <button class="btn btn-primary btn-sm" type="button" id="points-give-selected" disabled>Give to selected</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="points-remove-selected" disabled>Remove</button>
+          </div>
+        </div>
+        <p class="points-error" id="points-error" role="alert" hidden></p>
         <div id="roster-list"></div>
       </div>
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-10-26o"></script>
-  <script src="js/icons.js?v=2026-10-26f"></script>
-  <script src="js/sections.js?v=2026-10-06c"></script>
+  <script src="js/api.js?v=2026-10-26p"></script>
+  <script src="js/icons.js?v=2026-10-26p"></script>
+  <script src="js/sections.js?v=2026-10-26p"></script>
 </body>
 </html>

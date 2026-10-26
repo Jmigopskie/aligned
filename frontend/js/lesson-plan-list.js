@@ -130,36 +130,14 @@ function renderPlans(plans) {
         <td>${fmtDate(p.updated_at)}</td>
         <td>
           <div class="row-actions">
-            ${
-              // Only a draft can still be changed: the server locks a plan once
-              // it is submitted, so those get Preview instead.
-              isMineTab && p.status === "draft"
-                ? `<a class="btn btn-secondary btn-sm row-continue" href="generator.html?plan_id=${p.id}"><span data-icon="edit"></span>Continue</a>`
-                : ""
-            }
-            ${
-              // Same rule as Continue: only a draft can still change on the server.
-              isMineTab && p.status === "draft"
-                ? `<button class="row-action-btn" type="button" data-action="rename" data-plan="${p.id}" title="Rename" aria-label="Rename ${escapeHtml(p.title || "lesson plan")}">${Icons.edit}</button>`
-                : ""
-            }
-            <button class="row-action-btn" type="button" data-action="preview" data-plan="${p.id}" title="Preview" aria-label="Preview">${Icons.eye}</button>
-            <button class="row-action-btn" type="button" data-action="export" data-plan="${p.id}" data-title="${escapeHtml(p.title || "")}" title="Download" aria-label="Download">${Icons.download}</button>
-            ${
-              isMineTab
-                ? `<button class="row-action-btn" type="button" data-action="visibility" data-plan="${p.id}" data-public="${p.is_public ? "1" : "0"}" title="${p.is_public ? "Make private" : "Make public"}" aria-label="${p.is_public ? "Make private" : "Make public"}">${p.is_public ? Icons.globe : Icons.lock}</button>`
-                : ""
-            }
-            ${isMineTab && isStudent ? `<button class="row-action-btn" type="button" data-action="submit" data-plan="${p.id}" title="Submit to class" aria-label="Submit to class">${Icons.inbox}</button>` : ""}
-            ${isMineTab ? `<button class="row-action-btn danger" type="button" data-action="delete" data-plan="${p.id}" title="Delete" aria-label="Delete">${Icons.trash}</button>` : ""}
+            <button class="row-menu-btn row-dots" type="button" data-plan="${p.id}" aria-haspopup="menu" aria-expanded="false"
+              aria-label="Actions for ${escapeHtml(p.title || "lesson plan")}" title="Actions">${Icons.moreHorizontal}</button>
           </div>
         </td>
       </tr>`
     )
     .join("");
 
-  hydrateIcons(plansBody);
-  wireRowActions();
   bulk.sync();
 }
 
@@ -190,43 +168,141 @@ bulkDeleteBtn.addEventListener("click", async () => {
   applyFilter();
 });
 
-function wireRowActions() {
-  plansBody.querySelectorAll(".row-action-btn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const planId = btn.dataset.plan;
-      if (btn.dataset.action === "preview") {
-        openPreview(planId);
-      } else if (btn.dataset.action === "rename") {
-        renamePlan(planId);
-      } else if (btn.dataset.action === "export") {
-        exportPlan(planId, btn.dataset.title);
-      } else if (btn.dataset.action === "submit") {
-        openSubmitModal(planId);
-      } else if (btn.dataset.action === "visibility") {
-        const makePublic = btn.dataset.public !== "1";
-        try {
-          const data = await Api.setLessonPlanVisibility(planId, makePublic);
-          const idx = allPlans.findIndex((p) => String(p.id) === String(planId));
-          if (idx !== -1) allPlans[idx] = data.lesson_plan;
-          showToast(makePublic ? "Lesson plan is now public." : "Lesson plan is now private.");
-          applyFilter();
-        } catch (err) {
-          showToast(err.message, true);
-        }
-      } else if (btn.dataset.action === "delete") {
-        if (!confirm("Delete this lesson plan? This can't be undone.")) return;
-        try {
-          await Api.deleteLessonPlan(planId);
-          showToast("Lesson plan deleted.");
-          allPlans = allPlans.filter((p) => String(p.id) !== String(planId));
-          applyFilter();
-        } catch (err) {
-          showToast(err.message, true);
-        }
-      }
-    });
-  });
+// ---- Row actions: one "⋯" per row opens a shared menu. It is fixed to the
+// viewport (placed from the button), so the table's scroll box never clips it.
+
+// What a plan's menu offers. Only a draft can still change on the server, so
+// Continue and Rename are drafts-only; the rest is as the old buttons had it.
+function planActions(p) {
+  const mine = activeTab === "mine";
+  const draft = mine && p.status === "draft";
+  const student = currentUser && currentUser.role === "student";
+  return [
+    draft && { action: "continue", icon: "arrowRight", label: "Continue" },
+    draft && { action: "rename", icon: "edit", label: "Rename" },
+    { action: "preview", icon: "eye", label: "Preview" },
+    { action: "export", icon: "download", label: "Download" },
+    mine && { action: "visibility", icon: p.is_public ? "lock" : "globe", label: p.is_public ? "Make private" : "Make public" },
+    mine && student && { action: "submit", icon: "inbox", label: "Submit to class" },
+    mine && { action: "delete", icon: "trash", label: "Delete", danger: true },
+  ].filter(Boolean);
 }
+
+async function runRowAction(action, plan) {
+  const planId = plan.id;
+  if (action === "continue") {
+    window.location.href = `generator.html?plan_id=${planId}`;
+  } else if (action === "preview") {
+    openPreview(planId);
+  } else if (action === "rename") {
+    renamePlan(planId);
+  } else if (action === "export") {
+    exportPlan(planId, plan.title || "");
+  } else if (action === "submit") {
+    openSubmitModal(planId);
+  } else if (action === "visibility") {
+    const makePublic = !plan.is_public;
+    try {
+      const data = await Api.setLessonPlanVisibility(planId, makePublic);
+      const idx = allPlans.findIndex((p) => String(p.id) === String(planId));
+      if (idx !== -1) allPlans[idx] = data.lesson_plan;
+      showToast(makePublic ? "Lesson plan is now public." : "Lesson plan is now private.");
+      applyFilter();
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  } else if (action === "delete") {
+    if (!confirm("Delete this lesson plan? This can't be undone.")) return;
+    try {
+      await Api.deleteLessonPlan(planId);
+      showToast("Lesson plan deleted.");
+      allPlans = allPlans.filter((p) => String(p.id) !== String(planId));
+      applyFilter();
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  }
+}
+
+const rowMenu = document.createElement("div");
+rowMenu.className = "row-menu-dropdown plan-row-menu";
+rowMenu.setAttribute("role", "menu");
+document.body.append(rowMenu);
+let menuOpener = null;
+
+function closeRowMenu(refocus = false) {
+  if (!menuOpener) return;
+  rowMenu.classList.remove("open");
+  menuOpener.setAttribute("aria-expanded", "false");
+  if (refocus) menuOpener.focus();
+  menuOpener = null;
+}
+
+function openRowMenu(btn) {
+  const plan = allPlans.find((p) => String(p.id) === btn.dataset.plan);
+  if (!plan) return;
+  closeRowMenu();
+  rowMenu.replaceChildren(...planActions(plan).flatMap((a) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.setAttribute("role", "menuitem");
+    item.tabIndex = -1;
+    if (a.danger) item.className = "danger";
+    item.innerHTML = `${Icons[a.icon] || ""}<span></span>`;
+    item.lastChild.textContent = a.label;
+    item.addEventListener("click", () => {
+      closeRowMenu(true);
+      runRowAction(a.action, plan);
+    });
+    if (!a.danger) return [item];
+    const sep = document.createElement("div");
+    sep.className = "row-menu-sep";
+    sep.setAttribute("role", "separator");
+    return [sep, item];
+  }));
+  rowMenu.setAttribute("aria-label", btn.getAttribute("aria-label"));
+  rowMenu.classList.add("open");
+  menuOpener = btn;
+  btn.setAttribute("aria-expanded", "true");
+  // Under the button, right edges aligned; above it when there's no room below.
+  const r = btn.getBoundingClientRect();
+  const w = rowMenu.offsetWidth;
+  const h = rowMenu.offsetHeight;
+  rowMenu.style.left = `${Math.max(8, Math.min(r.right - w, innerWidth - w - 8))}px`;
+  rowMenu.style.top = `${r.bottom + 4 + h > innerHeight - 8 ? Math.max(8, r.top - h - 4) : r.bottom + 4}px`;
+  rowMenu.querySelector("[role=menuitem]").focus();
+}
+
+plansBody.addEventListener("click", (e) => {
+  const btn = e.target.closest(".row-dots");
+  if (!btn) return;
+  if (menuOpener === btn) closeRowMenu();
+  else openRowMenu(btn);
+});
+
+rowMenu.addEventListener("keydown", (e) => {
+  const items = [...rowMenu.querySelectorAll("[role=menuitem]")];
+  const i = items.indexOf(document.activeElement);
+  if (e.key === "Escape") {
+    e.preventDefault();
+    closeRowMenu(true);
+  } else if (e.key === "Tab") {
+    closeRowMenu();
+  } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    items[(i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length].focus();
+  } else if (e.key === "Home" || e.key === "End") {
+    e.preventDefault();
+    items[e.key === "Home" ? 0 : items.length - 1].focus();
+  }
+});
+
+// A click elsewhere, or the page moving under the fixed menu, closes it.
+document.addEventListener("mousedown", (e) => {
+  if (menuOpener && !rowMenu.contains(e.target) && !menuOpener.contains(e.target)) closeRowMenu();
+});
+window.addEventListener("resize", () => closeRowMenu());
+window.addEventListener("scroll", () => closeRowMenu(), true);
 
 // Rename a draft: the same name dialog as Save and Export, saved straight away.
 function renamePlan(planId) {

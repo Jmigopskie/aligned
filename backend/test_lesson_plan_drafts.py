@@ -21,7 +21,11 @@ from extensions import db
 from models.user import User
 from models.format import LessonPlanFormat
 from models.lesson_plan import LessonPlan
+from models.points import Build
 from models.section import Section, SectionMembership
+
+
+RUN = "test-run"
 
 
 def make_user(name, role):
@@ -52,6 +56,8 @@ def main():
         db.session.commit()
         section_id = section.id
         db.session.add(SectionMembership(section_id=section_id, student_id=student_id))
+        # Both students have paid for the plan they're writing (test_points.py covers paying).
+        db.session.add_all([Build(student_id=s, run_key=RUN) for s in (student_id, other_id)])
         db.session.commit()
 
         client = app.test_client()
@@ -63,7 +69,7 @@ def main():
         login(student_id)
 
         # --- Create: the first autosave makes exactly one draft row ---
-        res = client.post("/api/lesson-plans", json={
+        res = client.post("/api/lesson-plans", json={"run_key": RUN, 
             "format_id": format_id,
             "title": "Photosynthesis",
             "field_values": {"objectives": "Name the stages."},
@@ -119,7 +125,7 @@ def main():
 
         # --- Filters behind the "continue where you left off" strip ---
         for title in ["Draft One", "Draft Two", "Draft Three"]:
-            client.post("/api/lesson-plans", json={"format_id": format_id, "title": title})
+            client.post("/api/lesson-plans", json={"run_key": RUN, "format_id": format_id, "title": title})
 
         def titles(qs):
             res = client.get("/api/lesson-plans" + qs)
@@ -145,7 +151,7 @@ def main():
         # mode_values. This is what lets Guided and Building Proficiency be two
         # drafts of the plan rather than one shared one.
         login(student_id)
-        res = client.post("/api/lesson-plans", json={
+        res = client.post("/api/lesson-plans", json={"run_key": RUN, 
             "format_id": format_id,
             "title": "Two modes",
             "generation_mode": "full",
@@ -237,7 +243,7 @@ def main():
             },
             "courseGuide": {"id": 3, "title": "ICT Grade 7 Guide", "subject": "ICT"},
         }
-        res = client.post("/api/lesson-plans", json={
+        res = client.post("/api/lesson-plans", json={"run_key": RUN, 
             "format_id": format_id,
             "title": "With setup",
             "subject": "ICT",

@@ -134,6 +134,15 @@ async function init() {
   const firstName = (user.full_name || "").split(" ")[0] || "there";
   document.getElementById("hero-greeting").textContent = greetingForNow(firstName);
 
+  // A student's points: each lesson plan they start uses 30.
+  if (user.role === "student") {
+    const n = Number(user.points) || 0;
+    const chip = document.getElementById("hero-points");
+    chip.innerHTML = `<span aria-hidden="true">${Icons.coins}</span><strong>${n}</strong> point${n === 1 ? "" : "s"}`
+      + `<span class="points-chip-note">Each lesson plan you start uses ${POINTS_PER_PLAN} points. Ask your teacher for more.</span>`;
+    chip.classList.toggle("is-short", n < POINTS_PER_PLAN);
+  }
+
   // Teachers see their own banner; students see whichever teacher's section
   // they most recently joined (see User.effective_banner on the backend) —
   // falls back to the default illustration when neither has set one.

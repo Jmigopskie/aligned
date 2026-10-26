@@ -81,6 +81,8 @@ async function init() {
     return;
   }
   wireTopbar(user);
+  document.getElementById("points-balance").innerHTML = pointsBalanceHtml(user.points);
+  document.getElementById("points-panel").hidden = false;
   loadClasses();
 }
 

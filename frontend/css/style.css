@@ -2702,29 +2702,9 @@ body.auth-page {
   color: var(--text-body);
 }
 
-.row-actions .row-continue {
-  margin-right: var(--space-1);
-}
-
-/* Right-aligned so the icon buttons line up down the column whether or not a
-   row also has Continue. */
-@media (min-width: 641px) {
-  #plans-body .row-actions {
-    justify-content: flex-end;
-  }
-}
-
-/* On a phone card, Continue is the draft's main action: its own full-width
-   line, with the icon actions wrapping underneath. */
-@media (max-width: 640px) {
-  #plans-body .row-actions {
-    flex-wrap: wrap;
-  }
-
-  #plans-body .row-actions .row-continue {
-    flex: 1 1 100%;
-    margin-right: 0;
-  }
+/* A lesson plan row's one "⋯" button, at the end of its row (or card). */
+#plans-body .row-actions {
+  justify-content: flex-end;
 }
 
 .plan-title-cell .file-ico {
@@ -2813,6 +2793,65 @@ body.auth-page {
 .row-menu-dropdown button.danger:hover {
   background: var(--danger-bg);
   color: var(--danger);
+}
+
+/* The lesson plan list's row menu: one shared popup fixed to the viewport
+   (placed from its button by lesson-plan-list.js), each action an icon and a
+   word, Delete set apart at the bottom. */
+.plan-row-menu {
+  position: fixed;
+  min-width: 196px;
+  z-index: 60;
+}
+
+.plan-row-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.plan-row-menu button svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--text-body);
+}
+
+.plan-row-menu button:hover svg,
+.plan-row-menu button:focus-visible svg {
+  color: currentColor;
+}
+
+.plan-row-menu button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  background: var(--bg);
+}
+
+.plan-row-menu button.danger {
+  color: var(--danger);
+}
+
+.plan-row-menu button.danger svg {
+  color: var(--danger);
+}
+
+.row-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+.row-dots[aria-expanded="true"] {
+  background: var(--bg);
+  color: var(--primary);
+}
+
+@media (max-width: 640px) {
+  .plan-row-menu button {
+    min-height: 44px;
+  }
 }
 
 .row-actions {
@@ -5699,6 +5738,200 @@ body.owl-chat-shown .dash-main {
 .join-panel {
   max-width: 520px;
   margin-bottom: var(--space-7);
+}
+
+/* ---- Points: each lesson plan a student starts uses 30; the teacher gives them ---- */
+.points-panel {
+  max-width: 520px;
+  margin-bottom: var(--space-5);
+}
+
+.points-balance {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.points-balance-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.points-balance-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.points-balance-text {
+  font-size: var(--text-md);
+  color: var(--text-heading);
+}
+
+.points-balance-text strong {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+}
+
+.points-balance-text small {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-body);
+}
+
+/* The dashboard hero: a pill under the greeting, styled like it. */
+.points-chip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  width: max-content;
+  max-width: 100%;
+  margin: -14px 0 22px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #FFFFFF;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  color: var(--text-heading);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.points-chip svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+  vertical-align: -3px;
+}
+
+.points-chip strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.points-chip-note {
+  color: var(--text-body);
+  font-size: var(--text-xs);
+}
+
+.points-chip.is-short strong {
+  color: var(--danger);
+}
+
+.points-chip:hover,
+.points-chip:focus-visible {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2), 0 0 0 2px var(--primary);
+}
+
+/* My Sections: each student's balance and a quick give, plus a bulk bar. */
+.points-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+}
+
+.points-head h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.points-note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-body);
+}
+
+.points-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.points-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-heading);
+  cursor: pointer;
+}
+
+.points-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.points-amount {
+  width: 76px;
+  padding: 6px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.points-pick,
+.points-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  flex: none;
+}
+
+.roster-row-points {
+  gap: 10px 12px;
+  flex-wrap: wrap;
+}
+
+.roster-row-points .roster-who {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.points-count {
+  flex: none;
+  min-width: 56px;
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  text-align: right;
+}
+
+.points-count strong {
+  font-size: var(--text-md);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.points-count.is-short strong {
+  color: var(--danger);
+}
+
+.points-give {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.points-error {
+  margin: 8px 0 0;
+  font-size: var(--text-sm);
+  color: var(--danger);
 }
 
 .join-form {

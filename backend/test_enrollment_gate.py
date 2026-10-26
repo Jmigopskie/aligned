@@ -15,6 +15,7 @@ from app import create_app
 from extensions import db
 from models.format import LessonPlanFormat, FormatField
 from models.lesson_plan import LessonPlan
+from models.points import Build
 from models.section import Section, SectionMembership
 from models.user import User
 
@@ -36,7 +37,9 @@ def main():
         db.session.add_all([active, old])
         db.session.commit()
         db.session.add_all([SectionMembership(section_id=active.id, student_id=enrolled.id),
-                            SectionMembership(section_id=old.id, student_id=archived.id)])
+                            SectionMembership(section_id=old.id, student_id=archived.id),
+                            # Each student has paid for this plan, so only enrolment decides here.
+                            *[Build(student_id=s.id, run_key="run-1") for s in (alone, archived, enrolled)]])
         fmt = LessonPlanFormat(name="Plain", owner_id=teacher.id)
         db.session.add(fmt)
         db.session.flush()
@@ -52,13 +55,13 @@ def main():
                 sess["user_id"] = u.id
 
         def create():
-            return client.post("/api/lesson-plans", json={"format_id": fid, "title": "New plan", "field_values": {"topic": "x"}})
+            return client.post("/api/lesson-plans", json={"run_key": "run-1", "format_id": fid, "title": "New plan", "field_values": {"topic": "x"}})
 
         def generate():
-            return client.post("/api/generate/full", json={"format_id": fid, "include_keys": []})
+            return client.post("/api/generate/full", json={"run_key": "run-1", "format_id": fid, "include_keys": []})
 
         def chat():
-            return client.post("/api/generate/chat", json={"format_id": fid, "field_key": "topic", "message": "Help"})
+            return client.post("/api/generate/chat", json={"run_key": "run-1", "format_id": fid, "field_key": "topic", "message": "Help"})
 
         # --- Not enrolled (or only in an archived section): refused, with a reason ---
         for student in (alone, archived):

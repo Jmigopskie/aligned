@@ -540,7 +540,9 @@ const STEPS = {
       });
       wrap.append(btn);
     });
-    return wrap;
+    // Students: what starting this plan costs in points.
+    const note = G.pointsNote();
+    return note ? el("div", { class: "flow-answer" }, wrap, el("p", { class: "flow-help flow-points-note" }, note)) : wrap;
   },
 };
 
@@ -863,8 +865,15 @@ window.addEventListener("aligned:guided", () => {
 });
 
 // ---- after the last question ----
-function finish() {
+async function finish() {
   if (G.getAnswers().mode === "step") {
+    // A student's plan is paid for (30 points) before Guided begins.
+    try {
+      await G.payForBuild();
+    } catch (err) {
+      showError(err.message);
+      return;
+    }
     G.startGuided();
     guided.start();
     return;
@@ -882,7 +891,14 @@ function renderReview() {
     help: "I'll write everything set to Generate. Your lesson title and session number stay yours unless you change them.",
     body: (answer) => G.mountReview(answer),
     next: "Write my plan",
-    onNext: () => {
+    onNext: async () => {
+      // A student's plan is paid for (30 points) before Alan writes it.
+      try {
+        await G.payForBuild();
+      } catch (err) {
+        showError(err.message);
+        return;
+      }
       flowGenerating = true;
       G.startFull();
     },

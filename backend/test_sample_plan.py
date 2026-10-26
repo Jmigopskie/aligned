@@ -13,6 +13,7 @@ os.environ["DATABASE_URL"] = "sqlite://"
 from app import create_app
 from extensions import db
 from models.format import LessonPlanFormat, FormatField
+from models.points import Build
 from models.section import Section, SectionMembership
 from models.supplementary_source import SupplementarySource
 from models.user import User
@@ -34,6 +35,7 @@ def main():
         db.session.add(sec)
         db.session.commit()
         db.session.add_all([SectionMembership(section_id=sec.id, student_id=s.id) for s in (ana, ben)])
+        db.session.add_all([Build(student_id=s.id, run_key="run-1") for s in (ana, ben)])  # both paid
         fmt = LessonPlanFormat(name="Plain", owner_id=teacher.id)
         db.session.add(fmt)
         db.session.flush()
@@ -53,7 +55,7 @@ def main():
                 sess["user_id"] = user.id
             prompts.clear()
             res = client.post("/api/generate/full", json={"format_id": fid, "include_keys": ["motivation"],
-                                                          "context": {"topic": "Computer parts"}, "sample_id": sample_id})
+                                                          "context": {"topic": "Computer parts"}, "sample_id": sample_id, "run_key": "run-1"})
             assert res.status_code == 200, res.get_json()
             return prompts[0]
 
