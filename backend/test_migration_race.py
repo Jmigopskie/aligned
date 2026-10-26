@@ -243,6 +243,35 @@ def check_concurrent_create_tables():
     print("  concurrent create tables OK")
 
 
+def check_create_tables_waits_out_concurrent_ddl():
+    """MySQL 1684 while another worker is still creating a new table (the
+    points tables took the live site down on 2026-10-26 this way): wait and
+    try again, don't die."""
+    from sqlalchemy.exc import OperationalError
+    from app import _create_tables
+
+    app = create_app()
+    calls = []
+    real = db.create_all
+
+    def flaky():
+        calls.append(1)
+        if len(calls) == 1:
+            raise OperationalError("SHOW FULL TABLES", {}, Exception(
+                "(1684, \"Table 'aligned'.'builds' was skipped since its definition is being modified by concurrent DDL statement\")"))
+        real()
+
+    db.create_all = flaky
+    try:
+        with app.app_context():
+            _create_tables()
+    finally:
+        db.create_all = real
+    assert len(calls) == 2, calls
+    print("  create tables waits out concurrent DDL OK")
+
+
+check_create_tables_waits_out_concurrent_ddl()
 check_concurrent_create_tables()
 check_concurrent_add_column()
 check_idempotent()

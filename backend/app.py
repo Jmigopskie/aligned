@@ -21,17 +21,23 @@ def _create_tables():
     exists" (MySQL 1050; sqlite says "table ... already exists"). The table is
     there now, which is all this needed, so it tries again for any other new
     tables instead of dying; that took the live site down on 2026-10-24 when
-    supplementary_sources was added. Any other error still raises."""
+    supplementary_sources was added. A worker that reads the table list while
+    another is still creating a table gets MySQL 1684 ("... being modified by
+    concurrent DDL statement"), which is just as transient: it took the site
+    down on 2026-10-26 when the points tables were added, so it waits and
+    tries again too. Any other error still raises."""
     from sqlalchemy.exc import OperationalError
 
-    for attempt in range(5):
+    for attempt in range(8):
         try:
             db.create_all()
             return
         except OperationalError as exc:
-            if "already exists" not in str(exc) or attempt == 4:
+            message = str(exc).lower()
+            transient = "already exists" in message or "concurrent ddl" in message
+            if not transient or attempt == 7:
                 raise
-            time.sleep(0.2)
+            time.sleep(_DDL_RETRY_DELAY_SECONDS)
 
 
 def _add_column(table: str, column: str, ddl_type: str):
