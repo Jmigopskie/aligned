@@ -100,18 +100,24 @@ def _seed_formats(folder, owner_id):
 
         fmt = LessonPlanFormat.query.filter_by(builtin_key=key).first()
         if fmt is None:
-            fmt = LessonPlanFormat(builtin_key=key, owner_id=owner_id)
+            # A new built-in waits on hold until the admin has reworked it.
+            fmt = LessonPlanFormat(builtin_key=key, owner_id=owner_id, available=False)
             db.session.add(fmt)
 
         fmt.is_builtin = True
         fmt.is_public = True
-        fmt.name = entry.get("name") or key
-        fmt.description = entry.get("description")
         # Absolute paths, refreshed every boot, so the row follows the checkout
         # wherever it lives on this machine.
         fmt.source_file_path = source
         fmt.template_docx_path = template
+        # Once the admin has reworked a built-in's fields (and what goes in
+        # each), it is theirs: the manifest no longer overwrites it.
+        if not fmt.fields_reviewed:
+            fmt.name = entry.get("name") or key
+            fmt.description = entry.get("description")
         db.session.flush()
+        if fmt.fields_reviewed:
+            return True
 
         current = [{"field_key": f.field_key, "label": f.label, "field_type": f.field_type, "anchor_index": f.anchor_index,
                     "is_required": f.is_required, "ai_hint": f.ai_hint, "parts": f.parts_list}

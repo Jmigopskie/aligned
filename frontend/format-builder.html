@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-10-26p" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-26q" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -61,6 +61,7 @@
 
       <div class="page-header form-narrow">
         <h1 id="page-title">New format</h1>
+        <p id="builtin-note" class="page-subtitle builtin-note" hidden></p>
       </div>
 
       <div class="step-indicator form-narrow" id="step-indicator">
@@ -123,7 +124,7 @@
              defined by hand here: AlignED reads them automatically from
              whatever is left in the document once you save. -->
         <div id="doc-field-editor" hidden>
-          <p class="text-sm mt-0">
+          <p class="text-sm mt-0" id="doc-intro">
             Click into the document, then use the toolbar to format text, restyle headings and
             lists, or delete a leftover line entirely. AlignED finds the fields when you save; you
             then check them, and add any it missed, under Fields.
@@ -142,9 +143,9 @@
               <div>
                 <h2 class="field-roles-title">Fields</h2>
                 <p class="text-sm mt-0">
-                  Check each field AlignED found: its name, where students write it, whether Guided walks
-                  students through it, and whether it's locked so Alan never writes it. Remove any that are
-                  wrong, or add one it missed.
+                  Check each field AlignED found: its name, where students write it, what goes in it, whether
+                  Guided walks students through it, and whether it's locked so Alan never writes it. Remove any
+                  that are wrong, or add one it missed.
                 </p>
               </div>
               <button type="button" id="field-add-btn" class="btn btn-secondary btn-sm"><span data-icon="plus"></span>Add a field</button>
@@ -222,9 +223,9 @@
     </div>
   </template>
 
-  <script src="js/api.js?v=2026-10-26p"></script>
-  <script src="js/icons.js?v=2026-10-26p"></script>
+  <script src="js/api.js?v=2026-10-26q"></script>
+  <script src="js/icons.js?v=2026-10-26q"></script>
   <script src="js/doc-toolbar.js?v=2026-10-06c"></script>
-  <script src="js/format-builder.js?v=2026-10-26n"></script>
+  <script src="js/format-builder.js?v=2026-10-26q"></script>
 </body>
 </html>

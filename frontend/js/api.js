@@ -313,6 +313,10 @@ const Api = {
     const qs = new URLSearchParams(params).toString();
     return apiFetch(`/api/admin/sections${qs ? `?${qs}` : ""}`);
   },
+  // Built-in formats: the admin reworks them and switches each one on or off.
+  adminBuiltinFormats: () => apiFetch("/api/admin/builtin-formats"),
+  setFormatAvailability: (id, available) =>
+    apiFetch(`/api/formats/${id}/availability`, { method: "PATCH", body: JSON.stringify({ available }) }),
   // kind is "users" or "sections". Resolves to
   // { updated, updated_count, skipped: [{id, reason}] } — a batch can partly
   // apply, so callers must report `skipped` rather than assume all went through.

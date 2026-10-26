@@ -29,6 +29,10 @@ class LessonPlanFormat(db.Model):
     # the field list is theirs: editing the document shifts the fields'
     # positions instead of detecting them all over again.
     fields_reviewed = db.Column(db.Boolean, nullable=False, default=False)
+    # A built-in format is offered to teachers and students only while the
+    # admin has it switched on; built-ins start on hold until their fields
+    # and what goes in each are reworked. Own formats are always available.
+    available = db.Column(db.Boolean, nullable=False, default=True)
 
     fields = db.relationship(
         "FormatField",
@@ -55,6 +59,8 @@ class LessonPlanFormat(db.Model):
             "thumbnail": f"img/formats/{self.builtin_key}.webp" if self.is_builtin and self.builtin_key else None,
             "created_at": iso_utc(self.created_at),
             "fields_reviewed": bool(self.fields_reviewed),
+            "available": bool(self.available),
+            "builtin_key": self.builtin_key,
         }
         if include_fields:
             data["fields"] = [f.to_dict() for f in self.fields]

@@ -58,6 +58,15 @@ const fieldPlaceHint = document.getElementById("field-place-hint");
 let setupFields = [];
 let setupDirty = false;
 let placing = false;
+// A shipped built-in's document is the file in backend/builtin, so it stays
+// read-only; its fields, their context and labels are still set up here.
+let docLocked = false;
+
+// Where the builder returns to: Formats for teachers, Built-in formats for an
+// admin (who edits and uploads the built-ins). newBuiltin: an admin making a
+// new built-in (format-builder.html?builtin=1).
+let doneUrl = "lesson-plan.html";
+let newBuiltin = false;
 
 function anchorEl(idx) {
   return docBuilderCanvas.querySelector(`[data-anchor-index="${idx}"]`);
@@ -104,12 +113,23 @@ function renderFieldSetup() {
       </div>
       <label class="field-setup-check"><input type="checkbox" data-flag="guided" /><span>Guided</span></label>
       <label class="field-setup-check"><input type="checkbox" data-flag="locked" /><span>Locked</span></label>
-      <button type="button" class="field-setup-remove" aria-label="Remove this field"><span data-icon="x"></span></button>`;
+      <button type="button" class="field-setup-remove" aria-label="Remove this field"><span data-icon="x"></span></button>
+      <label class="field-setup-context">
+        <span>What goes here</span>
+        <textarea rows="1" maxlength="600" placeholder="e.g. Three learning objectives starting with a measurable verb, one per line"></textarea>
+      </label>`;
     row.querySelectorAll("[data-icon]").forEach((el) => { el.innerHTML = Icons[el.dataset.icon] || ""; });
     const name = row.querySelector(".field-setup-name");
     name.value = f.label;
     name.addEventListener("input", () => {
       f.label = name.value;
+      markSetupDirty();
+    });
+    // What the AI should put in this field (saved as the field's hint).
+    const context = row.querySelector(".field-setup-context textarea");
+    context.value = f.context || "";
+    context.addEventListener("input", () => {
+      f.context = context.value;
       markSetupDirty();
     });
     row.querySelector(".field-setup-where-text").textContent =
@@ -139,7 +159,7 @@ function renderFieldRoles(fields) {
   }
   setupFields = fields
     .filter((f) => f.anchor_index !== null && f.anchor_index !== undefined)
-    .map((f) => ({ field_key: f.field_key, label: f.label, anchor_index: f.anchor_index, guided: f.role === "heavy", locked: !!f.locked, manual: !!f.manual }))
+    .map((f) => ({ field_key: f.field_key, label: f.label, anchor_index: f.anchor_index, guided: f.role === "heavy", locked: !!f.locked, manual: !!f.manual, context: f.ai_hint || "" }))
     .sort((a, b) => a.anchor_index - b.anchor_index);
   setupDirty = false;
   renderFieldSetup();
@@ -173,7 +193,7 @@ docBuilderCanvas.addEventListener("click", (e) => {
     return;
   }
   const label = anchorText(idx).replace(/[:\s]+$/, "").slice(0, 60) || "New field";
-  setupFields.push({ field_key: null, label, anchor_index: idx, guided: true, locked: false, manual: true });
+  setupFields.push({ field_key: null, label, anchor_index: idx, guided: true, locked: false, manual: true, context: "" });
   setupFields.sort((a, b) => a.anchor_index - b.anchor_index);
   setPlacing(false);
   markSetupDirty();
@@ -206,8 +226,8 @@ async function saveFieldSetup() {
   }
   setButtonLoading(fieldRolesSaveBtn, true, "Saving");
   try {
-    const data = await Api.saveFieldSetup(editingFormatId, setupFields.map(({ field_key, label, anchor_index, guided, locked }) =>
-      ({ field_key, label: label.trim(), anchor_index, guided, locked })));
+    const data = await Api.saveFieldSetup(editingFormatId, setupFields.map(({ field_key, label, anchor_index, guided, locked, context }) =>
+      ({ field_key, label: label.trim(), anchor_index, guided, locked, context: (context || "").trim().slice(0, 600) })));
     // Redraw the document so each field's input shows where it now goes.
     const refreshed = await Api.getFormatTemplateHtml(editingFormatId);
     renderDocCanvas(refreshed.plain ? "" : refreshed.html); // the builder edits the real file, never the plain stand-in
@@ -321,7 +341,7 @@ async function handleFileSelected(file) {
 
 function renderDocCanvas(html) {
   docBuilderCanvas.innerHTML = html;
-  docBuilderCanvas.contentEditable = "true";
+  docBuilderCanvas.contentEditable = docLocked ? "false" : "true";
   hydrateDocImages(docBuilderCanvas);
   lastFocusedAnchor = null;
   snapshotContentState();
@@ -820,6 +840,7 @@ createFormatBtn.addEventListener("click", async () => {
     } else {
       const created = await Api.createFormat({
         name,
+        ...(newBuiltin ? { builtin: true } : {}),
         is_public: document.getElementById("is-public").checked,
         fields,
         source_temp_token: sourceTempToken || undefined,
@@ -832,7 +853,7 @@ createFormatBtn.addEventListener("click", async () => {
       }
       showToast("Format created.");
     }
-    window.location.href = "lesson-plan.html";
+    window.location.href = doneUrl;
   } catch (err) {
     showError(err.message);
   } finally {
@@ -847,23 +868,37 @@ deleteFormatBtn.addEventListener("click", async () => {
   try {
     await Api.deleteFormat(editingFormatId);
     showToast("Format deleted.");
-    window.location.href = "lesson-plan.html";
+    window.location.href = doneUrl;
   } catch (err) {
     showError(err.message);
     setButtonLoading(deleteFormatBtn, false);
   }
 });
 
-document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("formats");
+// A built-in's page: the share box goes (built-ins reach everyone once switched
+// on), and a note says where it's switched on or put on hold.
+function showBuiltinNote(isBuiltin, available) {
+  document.getElementById("is-public").closest(".checkbox-row").hidden = !!isBuiltin;
+  const note = document.getElementById("builtin-note");
+  note.hidden = !isBuiltin;
+  if (isBuiltin) {
+    note.textContent = available
+      ? "Built-in format, switched on: teachers and students can use it. Put it on hold in Admin > Built-in formats if a problem comes up."
+      : "Built-in format, on hold: no one else sees it until you switch it on in Admin > Built-in formats, once its fields and their context are ready.";
+  }
+}
 
 async function enterEditMode(fmt) {
   editingFormatId = fmt.id;
-  pageTitle.textContent = "Edit format";
-  document.title = "Edit format | AlignED";
+  pageTitle.textContent = fmt.is_builtin ? "Edit built-in format" : "Edit format";
+  document.title = `${pageTitle.textContent} | AlignED`;
   stepIndicator.hidden = true;
   backToStep1Btn.textContent = "Cancel";
-  backToStep1Btn.onclick = () => (window.location.href = "lesson-plan.html");
-  deleteFormatBtn.hidden = false;
+  backToStep1Btn.onclick = () => (window.location.href = doneUrl);
+  // A built-in is switched off (on hold) rather than deleted, and is shared with
+  // everyone by being switched on, not by the share box.
+  deleteFormatBtn.hidden = !!fmt.is_builtin;
+  showBuiltinNote(fmt.is_builtin, fmt.available);
   createFormatBtn.textContent = "Save changes";
 
   document.getElementById("format-name").value = fmt.name || "";
@@ -872,6 +907,12 @@ async function enterEditMode(fmt) {
   if (fmt.has_source_file) {
     manualFieldEditor.hidden = true;
     docFieldEditor.hidden = false;
+    docLocked = !!fmt.builtin_key;
+    if (docLocked) {
+      docToolbar.hidden = true;
+      document.getElementById("doc-intro").textContent =
+        "This built-in's document ships with AlignED, so it can't be edited here. Set up its fields under Fields: what each is called, what goes in it, and whether Guided walks students through it.";
+    }
 
     try {
       const data = await Api.getFormatTemplateHtml(fmt.id);
@@ -919,21 +960,37 @@ async function init() {
   }
   wireTopbar(user);
 
-  const formatId = new URLSearchParams(window.location.search).get("format_id");
+  const params = new URLSearchParams(window.location.search);
+  const isAdmin = user.role === "admin";
+  if (isAdmin) {
+    // The admin looks after the built-in formats from Admin > Built-in formats.
+    doneUrl = "admin-formats.html";
+    document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("admin-formats");
+    const back = document.querySelector(".back-link");
+    back.href = doneUrl;
+    back.lastChild.textContent = "Back to built-in formats";
+  }
+  const formatId = params.get("format_id") || params.get("id");
+  if (!formatId && isAdmin && params.get("builtin")) {
+    newBuiltin = true;
+    pageTitle.textContent = "New built-in format";
+    document.title = "New built-in format | AlignED";
+    showBuiltinNote(true, false);
+  }
   if (!formatId) OwlGuide.show("format-source");
   if (formatId) {
     try {
       const data = await Api.getFormat(formatId);
       const fmt = data.format;
-      if (fmt.owner_id !== user.id) {
+      if (fmt.owner_id !== user.id && !(isAdmin && fmt.is_builtin)) {
         showToast("Only the teacher who created this format can edit it.", true);
-        window.location.href = "lesson-plan.html";
+        window.location.href = doneUrl;
         return;
       }
       await enterEditMode(fmt);
     } catch (err) {
       showToast(err.message, true);
-      window.location.href = "lesson-plan.html";
+      window.location.href = doneUrl;
     }
   }
 }

@@ -9,7 +9,7 @@ from werkzeug.utils import secure_filename
 from extensions import db
 from models.format import LessonPlanFormat, FormatField
 from models.lesson_plan import LessonPlan
-from routes.auth_routes import login_required, staff_required, current_user
+from routes.auth_routes import admin_required, login_required, staff_required, current_user
 from services import ai_service, docx_service
 
 format_bp = Blueprint("formats", __name__)
@@ -79,15 +79,15 @@ def _build_format_fields(format_id, fields_payload):
         ))
     return rows
 
-def _reject_if_builtin(fmt):
-    """The ready-made formats are shared by everyone and seeded from files in
-    the repository, so nobody may change them, not even the admin account
-    that nominally owns them. Checked before ownership so the answer is the
-    same for every user. Returns an error response, or None to carry on."""
-    if fmt.is_builtin:
+def _reject_if_builtin(fmt, user=None):
+    """The ready-made formats are shared by everyone and only the admin
+    manages them (reworking their fields, switching them on or off; see
+    admin_builtin_formats). Checked before ownership so a teacher gets the
+    same answer whoever owns the row. Returns an error response, or None."""
+    if fmt.is_builtin and not (user and user.role == "admin"):
         return jsonify({
             "status": "error",
-            "message": "Built-in formats are read-only. Make your own with New format to change a layout.",
+            "message": "Built-in formats are managed by the admin. Make your own with New format to change a layout.",
         }), 403
     return None
 
@@ -100,15 +100,19 @@ def _tmp_dir():
 @login_required
 def list_formats():
     user = current_user()
+    # A built-in the admin has on hold is offered to no one but the admin.
+    live_builtin = LessonPlanFormat.is_builtin.is_(True) & LessonPlanFormat.available.is_(True)
     if user.role == "student":
         # A student picks from the built-ins and their own teachers' formats
         # (shared or not); joining the class is what grants access.
         teacher_ids = [m.section.teacher_id for m in user.section_memberships if m.section]
-        visible = LessonPlanFormat.is_builtin.is_(True)
+        visible = live_builtin
         if teacher_ids:
-            visible = visible | LessonPlanFormat.owner_id.in_(teacher_ids)
+            visible = visible | (LessonPlanFormat.owner_id.in_(teacher_ids) & LessonPlanFormat.is_builtin.is_(False))
     else:
         visible = (LessonPlanFormat.owner_id == user.id) | (LessonPlanFormat.is_public.is_(True))
+        if user.role != "admin":
+            visible = visible & (LessonPlanFormat.is_builtin.is_(False) | live_builtin)
     formats = LessonPlanFormat.query.filter(visible).order_by(LessonPlanFormat.created_at.desc()).all()
     return jsonify({"status": "ok", "formats": [f.to_dict() for f in formats]})
 
@@ -244,6 +248,11 @@ def create_format():
         return jsonify({"status": "error", "message": "Add at least one field with a label."}), 400
 
     fmt = LessonPlanFormat(name=name, owner_id=user.id, is_public=bool(data.get("is_public", False)))
+    if data.get("builtin") and user.role == "admin":
+        # An admin's built-in: shared with everyone, but on hold until the
+        # admin has set up its fields and switches it on.
+        fmt.is_builtin, fmt.is_public, fmt.available = True, True, False
+        fmt.description = (data.get("description") or "").strip()[:255] or None
     db.session.add(fmt)
     db.session.flush()
 
@@ -323,11 +332,11 @@ def get_format(format_id):
 def update_format(format_id):
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
-    locked = _reject_if_builtin(fmt)
+    locked = _reject_if_builtin(fmt, user)
     if locked:
         return locked
 
-    if fmt.owner_id != user.id:
+    if fmt.owner_id != user.id and not (fmt.is_builtin and user.role == "admin"):
         return jsonify({"status": "error", "message": "Only the teacher who created this format can edit it."}), 403
 
     data = request.get_json(silent=True) or {}
@@ -367,12 +376,16 @@ def update_format(format_id):
 def delete_format(format_id):
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
-    locked = _reject_if_builtin(fmt)
+    locked = _reject_if_builtin(fmt, user)
     if locked:
         return locked
 
-    if fmt.owner_id != user.id:
+    if fmt.owner_id != user.id and not (fmt.is_builtin and user.role == "admin"):
         return jsonify({"status": "error", "message": "Only the teacher who created this format can delete it."}), 403
+    if fmt.builtin_key:
+        # Shipped with the app: its files live in backend/builtin and it would
+        # come back on the next restart anyway.
+        return jsonify({"status": "error", "message": "This built-in ships with AlignED. Switch it off instead."}), 400
 
     in_use = LessonPlan.query.filter_by(format_id=fmt.id).count()
     if in_use:
@@ -498,12 +511,17 @@ def edit_format_content(format_id):
     detection create_format() runs when the format is first saved."""
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
-    locked = _reject_if_builtin(fmt)
+    locked = _reject_if_builtin(fmt, user)
     if locked:
         return locked
 
-    if fmt.owner_id != user.id:
+    if fmt.owner_id != user.id and not (fmt.is_builtin and user.role == "admin"):
         return jsonify({"status": "error", "message": "Only the teacher who created this format can edit its document."}), 403
+    if fmt.builtin_key:
+        # Its document is the file shipped in backend/builtin: an edit would
+        # change the repo copy and be lost on the next deploy.
+        return jsonify({"status": "error", "message": "This built-in's document ships with AlignED and can't be "
+                                                      "edited. Set up its fields and what goes in each instead."}), 400
 
     data = request.get_json(silent=True) or {}
     edits = _sanitize_content_edits(data.get("edits"))
@@ -577,10 +595,10 @@ def set_field_roles(format_id):
     """
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
-    locked = _reject_if_builtin(fmt)
+    locked = _reject_if_builtin(fmt, user)
     if locked:
         return locked
-    if fmt.owner_id != user.id:
+    if fmt.owner_id != user.id and not (fmt.is_builtin and user.role == "admin"):
         return jsonify({"status": "error", "message": "You don't have access to this format."}), 403
 
     data = request.get_json(silent=True) or {}
@@ -619,10 +637,10 @@ def set_field_setup(format_id):
     """
     user = current_user()
     fmt = LessonPlanFormat.query.get_or_404(format_id)
-    blocked = _reject_if_builtin(fmt)
+    blocked = _reject_if_builtin(fmt, user)
     if blocked:
         return blocked
-    if fmt.owner_id != user.id:
+    if fmt.owner_id != user.id and not (fmt.is_builtin and user.role == "admin"):
         return jsonify({"status": "error", "message": "Only the teacher who created this format can change its fields."}), 403
     template_path = docx_service.resolve_template_path(fmt)
     if not template_path:
@@ -676,10 +694,40 @@ def set_field_setup(format_id):
         field.sort_order = order
         field.role = "heavy" if item.get("guided") else "easy"
         field.locked = bool(item.get("locked"))
+        # What goes in this field, in the format owner's words: the AI's hint
+        # for it. Sent empty, it clears; left out, the field keeps its hint.
+        if "context" in item:
+            context = " ".join(str(item.get("context") or "").split())[:600]
+            field.ai_hint = context or None
     fmt.fields_reviewed = True
     db.session.commit()
     db.session.refresh(fmt)
     return jsonify({"status": "ok", "format": fmt.to_dict(include_fields=True)})
+
+@format_bp.get("/admin/builtin-formats")
+@admin_required
+def admin_builtin_formats():
+    """Every built-in format, on or on hold, for the admin's Built-in formats page."""
+    formats = (LessonPlanFormat.query.filter(LessonPlanFormat.is_builtin.is_(True))
+               .order_by(LessonPlanFormat.name).all())
+    return jsonify({"status": "ok", "formats": [f.to_dict() for f in formats]})
+
+@format_bp.patch("/formats/<int:format_id>/availability")
+@admin_required
+def set_format_availability(format_id):
+    """Switch a built-in on (teachers and students see it) or put it on hold.
+    Plans already made with it keep opening either way."""
+    fmt = LessonPlanFormat.query.get_or_404(format_id)
+    if not fmt.is_builtin:
+        return jsonify({"status": "error", "message": "Only built-in formats are switched on or off here."}), 400
+    available = (request.get_json(silent=True) or {}).get("available")
+    if not isinstance(available, bool):
+        return jsonify({"status": "error", "message": "Say whether the format should be on or off."}), 400
+    if available and not fmt.fields:
+        return jsonify({"status": "error", "message": "Set up this format's fields before switching it on."}), 400
+    fmt.available = available
+    db.session.commit()
+    return jsonify({"status": "ok", "format": fmt.to_dict()})
 
 def _shift_anchor(idx, deletions):
     """A position after some lines were deleted: None when its own line went."""

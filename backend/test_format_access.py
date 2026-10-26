@@ -58,7 +58,8 @@ def main():
         db.session.add(SectionMembership(section_id=section.id, student_id=student.id))
         db.session.commit()
 
-        builtins = {f.name for f in LessonPlanFormat.query.filter_by(is_builtin=True).all()}
+        # Seeded built-ins start on hold; only switched-on ones are offered.
+        builtins = {f.name for f in LessonPlanFormat.query.filter_by(is_builtin=True, available=True).all()}
         t_private_id = LessonPlanFormat.query.filter_by(name="T-private").one().id
         ids = {"teacher": teacher.id, "student": student.id, "loner": loner.id, "s_old": s_old.id}
 

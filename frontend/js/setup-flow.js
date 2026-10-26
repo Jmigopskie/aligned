@@ -243,10 +243,12 @@ async function paintFormats(wrap) {
   }
   const groups = formatGroups(formats, user);
   const item = (f, by) => ({ value: f.id, label: by && f.owner_name ? `${f.name} (${f.owner_name})` : f.name });
-  const options = [{ group: "Built-in", items: groups.builtin.map((f) => item(f)) }];
+  // Built-ins the admin has on hold aren't sent, so the group can be empty.
+  const options = groups.builtin.length ? [{ group: "Built-in", items: groups.builtin.map((f) => item(f)) }] : [];
   if (user.role === "student") {
     if (groups.teacher.length) options.push({ group: "From your teacher", items: groups.teacher.map((f) => item(f, true)) });
-    else say("Join your teacher's class to see the formats they uploaded.", "hi");
+    else if (options.length) say("Join your teacher's class to see the formats they uploaded.", "hi");
+    else say("No formats are ready yet. Ask your teacher to upload your school's format.", "hi");
   } else if (groups.mine.length) {
     options.push({ group: "Uploaded by you", items: groups.mine.map((f) => item(f)) });
   }

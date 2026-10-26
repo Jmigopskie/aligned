@@ -190,6 +190,17 @@ def _migrate_format_columns():
     _add_column("lesson_plan_formats", "fields_reviewed", "BOOLEAN NOT NULL DEFAULT 0")
     _add_unique_index("lesson_plan_formats", "uq_lesson_plan_formats_builtin_key", "builtin_key")
 
+    # Built-ins are on hold until the admin reworks and switches them on.
+    # Only when the column is first added are the built-ins already there put
+    # on hold; on every later boot the admin's on/off choice stands.
+    from sqlalchemy import inspect, text
+    had_column = "available" in {c["name"] for c in inspect(db.engine).get_columns("lesson_plan_formats")} \
+        if "lesson_plan_formats" in inspect(db.engine).get_table_names() else True
+    _add_column("lesson_plan_formats", "available", "BOOLEAN NOT NULL DEFAULT 1")
+    if not had_column:
+        with db.engine.begin() as conn:
+            conn.execute(text("UPDATE lesson_plan_formats SET available = 0 WHERE is_builtin = 1"))
+
 
 def _backfill_guide_doc_types():
     """Give a type to uploads from before the Budget of Work / Curriculum

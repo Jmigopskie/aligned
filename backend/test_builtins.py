@@ -106,15 +106,21 @@ def check_manifest_change_updates_in_place(app):
 def check_lock(app, admin, teacher, student):
     fmt = LessonPlanFormat.query.filter_by(builtin_key="4as-lesson-plan").one()
     field_key = fmt.fields[0].field_key
-    for user in (admin, teacher):  # admin is the nominal owner
-        c = client_for(app, user)
-        calls = [
-            c.patch(f"/api/formats/{fmt.id}", json={"name": "Hijacked"}),
-            c.delete(f"/api/formats/{fmt.id}"),
-            c.patch(f"/api/formats/{fmt.id}/content", json={"edits": [{"anchor_index": 1, "action": "delete"}]}),
-            c.patch(f"/api/formats/{fmt.id}/field-roles", json={"roles": {field_key: "heavy"}}),
-        ]
-        assert [r.status_code for r in calls] == [403] * 4, [r.status_code for r in calls]
+    c = client_for(app, teacher)
+    calls = [
+        c.patch(f"/api/formats/{fmt.id}", json={"name": "Hijacked"}),
+        c.delete(f"/api/formats/{fmt.id}"),
+        c.patch(f"/api/formats/{fmt.id}/content", json={"edits": [{"anchor_index": 1, "action": "delete"}]}),
+        c.patch(f"/api/formats/{fmt.id}/field-roles", json={"roles": {field_key: "heavy"}}),
+    ]
+    assert [r.status_code for r in calls] == [403] * 4, [r.status_code for r in calls]
+    # The admin manages built-ins (test_builtin_admin.py) but can't delete one
+    # that ships with the app.
+    c = client_for(app, admin)
+    assert c.delete(f"/api/formats/{fmt.id}").status_code == 400
+    # Nor edit its shipped document: that would rewrite the repo's copy.
+    assert c.patch(f"/api/formats/{fmt.id}/content",
+                   json={"edits": [{"anchor_index": 1, "action": "delete"}]}).status_code == 400
     db.session.expire_all()
     fmt = db.session.get(LessonPlanFormat, fmt.id)
     assert fmt.name == "4A's Lesson Plan" and fmt.fields[0].role is None
@@ -134,6 +140,11 @@ def check_lock(app, admin, teacher, student):
 
 
 def check_visibility(app, student):
+    # Built-ins start on hold; students see them once the admin switches them on.
+    res = client_for(app, student).get("/api/formats").get_json()
+    assert not [f for f in res["formats"] if f["is_builtin"]]
+    LessonPlanFormat.query.filter(LessonPlanFormat.builtin_key.isnot(None)).update({"available": True})
+    db.session.commit()
     res = client_for(app, student).get("/api/formats").get_json()
     shown = [f for f in res["formats"] if f["is_builtin"]]
     assert {f["name"] for f in shown} >= {"4A's Lesson Plan", "SNHS Detailed Lesson Plan"}
