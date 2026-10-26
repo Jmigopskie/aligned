@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-10-26q" />
+  <link rel="stylesheet" href="css/style.css?v=2026-10-26r" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -143,9 +143,8 @@
               <div>
                 <h2 class="field-roles-title">Fields</h2>
                 <p class="text-sm mt-0">
-                  Check each field AlignED found: its name, where students write it, what goes in it, whether
-                  Guided walks students through it, and whether it's locked so Alan never writes it. Remove any
-                  that are wrong, or add one it missed.
+                  Click a field, here or in the document, to set its name, what goes in it, and whether Guided
+                  walks students through it or it's locked so Alan never writes it. Add any AlignED missed.
                 </p>
               </div>
               <button type="button" id="field-add-btn" class="btn btn-secondary btn-sm"><span data-icon="plus"></span>Add a field</button>
@@ -154,8 +153,7 @@
               Click the line in the document where the new field's input goes.
               <button type="button" id="field-place-cancel" class="btn btn-ghost btn-sm">Cancel</button>
             </p>
-            <div class="field-setup-cols" aria-hidden="true"><span>Field and where it's written</span><span>Guided</span><span>Locked</span><span></span></div>
-            <div id="field-roles-list" class="field-setup-list"></div>
+            <ol id="field-roles-list" class="field-setup-list"></ol>
             <div class="field-setup-foot">
               <span class="text-sm" id="field-roles-status"></span>
               <button type="button" id="field-roles-save-btn" class="btn btn-primary btn-sm" disabled>Save fields</button>
@@ -175,6 +173,47 @@
         </div>
       </section>
       </main>
+    </div>
+  </div>
+
+  <!-- One field at a time: opened from the Fields list or the field's box in the document. -->
+  <div class="modal-overlay" id="field-modal" hidden>
+    <div class="modal-dialog field-modal" role="dialog" aria-modal="true" aria-labelledby="field-modal-title">
+      <div class="modal-header">
+        <h2 id="field-modal-title">Edit field</h2>
+        <button type="button" class="modal-close" id="field-modal-close" aria-label="Close"><span data-icon="x"></span></button>
+      </div>
+      <form class="modal-body" id="field-modal-form" novalidate>
+        <div class="field">
+          <label for="field-modal-name">Field name</label>
+          <input type="text" id="field-modal-name" maxlength="200" required />
+        </div>
+        <p class="field-modal-where">
+          <span id="field-modal-where-text"></span>
+          <button type="button" class="link-btn" id="field-modal-show"><span data-icon="eye"></span>Show in document</button>
+        </p>
+        <div class="field">
+          <label for="field-modal-context">What goes here</label>
+          <textarea id="field-modal-context" rows="4" maxlength="600"
+            placeholder="e.g. Three learning objectives starting with a measurable verb, one per line"></textarea>
+          <p class="hint field-modal-count"><span id="field-modal-count">0</span> / 600 · Alan follows this when he writes or guides this field.</p>
+        </div>
+        <label class="field-modal-option">
+          <input type="checkbox" id="field-modal-guided" />
+          <span><strong>Guided</strong>Guided mode walks students through this field.</span>
+        </label>
+        <label class="field-modal-option">
+          <input type="checkbox" id="field-modal-locked" />
+          <span><strong>Locked</strong>Alan never writes it; students do.</span>
+        </label>
+        <div class="field-modal-foot">
+          <button type="button" class="btn btn-ghost btn-sm danger" id="field-modal-remove"><span data-icon="trash"></span>Remove field</button>
+          <span class="flex gap-8">
+            <button type="button" class="btn btn-secondary" id="field-modal-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Done</button>
+          </span>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -226,6 +265,6 @@
   <script src="js/api.js?v=2026-10-26q"></script>
   <script src="js/icons.js?v=2026-10-26q"></script>
   <script src="js/doc-toolbar.js?v=2026-10-06c"></script>
-  <script src="js/format-builder.js?v=2026-10-26q"></script>
+  <script src="js/format-builder.js?v=2026-10-26r"></script>
 </body>
 </html>

@@ -98,59 +98,172 @@ function showFieldInDoc(f) {
   });
 }
 
+// The Fields list is one compact button per field; everything about a field
+// is edited in the field modal below.
 function renderFieldSetup() {
   fieldRolesPanel.hidden = false;
   fieldRolesSaveBtn.disabled = !setupDirty;
   if (!setupDirty) fieldRolesStatus.textContent = `${setupFields.length} field${setupFields.length === 1 ? "" : "s"}`;
   fieldRolesList.replaceChildren(...setupFields.map((f, i) => {
-    const row = document.createElement("div");
-    row.className = `field-setup-row${f.locked ? " is-locked" : ""}`;
-    const where = anchorText(f.anchor_index);
-    row.innerHTML = `
-      <div class="field-setup-main">
-        <input type="text" class="field-setup-name" maxlength="200" aria-label="Field name" />
-        <button type="button" class="field-setup-where"><span data-icon="eye"></span><span class="field-setup-where-text"></span></button>
-      </div>
-      <label class="field-setup-check"><input type="checkbox" data-flag="guided" /><span>Guided</span></label>
-      <label class="field-setup-check"><input type="checkbox" data-flag="locked" /><span>Locked</span></label>
-      <button type="button" class="field-setup-remove" aria-label="Remove this field"><span data-icon="x"></span></button>
-      <label class="field-setup-context">
-        <span>What goes here</span>
-        <textarea rows="1" maxlength="600" placeholder="e.g. Three learning objectives starting with a measurable verb, one per line"></textarea>
-      </label>`;
-    row.querySelectorAll("[data-icon]").forEach((el) => { el.innerHTML = Icons[el.dataset.icon] || ""; });
-    const name = row.querySelector(".field-setup-name");
-    name.value = f.label;
-    name.addEventListener("input", () => {
-      f.label = name.value;
-      markSetupDirty();
-    });
-    // What the AI should put in this field (saved as the field's hint).
-    const context = row.querySelector(".field-setup-context textarea");
-    context.value = f.context || "";
-    context.addEventListener("input", () => {
-      f.context = context.value;
-      markSetupDirty();
-    });
-    row.querySelector(".field-setup-where-text").textContent =
-      `${f.manual && !f.field_key ? "New · " : ""}Written beside “${where || "this line"}” · Show`;
-    row.querySelector(".field-setup-where").addEventListener("click", () => showFieldInDoc(f));
-    row.querySelectorAll("[data-flag]").forEach((box) => {
-      box.checked = !!f[box.dataset.flag];
-      box.addEventListener("change", () => {
-        f[box.dataset.flag] = box.checked;
-        row.classList.toggle("is-locked", !!f.locked);
-        markSetupDirty();
-      });
-    });
-    row.querySelector(".field-setup-remove").addEventListener("click", () => {
-      setupFields.splice(i, 1);
-      markSetupDirty();
-      renderFieldSetup();
-    });
-    return row;
+    const item = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `field-chip${f.context && f.context.trim() ? "" : " is-bare"}`;
+    btn.innerHTML = `
+      <span class="field-chip-num"></span>
+      <span class="field-chip-text">
+        <span class="field-chip-name"></span>
+        <span class="field-chip-meta"><span class="field-chip-tags"></span><span class="field-chip-where"></span></span>
+      </span>
+      <span class="field-chip-edit" aria-hidden="true">${Icons.edit || ""}</span>`;
+    btn.querySelector(".field-chip-num").textContent = i + 1;
+    btn.querySelector(".field-chip-name").textContent = f.label.trim() || "Untitled field";
+    btn.querySelector(".field-chip-where").textContent =
+      `${f.manual && !f.field_key ? "New · " : ""}beside “${anchorText(f.anchor_index) || "this line"}”`;
+    const tags = btn.querySelector(".field-chip-tags");
+    const tag = (text, cls) => {
+      const t = document.createElement("span");
+      t.className = `field-tag ${cls}`;
+      t.textContent = text;
+      tags.append(t);
+    };
+    if (f.guided) tag("Guided", "is-guided");
+    if (f.locked) tag("Locked", "is-locked");
+    if (!(f.context && f.context.trim())) tag("No context", "is-bare");
+    btn.setAttribute("aria-label", `Edit field ${i + 1}: ${btn.querySelector(".field-chip-name").textContent}`);
+    btn.addEventListener("click", () => openFieldModal(f, btn));
+    item.append(btn);
+    return item;
   }));
+  labelFieldSlots();
 }
+
+// In the builder a field's box in the document is a way into its modal, not
+// somewhere to type: the template stays blank.
+function labelFieldSlots() {
+  const byKey = new Map(setupFields.filter((f) => f.field_key).map((f) => [f.field_key, f]));
+  docBuilderCanvas.querySelectorAll("[data-field-key]").forEach((slot) => {
+    const f = byKey.get(slot.dataset.fieldKey);
+    slot.contentEditable = "false";
+    slot.classList.toggle("is-setup-slot", !!f);
+    if (f) {
+      slot.dataset.fieldLabel = `${f.label.trim() || "Field"}${f.context && f.context.trim() ? "" : " · add what goes here"}`;
+      slot.tabIndex = 0;
+      slot.setAttribute("role", "button");
+      slot.setAttribute("aria-label", `Edit field: ${f.label}`);
+    }
+  });
+}
+
+// ---- the field modal ----
+const fieldModal = document.getElementById("field-modal");
+const fieldModalForm = document.getElementById("field-modal-form");
+const fieldModalName = document.getElementById("field-modal-name");
+const fieldModalContext = document.getElementById("field-modal-context");
+const fieldModalCount = document.getElementById("field-modal-count");
+const fieldModalGuided = document.getElementById("field-modal-guided");
+const fieldModalLocked = document.getElementById("field-modal-locked");
+let modalField = null;
+let modalReturnFocus = null;
+
+function openFieldModal(f, returnFocus) {
+  modalField = f;
+  modalReturnFocus = returnFocus || document.activeElement;
+  const n = setupFields.indexOf(f) + 1;
+  document.getElementById("field-modal-title").textContent = `Field ${n} of ${setupFields.length}`;
+  fieldModalName.value = f.label;
+  fieldModalContext.value = f.context || "";
+  fieldModalCount.textContent = fieldModalContext.value.length;
+  fieldModalGuided.checked = !!f.guided;
+  fieldModalLocked.checked = !!f.locked;
+  document.getElementById("field-modal-where-text").textContent =
+    `Written beside “${anchorText(f.anchor_index) || "this line"}”.`;
+  fieldModal.hidden = false;
+  fieldModalName.focus();
+  fieldModalName.select();
+}
+
+function closeFieldModal() {
+  fieldModal.hidden = true;
+  modalField = null;
+  if (modalReturnFocus && document.contains(modalReturnFocus)) modalReturnFocus.focus();
+}
+
+fieldModalContext.addEventListener("input", () => {
+  fieldModalCount.textContent = fieldModalContext.value.length;
+});
+
+fieldModalForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (!modalField) return;
+  if (!fieldModalName.value.trim()) {
+    showToast("Every field needs a name.", true);
+    fieldModalName.focus();
+    return;
+  }
+  const f = modalField;
+  const next = {
+    label: fieldModalName.value,
+    context: fieldModalContext.value,
+    guided: fieldModalGuided.checked,
+    locked: fieldModalLocked.checked,
+  };
+  const changed = Object.keys(next).some((k) => (k === "guided" || k === "locked" ? !!f[k] : f[k] || "") !== next[k]);
+  Object.assign(f, next);
+  const index = setupFields.indexOf(f);
+  const returnTo = modalReturnFocus;
+  closeFieldModal();
+  if (changed) {
+    markSetupDirty();
+    renderFieldSetup();
+    // Opened from the list, which was just redrawn: focus this field's new button.
+    if (!document.contains(returnTo)) fieldRolesList.querySelectorAll(".field-chip")[index]?.focus();
+  }
+});
+
+document.getElementById("field-modal-cancel").addEventListener("click", closeFieldModal);
+document.getElementById("field-modal-close").addEventListener("click", closeFieldModal);
+fieldModal.addEventListener("click", (e) => {
+  if (e.target === fieldModal) closeFieldModal();
+});
+fieldModal.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    e.stopPropagation();
+    closeFieldModal();
+  }
+});
+document.getElementById("field-modal-show").addEventListener("click", () => {
+  const f = modalField;
+  modalReturnFocus = null;
+  closeFieldModal();
+  if (f) showFieldInDoc(f);
+});
+document.getElementById("field-modal-remove").addEventListener("click", () => {
+  const f = modalField;
+  if (!f) return;
+  setupFields.splice(setupFields.indexOf(f), 1);
+  modalReturnFocus = fieldAddBtn;
+  closeFieldModal();
+  markSetupDirty();
+  renderFieldSetup();
+  showToast(`Removed “${f.label.trim() || "field"}”. Save fields to keep this.`);
+});
+
+// A field's box in the document opens its modal.
+docBuilderCanvas.addEventListener("click", (e) => {
+  if (placing) return;
+  const slot = e.target.closest(".is-setup-slot");
+  if (!slot) return;
+  e.preventDefault();
+  const f = setupFields.find((x) => x.field_key === slot.dataset.fieldKey);
+  if (f) openFieldModal(f, slot);
+});
+docBuilderCanvas.addEventListener("keydown", (e) => {
+  const slot = e.target.closest && e.target.closest(".is-setup-slot");
+  if (!slot || (e.key !== "Enter" && e.key !== " ")) return;
+  e.preventDefault();
+  slot.click();
+});
 
 function renderFieldRoles(fields) {
   if (!fields || !fields.length) {
@@ -198,13 +311,9 @@ docBuilderCanvas.addEventListener("click", (e) => {
   setPlacing(false);
   markSetupDirty();
   renderFieldSetup();
-  const added = setupFields.findIndex((f) => f.anchor_index === idx);
-  const input = fieldRolesList.querySelectorAll(".field-setup-name")[added];
-  if (input) {
-    input.scrollIntoView({ behavior: "smooth", block: "center" });
-    input.focus();
-    input.select();
-  }
+  // Straight into the new field's modal: name it and say what goes there.
+  const added = setupFields.find((f) => f.anchor_index === idx);
+  openFieldModal(added, fieldRolesList.querySelectorAll(".field-chip")[setupFields.indexOf(added)]);
 }, true);
 docBuilderCanvas.addEventListener("mouseover", (e) => {
   if (!placing) return;
@@ -342,6 +451,7 @@ async function handleFileSelected(file) {
 function renderDocCanvas(html) {
   docBuilderCanvas.innerHTML = html;
   docBuilderCanvas.contentEditable = docLocked ? "false" : "true";
+  labelFieldSlots();
   hydrateDocImages(docBuilderCanvas);
   lastFocusedAnchor = null;
   snapshotContentState();
