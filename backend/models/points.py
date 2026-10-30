@@ -1,15 +1,20 @@
-"""Points: a student's allowance for starting lesson plans.
+"""Points: a student's allowance for having Alan write lesson plans.
 
-A teacher allots points to the students in their sections; starting a lesson
-plan (Building Proficiency or Guided) costs a student BUILD_COST points, once
-per plan. The plan is identified by the setup run's key, so leaving a plan and
-coming back to it later never costs again. Teachers and admins don't pay.
+A teacher allots points to the students in their sections; having Alan write a
+plan (Building Proficiency) costs a student BUILD_COST points, once per plan.
+Guided mode is free. The plan is identified by the setup run's key, or by the
+saved plan once it carries its build, so writing the same plan again never
+costs again. Teachers and admins don't pay.
 """
 from datetime import datetime
 
 from extensions import db, iso_utc
 
 BUILD_COST = 30
+# Plans saved before points existed (deployed 2026-10-26 ~13:07 +08:00) never
+# carried a build; they stay free to write. Every plan saved after that
+# deploy carries its build, so a few minutes' slack costs nothing.
+POINTS_STARTED_UTC = datetime(2026, 10, 26, 5, 15)
 
 
 class Build(db.Model):

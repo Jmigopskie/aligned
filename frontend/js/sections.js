@@ -166,7 +166,7 @@ function paintBalances() {
     const n = balances.get(el.dataset.balance) || 0;
     el.innerHTML = `<strong>${n}</strong> pt${n === 1 ? "" : "s"}`;
     el.classList.toggle("is-short", n < POINTS_PER_PLAN);
-    el.title = n < POINTS_PER_PLAN ? "Not enough to start a lesson plan" : `Enough for ${Math.floor(n / POINTS_PER_PLAN)} lesson plan(s)`;
+    el.title = n < POINTS_PER_PLAN ? "Not enough for a Building Proficiency plan" : `Enough for ${Math.floor(n / POINTS_PER_PLAN)} Building Proficiency plan(s)`;
   });
 }
 

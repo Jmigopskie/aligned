@@ -245,7 +245,7 @@ const Api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  // Starting a lesson plan: a student pays 30 points once per plan ({run_key} or {plan_id}).
+  // Before Alan writes a plan: a student pays 30 points once per plan ({run_key} or {plan_id}).
   startBuild: (payload) =>
     apiFetch("/api/builds", { method: "POST", body: JSON.stringify(payload) }),
   getLessonPlan: (planId) => apiFetch(`/api/lesson-plans/${planId}`),
@@ -282,7 +282,7 @@ const Api = {
     apiFetch(`/api/sections/${sectionId}/regenerate-code`, { method: "POST" }),
   removeStudent: (sectionId, studentId) =>
     apiFetch(`/api/sections/${sectionId}/students/${studentId}`, { method: "DELETE" }),
-  // Points: each lesson plan a student starts costs some; the section's teacher gives them.
+  // Points: each plan Alan writes for a student costs some (Guided is free); the section's teacher gives them.
   sectionPoints: (sectionId) => apiFetch(`/api/sections/${sectionId}/points`),
   givePoints: (sectionId, studentIds, add) =>
     apiFetch(`/api/sections/${sectionId}/points`, {
@@ -1304,8 +1304,8 @@ function pointsBalanceHtml(points) {
   return `<div class="points-balance" role="status">
     <span class="points-balance-icon" aria-hidden="true">${Icons.coins}</span>
     <span class="points-balance-text"><strong>${n}</strong> point${n === 1 ? "" : "s"}
-      <small>${plans ? `Enough for ${plans} lesson plan${plans === 1 ? "" : "s"}.` : "Not enough to start a lesson plan yet."}
-      Each lesson plan you start uses ${POINTS_PER_PLAN} points. Ask your teacher for more.</small></span>
+      <small>${plans ? `Enough for Alan to write ${plans} lesson plan${plans === 1 ? "" : "s"}.` : "Not enough for Alan to write a lesson plan yet."}
+      Building Proficiency uses ${POINTS_PER_PLAN} points per plan; Guided is free. Ask your teacher for more.</small></span>
   </div>`;
 }
 

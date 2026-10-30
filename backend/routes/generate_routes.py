@@ -199,11 +199,9 @@ _CHAT_TEXT_LIMIT = 600
 def owl_chat():
     """Guided mode: one turn of the teacher's chat with the owl about the
     field they're currently writing. The owl answers briefly and offers
-    choices, some of which the page can insert straight into the field."""
+    choices, some of which the page can insert straight into the field.
+    Free: points are only spent when Alan writes the plan."""
     data = request.get_json(silent=True) or {}
-    unpaid = points_routes.require_paid_build(current_user(), data)
-    if unpaid:
-        return unpaid
     fmt = LessonPlanFormat.query.get_or_404(data.get("format_id"))
     field = next((f for f in grounding.competency_view(fmt.fields) if f.field_key == data.get("field_key")), None)
     if not field:
@@ -346,10 +344,9 @@ def update_lesson_plan(plan_id):
 def save_lesson_plan():
     user = current_user()
     data = request.get_json(silent=True) or {}
-    # A student's new plan needs its build paid first (routes/points_routes.py).
+    # A plan Alan wrote keeps its paid build (routes/points_routes.py); a
+    # Guided plan is free and saves without one.
     build = points_routes.build_for(user, data)
-    if user.role == "student" and not build:
-        return points_routes.require_paid_build(user, {"run_key": ""})
 
     plan = LessonPlan(
         user_id=user.id,

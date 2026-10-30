@@ -542,7 +542,7 @@ const STEPS = {
       });
       wrap.append(btn);
     });
-    // Students: what starting this plan costs in points.
+    // Students: what each mode costs in points (only Building Proficiency does).
     const note = G.pointsNote();
     return note ? el("div", { class: "flow-answer" }, wrap, el("p", { class: "flow-help flow-points-note" }, note)) : wrap;
   },
@@ -869,13 +869,7 @@ window.addEventListener("aligned:guided", () => {
 // ---- after the last question ----
 async function finish() {
   if (G.getAnswers().mode === "step") {
-    // A student's plan is paid for (30 points) before Guided begins.
-    try {
-      await G.payForBuild();
-    } catch (err) {
-      showError(err.message);
-      return;
-    }
+    // Guided is free: points are only spent when Alan writes the plan.
     G.startGuided();
     guided.start();
     return;
@@ -894,7 +888,8 @@ function renderReview() {
     body: (answer) => G.mountReview(answer),
     next: "Write my plan",
     onNext: async () => {
-      // A student's plan is paid for (30 points) before Alan writes it.
+      // A student's plan is paid for (30 points) before Alan writes it; paying
+      // here keeps a shortfall on this screen (runGeneration checks again).
       try {
         await G.payForBuild();
       } catch (err) {

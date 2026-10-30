@@ -2953,6 +2953,16 @@ async function runGeneration(includeKeys) {
     return;
   }
 
+  // Every way Alan writes (Building Proficiency, Regenerate, "Generate these
+  // too" after Guided) costs a student 30 points once per plan.
+  try {
+    await payForBuild();
+  } catch (err) {
+    showError(err.message);
+    emitGeneration("error", { message: err.message });
+    return;
+  }
+
   errorBox.hidden = true;
   ownFieldsNote.hidden = true;
   setButtonLoading(generateFullBtn, true, "Generating");
@@ -3775,9 +3785,9 @@ function useMode(name) {
   applyPrefill();
 }
 
-// A student's lesson plan costs 30 points, once: the first start of a run
-// pays; coming back to the same run or a saved plan is free (the server
-// decides). Throws the reason when there aren't enough points.
+// Alan writing a student's lesson plan costs 30 points, once per plan:
+// writing the same run or plan again is free, and Guided never pays (the
+// server decides). Throws the reason when there aren't enough points.
 async function payForBuild() {
   if (!currentUser || currentUser.role !== "student" || flowFlags.paid) return;
   const data = await Api.startBuild({ run_key: currentRunId, plan_id: planId || null });
@@ -3789,14 +3799,14 @@ async function payForBuild() {
   saveDraft();
 }
 
-// What starting this plan costs a student, for the mode step; "" for teachers.
+// What each mode costs a student, for the mode step; "" for teachers.
 function pointsNote() {
   if (!currentUser || currentUser.role !== "student") return "";
-  if (flowFlags.paid || planId) return "This lesson plan is already paid for, so carrying on is free.";
+  if (flowFlags.paid) return "This lesson plan is already paid for, so Alan writes it again for free. Guided is always free.";
   const have = currentUser.points || 0;
   return have >= 30
-    ? `Starting this lesson plan uses 30 of your ${have} points.`
-    : `Starting a lesson plan uses 30 points and you have ${have}. Ask your teacher for more points.`;
+    ? `Building Proficiency uses 30 of your ${have} points. Guided is free.`
+    : `Building Proficiency uses 30 points and you have ${have}; ask your teacher for more. Guided is free.`;
 }
 
 function startFull() {
