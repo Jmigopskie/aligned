@@ -102,7 +102,9 @@ def search_course_guides():
     order += [case((CourseGuide.is_builtin.is_(True), CourseGuide.id), else_=None).asc(),
               CourseGuide.created_at.desc()]
 
-    guides = query.order_by(*order).limit(50).all()
+    # Rows are light (no extracted text). The cap sits well above the ~52
+    # built-ins, so a broad search never drops teachers' uploads off the end.
+    guides = query.order_by(*order).limit(200).all()
     return jsonify({"status": "ok", "course_guides": [g.to_dict() for g in guides]})
 
 _UNTYPED = "untyped"  # the folder for uploads that never got a type

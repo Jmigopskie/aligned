@@ -12,7 +12,7 @@ const PART_GUIDES = [
   [/performance standard/,
     "The performance standard says what learners can do or make with what they learned. Copy it word for word from your Budget of Work or Curriculum Guide, from the same row as your content standard."],
   [/competenc|melc/,
-    "The learning competency is the one skill this lesson targets. Copy it word for word from your Budget of Work or Curriculum Guide, for this lesson's term and week. Objectives go in their own part."],
+    "The learning competency is the one skill this lesson targets. Copy it word for word from your Budget of Work or Curriculum Guide, for this lesson's topic. Objectives go in their own part."],
   [/objective/,
     "Learning objectives say what learners will be able to do by the end of the lesson. Write three, one per line, each starting with a measurable verb:\n- one for knowing (identify, explain, compare)\n- one for feeling or valuing (value, show, appreciate)\n- one for doing (perform, create, demonstrate)"],
   [/reference|resource|material|teacher'?s guide|textbook|lr portal/,

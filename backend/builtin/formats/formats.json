@@ -891,7 +891,7 @@
     "description": "TUP Cavite semi-detailed plan: objectives, subject matter, references, procedure, evaluation and assignment.",
     "source": "tup-sdlp.pdf",
     "template": "tup-sdlp.docx",
-    "pages": 3,
+    "pages": 2,
     "fields": [
       {
         "label": "Lesson Plan in (Subject)",
@@ -917,137 +917,137 @@
       {
         "label": "Lesson Objectives",
         "field_type": "textarea",
-        "anchor_index": 45,
+        "anchor_index": 44,
         "is_required": true,
         "ai_hint": "Only the objectives, one per line: the template already prints 'At the end of the lesson, the students should be able to:' above them."
       },
       {
         "label": "Main Topic",
         "field_type": "text",
-        "anchor_index": 51,
+        "anchor_index": 47,
         "is_required": true,
         "ai_hint": "The main topic from the lesson details."
       },
       {
         "label": "Sub-Topic",
         "field_type": "text",
-        "anchor_index": 52,
+        "anchor_index": 48,
         "is_required": true,
         "ai_hint": "The specific topic of this lesson, from the lesson details."
       },
       {
         "label": "Values Integrated",
         "field_type": "textarea",
-        "anchor_index": 53,
+        "anchor_index": 49,
         "is_required": false,
         "ai_hint": "Up to three values the lesson develops, one per line."
       },
       {
         "label": "Instructional Materials",
         "field_type": "textarea",
-        "anchor_index": 57,
+        "anchor_index": 51,
         "is_required": false,
         "ai_hint": "Up to three materials actually used in this lesson, one per line."
       },
       {
         "label": "References",
         "field_type": "textarea",
-        "anchor_index": 62,
+        "anchor_index": 53,
         "is_required": false
       },
       {
         "label": "Greetings",
         "field_type": "textarea",
-        "anchor_index": 70,
+        "anchor_index": 58,
         "is_required": false,
         "role": "easy"
       },
       {
         "label": "Prayer",
         "field_type": "textarea",
-        "anchor_index": 71,
+        "anchor_index": 59,
         "is_required": false,
         "role": "easy"
       },
       {
         "label": "Checking of Attendance",
         "field_type": "textarea",
-        "anchor_index": 72,
+        "anchor_index": 60,
         "is_required": false,
         "role": "easy"
       },
       {
         "label": "Checking of Assignment",
         "field_type": "textarea",
-        "anchor_index": 73,
+        "anchor_index": 61,
         "is_required": false,
         "role": "easy"
       },
       {
         "label": "Classroom Management",
         "field_type": "textarea",
-        "anchor_index": 74,
+        "anchor_index": 62,
         "is_required": false,
         "ai_hint": "Three short classroom rules for this session, one per line."
       },
       {
         "label": "Energizer",
         "field_type": "textarea",
-        "anchor_index": 78,
+        "anchor_index": 64,
         "is_required": false
       },
       {
         "label": "Review of the Past Lesson",
         "field_type": "textarea",
-        "anchor_index": 80,
+        "anchor_index": 66,
         "is_required": false
       },
       {
         "label": "Motivation",
         "field_type": "textarea",
-        "anchor_index": 83,
+        "anchor_index": 68,
         "is_required": false
       },
       {
         "label": "Introduction",
         "field_type": "textarea",
-        "anchor_index": 102,
+        "anchor_index": 71,
         "is_required": false
       },
       {
         "label": "Lesson Proper",
         "field_type": "textarea",
-        "anchor_index": 104,
+        "anchor_index": 73,
         "is_required": false
       },
       {
         "label": "Application",
         "field_type": "textarea",
-        "anchor_index": 106,
+        "anchor_index": 75,
         "is_required": false
       },
       {
         "label": "Generalization",
         "field_type": "textarea",
-        "anchor_index": 108,
+        "anchor_index": 77,
         "is_required": false
       },
       {
         "label": "Evaluation",
         "field_type": "textarea",
-        "anchor_index": 111,
+        "anchor_index": 79,
         "is_required": false
       },
       {
         "label": "Follow-up Assignment",
         "field_type": "textarea",
-        "anchor_index": 115,
+        "anchor_index": 82,
         "is_required": false
       },
       {
         "label": "Advance Assignment",
         "field_type": "textarea",
-        "anchor_index": 116,
+        "anchor_index": 83,
         "is_required": false
       }
     ]

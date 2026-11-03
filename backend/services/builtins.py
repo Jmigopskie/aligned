@@ -117,6 +117,15 @@ def _seed_formats(folder, owner_id):
             fmt.description = entry.get("description")
         db.session.flush()
         if fmt.fields_reviewed:
+            # A new shipped document can move the lines under a reworked
+            # built-in: each field the manifest knows follows its line, and
+            # keeps the admin's name, context, Guided and Locked.
+            shipped = {row.field_key: row.anchor_index for row in _build_format_fields(fmt.id, fields)}
+            for field in fmt.fields:
+                if field.field_key in shipped and field.anchor_index != shipped[field.field_key]:
+                    field.anchor_index = shipped[field.field_key]
+                elif field.field_key not in shipped:
+                    _log.info("Built-in format %s: field %s was placed by hand; check its line.", key, field.field_key)
             return True
 
         current = [{"field_key": f.field_key, "label": f.label, "field_type": f.field_type, "anchor_index": f.anchor_index,

@@ -47,12 +47,9 @@ assert.strictEqual(answered("subject", { durationMinutes: 45 }), false);
 assert.strictEqual(answered("topics", { mainTopic: "Spreadsheets", topic: "Cell formulas" }), true);
 assert.strictEqual(answered("topics", { topic: "Cell formulas" }), false, "main topic is required");
 assert.strictEqual(answered("topics", { mainTopic: "Spreadsheets", topic: "  " }), false);
-const when = { term: "2nd Term", week: "3" };
-assert.strictEqual(answered("sources", { guides: [{ id: 4 }, { id: 5 }], ...when }), true);
-assert.strictEqual(answered("sources", { sources: [{ id: 9 }], ...when }), true, "an own upload is enough");
-assert.strictEqual(answered("sources", { guides: [], sources: [], ...when }), false, "at least one source");
-assert.strictEqual(answered("sources", { guides: [{ id: 4 }], term: "2nd Term" }), false, "the week is needed");
-assert.strictEqual(answered("sources", { guides: [{ id: 4 }], week: "3" }), false, "the term is needed");
+assert.strictEqual(answered("sources", { guides: [{ id: 4 }, { id: 5 }] }), true, "no term or week asked");
+assert.strictEqual(answered("sources", { sources: [{ id: 9 }] }), true, "an own upload is enough");
+assert.strictEqual(answered("sources", { guides: [], sources: [] }), false, "at least one source");
 assert.strictEqual(answered("sample", {}), true, "the sample plan is optional");
 assert.strictEqual(answered("assessment", {}), false, "an assessment type is required");
 assert.strictEqual(answered("assessment", { assessment: "task" }), true);
@@ -72,13 +69,10 @@ assert.ok(!("f0" in kept));
 const college = ctx.prefillFieldValues([{ field_key: "g", label: "Grade Level & Section" }],
   { levelType: "college", program: "BSIT", year: "2nd Year", section: "A" }, {});
 assert.strictEqual(college.g, "BSIT · 2nd Year · A");
-const termWeek = ctx.prefillFieldValues([{ field_key: "t", label: "Quarter" }, { field_key: "w", label: "Week" }], when, {});
-assert.deepStrictEqual({ ...termWeek }, { t: "2nd Term", w: "Week 3" });
-// Typed by hand: "Week 4" stays as it is, a bare number gets "Week" in front.
-assert.strictEqual(ctx.weekLabel(" Week 4 "), "Week 4");
-assert.strictEqual(ctx.weekLabel("4"), "Week 4");
-assert.strictEqual(ctx.weekLabel("Weeks 3-4"), "Weeks 3-4");
-assert.strictEqual(ctx.weekLabel(""), "");
+// Setup no longer asks for a term or week, so those blanks aren't prefilled.
+const termWeek = ctx.prefillFieldValues([{ field_key: "t", label: "Quarter" }, { field_key: "w", label: "Week" }],
+  { term: "2nd Term", week: "3" }, {});
+assert.deepStrictEqual({ ...termWeek }, {});
 
 // Format groups: students see built-ins and their teachers' formats.
 const formats = [{ id: 1, is_builtin: true, owner_id: 9 }, { id: 2, is_builtin: false, owner_id: 5 }, { id: 3, is_builtin: false, owner_id: 7 }];

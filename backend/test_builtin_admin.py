@@ -94,6 +94,16 @@ def main():
         db.session.commit()
         f0 = FormatField.query.filter_by(format_id=dlp_id, field_key=setup[0]["field_key"]).one()
         assert f0.ai_hint == "The school's full name.", f0.ai_hint
+        # A new shipped document moves lines: the field follows the manifest's
+        # line and keeps the admin's context.
+        shipped_anchor = f0.anchor_index
+        f0.anchor_index = shipped_anchor + 500
+        db.session.commit()
+        builtins.seed_builtins()
+        db.session.commit()
+        db.session.expire_all()
+        f0 = FormatField.query.filter_by(format_id=dlp_id, field_key=setup[0]["field_key"]).one()
+        assert f0.anchor_index == shipped_anchor and f0.ai_hint == "The school's full name.", (f0.anchor_index, f0.ai_hint)
         print("  seeding keeps the rework OK")
 
         # --- On and off ---

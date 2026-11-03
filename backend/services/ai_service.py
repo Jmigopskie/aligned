@@ -433,7 +433,7 @@ def _field_directive(field):
     if grounding.is_copy_only_field(field):
         return (
             " Copy exactly ONE statement from the course guide / budget of work above, WORD FOR "
-            "WORD: the single one for this lesson's term, week and topic. Only that statement: no "
+            "WORD: the single one for this lesson's topic. Only that statement: no "
             "second statement, no heading, code or week number, nothing reworded, shortened or "
             "added. The length limits do not apply to this field. A line not found in the guide is "
             "removed, and only the first statement is kept."
@@ -625,14 +625,6 @@ def _lesson_block(context: dict, guide_text: str, citation: str = "") -> str:
         block += (f"\nThis lesson teaches ONE specific topic: {topic}{within}. Every field (content, examples, "
                   f"activities, questions, assessment, assignment) is about {topic} itself; the main topic and "
                   f"the guide's section are only its frame. Do not drift into the main topic's other subtopics.\n")
-    # Typed by hand: "3" reads as "Week 3", "Week 4" stays as written.
-    week = str(context.get("week") or "").strip()
-    week = f"Week {week}" if week.isdigit() else week
-    when = ", ".join(p for p in (str(context.get("term") or "").strip(), week) if p)
-    if when and guide_text:
-        block += (f"\nThis lesson is for {when}. Take its competency, content and standards from that term "
-                  f"and week in the Budget of Work below; if a document has no such row, use the row that "
-                  f"covers the lesson's topic.\n")
     if guide_text:
         block += f"""
 This is the section of the course guide that covers the lesson's topic. EVERY field must be

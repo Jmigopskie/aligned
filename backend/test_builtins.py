@@ -36,7 +36,7 @@ KEYS = {"4as-lesson-plan", "dlp", "ilaw-lesson-plan", "pal3-sdlp", "snhs-dlp", "
 # widths and a few characters, never structure: a field's anchor_index still
 # names the same paragraph, so saved plans keep their answers where they were.
 TEMPLATE_ITEMS = {"4as-lesson-plan": 60, "dlp": 111, "ilaw-lesson-plan": 190, "pal3-sdlp": 96, "snhs-dlp": 91,
-                  "tup-sdlp": 129}
+                  "tup-sdlp": 91}
 
 
 def client_for(app, user):

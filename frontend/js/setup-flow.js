@@ -552,7 +552,7 @@ const STEPS = {
 // Library documents sit in one folder per type (Curriculum Guide, Budget of
 // Work, and any type a teacher names on upload), with a search across all of
 // them; several can be picked. The student's own files are uploaded beside
-// them and stay private. Every pick shows in one list, then the term and week.
+// them and stay private. Every pick shows in one list.
 const guideKind = (g) => g.type_label || (g.doc_type === "budget_of_work" ? "Budget of Work" : "Curriculum Guide");
 const FIRST_FOLDERS = ["Curriculum Guide", "Budget of Work"];
 
@@ -682,17 +682,12 @@ function drawSources(box, library) {
     input.value = "";
   });
 
-  const when = row(
-    textAnswer("term", { label: "Term", placeholder: "e.g. 2nd Term" }),
-    textAnswer("week", { label: "Week", placeholder: "e.g. Week 3" }),
-  );
-
   const label = el("div", { class: "flow-sources-head" },
     el("p", { class: "flow-label", id: "flow-library-label" }, "Supplementary sources"), upload);
   box.replaceChildren(label, ...(library.length
     ? [el("div", { class: "flow-field" }, search), folders, results, noMatch]
     : [el("p", { class: "flow-help" }, "No library documents for this subject yet. Upload your own file instead.")]),
-  input, list, when);
+  input, list);
   paintChosen();
 }
 
@@ -981,7 +976,6 @@ const DETAIL_ROWS = [
   ["topics", "Last topic", (a) => (a.firstLesson ? "This is the first lesson" : a.previousTopic)],
   ["topics", "Next topic", (a) => (a.nextUnsure ? "Not sure yet" : a.nextTopic)],
   ["sources", "Supplementary sources", (a) => [...(a.guides || []).map((g) => g.title), ...(a.sources || []).map((s) => s.name)].join(", ")],
-  ["sources", "Term and week", (a) => [a.term, weekLabel(a.week)].filter(Boolean).join(", ")],
   ["sample", "Sample lesson plan", (a) => (a.sample ? a.sample.name : "None")],
 ];
 

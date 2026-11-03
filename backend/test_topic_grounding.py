@@ -85,14 +85,11 @@ def main():
     assert _timing_problems(day, [pre, flow], 45) == [(0, 55, True)], "55 minutes breaks a 45-minute one"
     print("  session cap OK")
 
-    # Step 6's term and week point Alan at that row of the Budget of Work.
+    # Setup no longer asks for a term and week: the topic picks the guide's row.
     from services.ai_service import _lesson_block
-    block = _lesson_block({"topic": "Cell formulas", "term": "2nd Term", "week": "3"}, "Week 3 ... competency")
-    assert "2nd Term, Week 3" in block and "that term and week" in block, block[:300]
-    assert "that term and week" not in _lesson_block({"topic": "Cell formulas"}, "guide text")
-    typed = _lesson_block({"topic": "Cell formulas", "term": "2nd Term", "week": "Week 4"}, "guide")
-    assert "2nd Term, Week 4." in typed and "Week Week" not in typed, typed[:300]
-    print("  term and week OK")
+    block = _lesson_block({"topic": "Cell formulas", "term": "2nd Term", "week": "3"}, "guide text")
+    assert "Cell formulas" in block and "term and week" not in block, block[:300]
+    print("  topic picks the row OK")
 
     print("grounding OK")
 

@@ -77,6 +77,20 @@ matatag-epp-tle-cg-grades-4-10.pdf (same file), so it wasn't added twice.
 | tesda-ict-telecom-osp-installation-fiber-optic-cable-nc-ii.pdf | ICT - Telecom OSP Installation (Fiber Optic Cable) (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Telecom-OSP-Installation-Fiber-Optic-Cable-NC-II-CG.pdf |
 | tesda-ict-telecom-osp-subscriber-line-copper-pots-dsl-nc-ii.pdf | ICT - Telecom OSP and Subscriber Line Installation (Copper Cable / POTS and DSL) (NC II) | https://www.deped.gov.ph/wp-content/uploads/2019/01/Telecom-OSP-and-Subscriber-Line-Installation-Copper-Cable-POTS-and-DSL-NC-II-CG.pdf |
 
+## TESDA Competency-Based Curricula for HE (FCS)
+
+Added 2026-11-03 from a zip the project owner supplied (TESDA-GUIDE). Each was a legacy Word
+.doc, converted to PDF with LibreOffice; the .txt beside it is text_extract run on that PDF.
+They sit in the "TESDA Curriculum Guide" folder under HE (FCS). No public source URL.
+
+| File | Title | Original file |
+|---|---|---|
+| tesda-fcs-cookery-nc-ii.pdf | HE (FCS) - Cookery (NC II) | CBC COOKERY NC II.doc |
+| tesda-fcs-dressmaking-nc-ii.pdf | HE (FCS) - Dressmaking (NC II) | CBC Dressmaking NC II.doc |
+| tesda-fcs-hairdressing-nc-ii.pdf | HE (FCS) - Hairdressing (NC II) | cbc - Hairdressing NC II_amended 04-13-2011.doc |
+| tesda-fcs-housekeeping-nc-ii.pdf | HE (FCS) - Housekeeping (NC II) | complete package_HSK_Realligned.doc |
+| tesda-fcs-tailoring-nc-ii.pdf | HE (FCS) - Tailoring (NC II) | CBC Tailoring NC II.doc |
+
 ## Not included
 
 - Grades 11 and 12: the LR Portal has no TLE or ICT budget of work
