@@ -45,12 +45,15 @@ function filled(value) {
   return typeof value === "string" ? value.trim().length > 0 : value != null && value !== "";
 }
 
+// The quiz sizes the setup offers.
+const QUIZ_SIZES = [5, 10, 15, 20];
+
 function isStepAnswered(stepId, answers) {
   const a = answers || {};
   switch (stepId) {
     case "format": return filled(a.formatId); // the school is encouraged, not required
-    case "assessment": // a 1-5 item quiz, or a performance task with a rubric
-      return a.assessment === "task" || (a.assessment === "quiz" && Number.isInteger(a.quizItems) && a.quizItems >= 1 && a.quizItems <= 5);
+    case "assessment": // a 5, 10, 15 or 20 item quiz, or a performance task with a rubric
+      return a.assessment === "task" || (a.assessment === "quiz" && QUIZ_SIZES.includes(a.quizItems));
     case "people": return filled(a.studentTeacher) && filled(a.coop);
     case "class":
       return a.levelType === "college" ? filled(a.program) && filled(a.year) : filled(a.grade);

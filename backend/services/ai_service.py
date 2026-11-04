@@ -542,7 +542,9 @@ def _grounding_directive(field, context: dict) -> str:
 
 # The evaluation part, not a practice activity that merely "leads to" one.
 _ASSESSMENT_FIELD = re.compile(r"assess|evaluat|quiz|\btest\b", re.I)
-_QUIZ_ITEMS = re.compile(r"(\d)-item multiple-choice quiz")
+_QUIZ_ITEMS = re.compile(r"(\d+)-item multiple-choice quiz")
+# A 20-item quiz (question, four options, then the key) or a task and rubric.
+_MAX_ASSESSMENT_LINES = 160
 
 
 def _assessment_directive(haystack: str, context: dict) -> str:
@@ -557,12 +559,20 @@ def _assessment_directive(haystack: str, context: dict) -> str:
         n = int(quiz.group(1))
         return (f" Assess with a multiple-choice quiz of exactly {n} item{'s' if n > 1 else ''} on the lesson's "
                 "specific topic: each item a numbered question with four options, a. to d., one per line, "
-                "then 'Answer key:' with the correct letter for every item.")
+                "then 'Answer key:' with the correct letter for every item. The length limits do not apply "
+                "to this field.")
     if "performance task" in kind:
         return (" Assess with a performance task on the lesson's specific topic: the task, its step-by-step "
                 "instructions, then 'Rubric:' with 3 to 5 criteria, one per line, each giving its levels and "
-                "points (e.g. 'Accuracy: Excellent 5 | Good 4 | Fair 3 | Needs improvement 2'), then the total points.")
+                "points (e.g. 'Accuracy: Excellent 5 | Good 4 | Fair 3 | Needs improvement 2'), then the total "
+                "points. The length limits do not apply to this field.")
     return ""
+
+
+def _sets_assessment(field, context) -> bool:
+    """The field that carries the setup's quiz or performance task."""
+    haystack = f"{field.field_key or ''} {field.label or ''}".lower().replace("_", " ")
+    return field.field_type != "weekly" and bool(_assessment_directive(haystack, context or {}))
 
 
 # What the standard DepEd lesson-plan parts are for, used only when a format
@@ -821,13 +831,22 @@ def _trim(values, fields, guide_text="", citation="", context=None):
     the guide's own wording and held to links that open."""
     plain = [f for f in fields if not _is_exact(f)]
     exact = [f for f in fields if _is_exact(f)]
+    # The setup's quiz or task is as long as it needs to be (up to a 20-item
+    # quiz) and keeps its own numbering and option letters.
+    assess = [f for f in plain if _sets_assessment(f, context)]
     out = ai_limits.enforce_limits(
-        values, plain,
+        values, [f for f in plain if f not in assess],
         max_items=_MAX_LIST_ITEMS,
         max_item_words=_MAX_ITEM_WORDS,
         max_sentences=_MAX_PROSE_SENTENCES,
         max_prose_words=_MAX_PROSE_WORDS,
     )
+    if assess:
+        out.update(ai_limits.enforce_limits(
+            values, assess, max_items=_MAX_ASSESSMENT_LINES, max_item_words=_MAX_ITEM_WORDS,
+            max_sentences=_MAX_ASSESSMENT_LINES, max_prose_words=_MAX_ASSESSMENT_LINES * _MAX_ITEM_WORDS,
+            keep_markers=True,
+        ))
     if exact:
         kept = ai_limits.enforce_limits(
             values, exact, max_items=10, max_item_words=120, max_sentences=12, max_prose_words=400,

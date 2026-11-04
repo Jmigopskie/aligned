@@ -274,6 +274,22 @@ def check_assessment_type():
     assert "quiz" not in ai_service._grounding_directive(mastery, {"assessment_type": "a 3-item multiple-choice quiz"})
     assert "quiz" not in ai_service._grounding_directive(Field("flow", "Flow"), {"assessment_type": "a 3-item multiple-choice quiz"})
     assert ai_service._grounding_directive(evaluation, {}) == ""
+    # 5, 10, 15 or 20 items: a two-digit count is read whole.
+    twenty = {"assessment_type": "a 20-item multiple-choice quiz"}
+    assert "exactly 20 items" in ai_service._grounding_directive(evaluation, twenty)
+    # The quiz comes back whole, numbered and lettered; other fields keep the ceilings.
+    quiz_text = "\n".join(f"{n}. Question {n}?\na. one\nb. two\nc. three\nd. four" for n in range(1, 21))
+    quiz_text += "\nAnswer key:\n" + "\n".join(f"{n}. b" for n in range(1, 21))
+    flow = Field("flow", "Flow")
+    out = ai_service._trim({"evaluating_learning": quiz_text, "flow": "\n".join(f"Step {n}" for n in range(1, 21))},
+                           [evaluation, flow], context=twenty)
+    lines = out["evaluating_learning"].split("\n")
+    assert len(lines) == 121 and lines[0] == "1. Question 1?" and lines[1] == "a. one", lines[:3]
+    assert lines[-1] == "20. b" and "Answer key:" in lines, lines[-3:]
+    assert len(out["flow"].split("\n")) == ai_service._MAX_LIST_ITEMS
+    # Without a quiz in the setup, the evaluation field keeps the usual ceiling.
+    plain = ai_service._trim({"evaluating_learning": quiz_text}, [evaluation], context={})
+    assert len(plain["evaluating_learning"].split("\n")) == ai_service._MAX_LIST_ITEMS
     print("  assessment type OK")
 
 

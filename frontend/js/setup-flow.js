@@ -378,28 +378,31 @@ function row(...cells) {
 // ---- answers per step ----
 const STEPS = {
   format: formatStep,
-  // A quiz (1 to 5 items, its count asked under it) or a performance task with a rubric.
+  // A quiz (5, 10, 15 or 20 items, its count asked under it) or a performance task with a rubric.
   assessment: () => {
     const wrap = el("div", { class: "flow-answer" });
+    // A draft from when quizzes had 1 to 5 items starts at 5.
+    const quizSize = () => (QUIZ_SIZES.includes(G.getAnswers().quizItems) ? G.getAnswers().quizItems : 5);
     const paint = () => {
+      if (G.getAnswers().assessment === "quiz" && quizSize() !== G.getAnswers().quizItems) G.setAnswers({ quizItems: quizSize() });
       const a = G.getAnswers();
       const choices = el("div", { class: "flow-choices flow-choices-stack flow-mode-choices", role: "group", "aria-labelledby": "flow-question" });
       [
-        { value: "quiz", title: "Multiple-choice quiz", sub: "1 to 5 items, with an answer key." },
+        { value: "quiz", title: "Multiple-choice quiz", sub: "5, 10, 15 or 20 items, with an answer key." },
         { value: "task", title: "Performance task with a rubric", sub: "Learners show the skill; a rubric scores it." },
       ].forEach((m) => {
         const btn = el("button", { type: "button", class: "flow-choice flow-format flow-mode", "aria-pressed": String(m.value === a.assessment) },
           twoLine(m.title, m.sub), tick());
         btn.addEventListener("click", () => {
-          G.setAnswers({ assessment: m.value, quizItems: G.getAnswers().quizItems || 5 });
+          G.setAnswers({ assessment: m.value, quizItems: quizSize() });
           paint();
           refresh();
         });
         choices.append(btn);
       });
       const items = a.assessment === "quiz"
-        ? row(selectAnswer("flow-quiz-items", "Number of items", [1, 2, 3, 4, 5].map((n) => ({ value: n, label: `${n} item${n === 1 ? "" : "s"}` })),
-          a.quizItems || 5, (v) => G.setAnswers({ quizItems: parseInt(v, 10) })))
+        ? row(selectAnswer("flow-quiz-items", "Number of items", QUIZ_SIZES.map((n) => ({ value: n, label: `${n} items` })),
+          quizSize(), (v) => G.setAnswers({ quizItems: parseInt(v, 10) })))
         : "";
       wrap.replaceChildren(choices, items);
     };

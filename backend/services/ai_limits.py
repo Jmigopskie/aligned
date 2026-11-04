@@ -131,11 +131,12 @@ def is_answered(value) -> bool:
 
 
 def clean_value(value, field_type: str = "text", *, max_items: int, max_item_words: int,
-                max_sentences: int, max_prose_words: int) -> str:
+                max_sentences: int, max_prose_words: int, keep_markers: bool = False) -> str:
     """One field's returned value, trimmed to the ceilings and stripped of
     markdown and stray bullet markers. Returns plain text with one item per line
     for list-like fields, which is the shape the page's own bullet formatting
-    expects."""
+    expects. keep_markers keeps the lines as numbered and lettered ("1.",
+    "a.", as a quiz is), only capped."""
     if value is None:
         return ""
 
@@ -145,6 +146,9 @@ def clean_value(value, field_type: str = "text", *, max_items: int, max_item_wor
         lines = str(value).split("\n")
 
     lines = [_strip_markdown(line).strip() for line in lines]
+    if keep_markers:
+        kept = [line for line in lines if line][:max_items]
+        return "\n".join(_clip_words(line, max_item_words) for line in kept)
 
     # Whether this was a numbered list has to be read before the markers come
     # off, and only counts when at least two lines carry a number: one stray
@@ -205,7 +209,7 @@ def weekly_parts(value, names) -> list:
 
 
 def enforce_limits(values: dict, fields, *, max_items: int, max_item_words: int,
-                   max_sentences: int, max_prose_words: int) -> dict:
+                   max_sentences: int, max_prose_words: int, keep_markers: bool = False) -> dict:
     """Trim every value the model returned, keyed by field_key.
 
     Values for keys that aren't part of this format are dropped: a model
@@ -235,6 +239,7 @@ def enforce_limits(values: dict, fields, *, max_items: int, max_item_words: int,
             max_item_words=max_item_words,
             max_sentences=max_sentences,
             max_prose_words=max_prose_words,
+            keep_markers=keep_markers,
         )
     return out
 

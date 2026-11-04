@@ -53,8 +53,9 @@ assert.strictEqual(answered("sources", { guides: [], sources: [] }), false, "at 
 assert.strictEqual(answered("sample", {}), true, "the sample plan is optional");
 assert.strictEqual(answered("assessment", {}), false, "an assessment type is required");
 assert.strictEqual(answered("assessment", { assessment: "task" }), true);
-assert.strictEqual(answered("assessment", { assessment: "quiz", quizItems: 3 }), true);
-assert.strictEqual(answered("assessment", { assessment: "quiz", quizItems: 6 }), false, "a quiz has 1 to 5 items");
+for (const n of [5, 10, 15, 20]) assert.strictEqual(answered("assessment", { assessment: "quiz", quizItems: n }), true, `${n} items`);
+assert.strictEqual(answered("assessment", { assessment: "quiz", quizItems: 3 }), false, "a quiz has 5, 10, 15 or 20 items");
+assert.strictEqual(answered("assessment", { assessment: "quiz", quizItems: 25 }), false);
 assert.strictEqual(answered("assessment", { assessment: "quiz" }), false, "a quiz needs its item count");
 assert.strictEqual(answered("mode", { mode: "step" }), true);
 assert.strictEqual(answered("mode", {}), false);
