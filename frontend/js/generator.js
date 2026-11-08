@@ -222,7 +222,7 @@ const mainTopicInput = document.getElementById("ctx-main-topic");
 // The flow's own state, saved with the setup so a refresh lands on the same step.
 // guides: the library documents picked in step 6, any number of either kind;
 // sources: the student's own private uploads.
-let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [], guides: [], sample: null, assessment: null, quizItems: 5, guidedAt: "part" };
+let flowFlags = { firstLesson: false, nextUnsure: false, flowStep: null, stage: "flow", formatName: "", mode: null, sources: [], guides: [], week: "", sample: null, assessment: null, quizItems: 5, guidedAt: "part" };
 // One run = one pass through the flow; its draft is keyed by run, not by
 // format, so picking a format never silently brings back an older draft.
 let currentRunId = new URLSearchParams(window.location.search).get("run");
@@ -487,9 +487,32 @@ function drawTurns(turns) {
 
 const startersFor = (field) => (field.locked ? OWL_COACH_STARTERS : OWL_STARTERS);
 
+// The lesson proper (TUP's "Lesson Proper", a "Discussion"): the lesson
+// itself, taught from the plan's references.
+function isLessonProper(field) {
+  return /lesson.proper|discussion/i.test(`${field.label || ""} ${String(field.field_key || "").replace(/_/g, " ")}`);
+}
+
+// The references the student listed in the plan, one per line.
+function planReferences() {
+  return (fmt.fields || [])
+    .filter((f) => /reference/i.test(`${f.field_key} ${f.label}`))
+    .flatMap((f) => [].concat(fieldValues[f.field_key] || []))
+    .flatMap((v) => String(v || "").split("\n"))
+    .map((line) => line.replace(/^[•\-*]\s+/, "").trim())
+    .filter(Boolean);
+}
+
 // Alan's built-in opening for a part (js/part-guides.js): no AI call.
 function partIntro(field) {
-  return partGuide(field) + (field.locked
+  let intro = partGuide(field);
+  if (isLessonProper(field)) {
+    const refs = planReferences();
+    intro += refs.length
+      ? `\n\nThese are your references:\n${refs.map((r) => `- ${r}`).join("\n")}\nMake sure your discussion comes from them. Ask me and I'll draft the lesson from what they say: definitions, terms and examples.`
+      : "\n\nYou haven't listed any references yet. Add them in the References part first (I can find some for you), so your discussion comes from real sources.";
+  }
+  return intro + (field.locked
     ? "\n\nYour teacher wants this part in your own words, so I won't write it for you, but I can help you think it through."
     : "");
 }
@@ -887,6 +910,8 @@ function getAdvancedContext() {
     main_topic: mainTopicInput.value.trim(),
     // Step 2: how the lesson is assessed, in words, as the prompt reads it.
     assessment_type: assessmentText(flowFlags),
+    // College only: the course syllabus week, when the student named one.
+    week: isCollege ? String(flowFlags.week || "").trim() : "",
   };
   // Only when Alan actually asked (the plan went through the flow): then an
   // empty value means "first lesson" / "not sure yet" and the server grounds
@@ -1585,6 +1610,13 @@ function formatGeneratedValue(raw) {
   // these cleanly, so they arrive as "1. ", "2. ", and so on.
   if (items.filter((item) => /^\(?\d{1,2}[.)]\s/.test(item)).length >= 2) {
     return items.join("\n");
+  }
+
+  // Headings with bullets under them (a lesson proper as taught): the
+  // structure is already there, so it stays as written.
+  const bulleted = items.filter((item) => /^[•\-*]\s/.test(item)).length;
+  if (bulleted && bulleted < items.length) {
+    return items.map((item) => item.replace(/^[-*]\s+/, "• ")).join("\n");
   }
 
   // A lead-in line ("At the end of the lesson, the learners are expected to:")
@@ -3724,7 +3756,7 @@ const ANSWER_INPUTS = {
   section: sectionInput, previousTopic: prevTopicInput, topic: topicInput, nextTopic: nextTopicInput,
   mainTopic: mainTopicInput,
 };
-const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "sample", "assessment", "quizItems", "guidedAt"];
+const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "week", "sample", "assessment", "quizItems", "guidedAt"];
 
 function getAnswers() {
   const answers = {};
@@ -3983,6 +4015,8 @@ window.Generator = {
   // The Guided screens: the parts Alan walks through, the quick blanks left
   // over, and reading/writing their answers.
   guidedParts: () => stepFieldKeys.map(partInfo),
+  // The plan's references for a lesson proper part; null for any other part.
+  lessonReferences: (key) => (fieldByKey(key) && isLessonProper(fieldByKey(key)) ? planReferences() : null),
   quickParts: () => incompleteEasyFieldKeys().map(partInfo),
   fieldValue: (key) => fieldValues[key],
   isFieldComplete,

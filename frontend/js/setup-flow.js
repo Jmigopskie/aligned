@@ -2,7 +2,7 @@
 // big 3D Alan reacts on the right. The answers go to generator.js through
 // window.Generator; the step order and rules come from setup-flow-steps.js.
 // Guided mode continues on the same shell (guided-flow.js).
-import { createGuided } from "./guided-flow.js?v=2026-10-26o";
+import { createGuided } from "./guided-flow.js?v=2026-11-08a";
 
 const flow = document.getElementById("flow");
 const G = window.Generator;
@@ -687,10 +687,14 @@ function drawSources(box, library) {
 
   const label = el("div", { class: "flow-sources-head" },
     el("p", { class: "flow-label", id: "flow-library-label" }, "Supplementary sources"), upload);
+  // College: the course syllabus goes by week, so its week can be named (optional).
+  const week = G.getAnswers().levelType === "college"
+    ? row(textAnswer("week", { label: "Week (from your course syllabus)", placeholder: "e.g. Week 5" }))
+    : "";
   box.replaceChildren(label, ...(library.length
     ? [el("div", { class: "flow-field" }, search), folders, results, noMatch]
     : [el("p", { class: "flow-help" }, "No library documents for this subject yet. Upload your own file instead.")]),
-  input, list);
+  input, list, week);
   paintChosen();
 }
 
@@ -979,6 +983,7 @@ const DETAIL_ROWS = [
   ["topics", "Last topic", (a) => (a.firstLesson ? "This is the first lesson" : a.previousTopic)],
   ["topics", "Next topic", (a) => (a.nextUnsure ? "Not sure yet" : a.nextTopic)],
   ["sources", "Supplementary sources", (a) => [...(a.guides || []).map((g) => g.title), ...(a.sources || []).map((s) => s.name)].join(", ")],
+  ["sources", "Week", (a) => weekLabel(a.week), (a) => a.levelType === "college"],
   ["sample", "Sample lesson plan", (a) => (a.sample ? a.sample.name : "None")],
 ];
 
@@ -998,7 +1003,8 @@ function showDetails() {
       if (a.formatName) {
         list.append(el("div", { class: "flow-detail is-fixed" }, twoLine("Format", a.formatName)));
       }
-      DETAIL_ROWS.forEach(([id, label, value]) => {
+      DETAIL_ROWS.forEach(([id, label, value, shown]) => {
+        if (shown && !shown(a)) return;
         const row = el("button", { type: "button", class: "flow-detail" }, twoLine(label, value(a) || "Not answered"), icon("edit"));
         row.addEventListener("click", () => {
           index = steps.indexOf(id);

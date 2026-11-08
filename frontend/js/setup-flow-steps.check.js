@@ -70,10 +70,18 @@ assert.ok(!("f0" in kept));
 const college = ctx.prefillFieldValues([{ field_key: "g", label: "Grade Level & Section" }],
   { levelType: "college", program: "BSIT", year: "2nd Year", section: "A" }, {});
 assert.strictEqual(college.g, "BSIT · 2nd Year · A");
-// Setup no longer asks for a term or week, so those blanks aren't prefilled.
+// K-12 is never asked for a term or week, so those blanks aren't prefilled.
 const termWeek = ctx.prefillFieldValues([{ field_key: "t", label: "Quarter" }, { field_key: "w", label: "Week" }],
   { term: "2nd Term", week: "3" }, {});
 assert.deepStrictEqual({ ...termWeek }, {});
+// College may name its syllabus week.
+const collegeWeek = ctx.prefillFieldValues([{ field_key: "w", label: "Week" }], { levelType: "college", week: "5" }, {});
+assert.deepStrictEqual({ ...collegeWeek }, { w: "Week 5" });
+assert.strictEqual(ctx.weekLabel(" Week 4 "), "Week 4");
+assert.strictEqual(ctx.weekLabel("4"), "Week 4");
+assert.strictEqual(ctx.weekLabel("Weeks 3-4"), "Weeks 3-4");
+assert.strictEqual(ctx.weekLabel(""), "");
+assert.strictEqual(answered("sources", { guides: [{ id: 4 }], levelType: "college" }), true, "the week is optional");
 
 // Format groups: students see built-ins and their teachers' formats.
 const formats = [{ id: 1, is_builtin: true, owner_id: 9 }, { id: 2, is_builtin: false, owner_id: 5 }, { id: 3, is_builtin: false, owner_id: 7 }];

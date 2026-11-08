@@ -360,6 +360,27 @@ export function createGuided(ui) {
     return { node, sync };
   }
 
+  // The lesson proper is taught from the plan's references: they show under
+  // the box, each link opening in a new tab.
+  function referencesBox(refs) {
+    const box = el("section", { class: "flow-refs", "aria-label": "Your references" },
+      el("p", { class: "flow-label" }, "Your references"));
+    if (!refs.length) {
+      box.append(el("p", { class: "flow-help" },
+        "None yet. Add them in the References part, so your discussion comes from real sources."));
+      return box;
+    }
+    const list = el("ul", { class: "flow-refs-list" });
+    refs.forEach((ref) => {
+      const url = (ref.match(/https?:\/\/[^\s<>"')\]]+/) || [""])[0].replace(/[.,;]+$/, "");
+      const item = el("li", {}, url ? ref.slice(0, ref.indexOf(url)) : ref);
+      if (url) item.append(el("a", { href: url, target: "_blank", rel: "noopener noreferrer" }, url));
+      list.append(item);
+    });
+    box.append(list, el("p", { class: "flow-help" }, "Your discussion should come from these sources."));
+    return box;
+  }
+
   // ---- screens ----
   function part(i) {
     const parts = G.guidedParts();
@@ -391,6 +412,8 @@ export function createGuided(ui) {
         });
         tools.append(clear);
         answer.append(...[].concat(ed.node), tools);
+        const refs = G.lessonReferences(p.key);
+        if (refs) answer.append(referencesBox(refs));
       },
       next: last ? "Done with the parts" : "Next part",
       canNext: () => G.isFieldComplete(p.key),

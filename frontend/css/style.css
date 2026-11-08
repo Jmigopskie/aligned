@@ -7490,6 +7490,21 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
 .flow-day-picker .flow-select select { height: 48px; font-size: 17px; }
 .flow-day-to { font-size: 15px; color: var(--text-body); }
 
+/* The lesson proper's references, under its box. */
+.flow-refs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.flow-refs > .flow-label { margin: 0; }
+.flow-refs > .flow-help { margin: 0; font-size: 15px; }
+.flow-refs-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.45; color: var(--text-heading); }
+.flow-refs-list a { color: var(--primary); overflow-wrap: anywhere; text-underline-offset: 3px; }
+
 /* The part's own tools: fill from the sources, clear. */
 .flow-part-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .flow-part-tools .flow-clear { align-self: auto; }

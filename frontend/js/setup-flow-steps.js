@@ -78,7 +78,15 @@ const PREFILL_LABELS = [
   [["student teacher", "teacher", "name of teacher", "name of teachers"], (a) => a.studentTeacher],
   [["learning area", "learning area(s)"], (a) => a.subject],
   [["grade level", "grade level & section"], classLabel],
+  [["week", "week no.", "week number"], (a) => (a.levelType === "college" ? weekLabel(a.week) : "")],
 ];
+
+// College only: the syllabus week, typed by hand. A bare number reads as
+// "Week 5"; anything else ("Weeks 3-4") stays as written.
+function weekLabel(week) {
+  const w = String(week || "").trim();
+  return /^\d+$/.test(w) ? `Week ${w}` : w;
+}
 
 // Answers given once (school, name, subject, class) go straight into the
 // format's matching blanks, but never over something already written.

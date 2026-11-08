@@ -17,6 +17,7 @@ import json
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
@@ -164,7 +165,9 @@ _OWL_SYSTEM_INSTRUCTION = (
     "in their own words): classroom-ready, in DepEd K-12 terminology, grounded in the lesson's "
     "topic, subject and course guide. Fit the field: one line for a short text field; for "
     f"a list, one item per line and at most {_MAX_LIST_ITEMS} complete items; for learning objectives, exactly "
-    "3 objectives, one per line (no competency, no lead-in). Its label names the option in at most "
+    "3 objectives, one per line (no competency, no lead-in); for the lesson proper or discussion, the "
+    "whole lesson as that field's instructions describe (headings, definitions, terms, examples), taken "
+    "only from the references' content given. Its label names the option in at most "
     "6 words. Its \"why\" explains that option in one short sentence (at most 25 words): "
     "why it fits this field and lesson, or what it does for the learners.\n"
     "- An \"ask\" choice is a follow-up question the teacher may want to ask next, at most "
@@ -537,7 +540,24 @@ def _grounding_directive(field, context: dict) -> str:
     if minutes and any(w in haystack for w in _TIMING_WORDS):
         span = f"{minutes} minutes per session" if weekly else f"{minutes} minutes"
         out += f" The whole discussion lasts {span}. Where the procedure gives times, they must add up to that."
+    if grounding.is_lesson_proper_field(field):
+        out += _LESSON_PROPER_DIRECTIVE
     return out + _assessment_directive(haystack, context)
+
+
+# Testers wanted the lesson itself, as the teacher puts it on slides, not an
+# overview of what the teacher will do.
+_LESSON_PROPER_DIRECTIVE = (
+    " Write the actual lesson the teacher teaches and shows on slides, not an overview or a list of "
+    "steps the teacher follows. For each key concept of today's specific topic: a short heading or "
+    "question on its own line (e.g. 'What is a Number System?'), its definition in one sentence, the "
+    "key terms each with its meaning, its parts, rules or types as a numbered list ('1. Digits: the "
+    "symbols it uses'), and concrete examples ('Binary has 2 digits (0 and 1), so its base is 2.'). "
+    "One point per line: '• ' before a bullet point, '1. ' before a numbered one, nothing before a "
+    "heading. Every fact, term, definition and example comes from the online references' content or "
+    "the course guide given above; never invent one, and leave out what they don't cover. The length "
+    "limits do not apply to this field."
+)
 
 
 # The evaluation part, not a practice activity that merely "leads to" one.
@@ -585,8 +605,8 @@ _PART_MEANINGS = [
      "that gets learners curious; say what learners do."),
     (r"\banalysis\b", "Two to four questions the teacher asks so learners process the activity they just did "
      "and draw out the concept. Questions only, addressed to learners."),
-    (r"\babstraction\b|\blesson proper\b|\bdiscussion\b", "The core teaching of the concept, as ordered steps the "
-     "teacher follows, with the key facts or definitions learners must get."),
+    (r"\babstraction\b|\blesson proper\b|\bdiscussion\b", "The lesson itself, as the teacher teaches it and "
+     "shows it on slides: definitions, terms and examples."),
     (r"\bapplication\b", "One task where learners use the new concept themselves (individually, in pairs or "
      "groups), with what they produce."),
     (r"\bgeneralization\b", "The key idea of the lesson in one to three sentences, as learners should be able to "
@@ -635,6 +655,13 @@ def _lesson_block(context: dict, guide_text: str, citation: str = "") -> str:
         block += (f"\nThis lesson teaches ONE specific topic: {topic}{within}. Every field (content, examples, "
                   f"activities, questions, assessment, assignment) is about {topic} itself; the main topic and "
                   f"the guide's section are only its frame. Do not drift into the main topic's other subtopics.\n")
+    # College only: the syllabus week, typed by hand ("5" reads as "Week 5").
+    week = str(context.get("week") or "").strip()
+    if week and guide_text:
+        week = f"Week {week}" if week.isdigit() else week
+        block += (f"\nThis lesson is for {week} of the course syllabus: take its topic, outcomes and content "
+                  f"from that week in the syllabus or guide below when it lists weeks, otherwise from the part "
+                  f"that covers the topic.\n")
     if guide_text:
         block += f"""
 This is the section of the course guide that covers the lesson's topic. EVERY field must be
@@ -831,9 +858,11 @@ def _trim(values, fields, guide_text="", citation="", context=None):
     the guide's own wording and held to links that open."""
     plain = [f for f in fields if not _is_exact(f)]
     exact = [f for f in fields if _is_exact(f)]
-    # The setup's quiz or task is as long as it needs to be (up to a 20-item
-    # quiz) and keeps its own numbering and option letters.
-    assess = [f for f in plain if _sets_assessment(f, context)]
+    # The setup's quiz or task (up to a 20-item quiz) and the lesson proper
+    # (the lesson as taught) are as long as they need to be, and keep their
+    # own headings, numbering and option letters.
+    assess = [f for f in plain if _sets_assessment(f, context)
+              or (f.field_type != "weekly" and grounding.is_lesson_proper_field(f))]
     out = ai_limits.enforce_limits(
         values, [f for f in plain if f not in assess],
         max_items=_MAX_LIST_ITEMS,
@@ -1120,6 +1149,17 @@ def select_fields(fields, include_keys):
     return [f for f in fields if f.field_key in wanted]
 
 
+def _plan_references(fields, context: dict):
+    """(references found online, their block for the prompt). Found before
+    writing, so the lesson proper is taught from what those pages say and the
+    references part lists the same pages afterwards."""
+    if not any(grounding.is_reference_field(f) or grounding.is_lesson_proper_field(f) for f in fields):
+        return [], ""
+    found = find_references(context)
+    teaches = any(grounding.is_lesson_proper_field(f) for f in fields)
+    return found, _references_block(found, reference_material(found, context) if teaches and found else "")
+
+
 def generate_full(context: dict, fields, course_guide_text: str = "", include_keys=None,
                   course_guide_citation: str = "") -> dict:
     targets, _ = _split_uncopyable(select_fields(fields, include_keys), course_guide_text)
@@ -1127,7 +1167,8 @@ def generate_full(context: dict, fields, course_guide_text: str = "", include_ke
         return {}
     cite = course_guide_citation
     excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
-    lesson = _lesson_block(context, excerpt, cite)
+    found, refs_block = _plan_references(targets, context)
+    lesson = _lesson_block(context, excerpt, cite) + refs_block
     task = f"""
 Fill ONLY the following fields and return strict JSON with field_key as keys:
 {_schema_block(targets, context)}
@@ -1136,7 +1177,7 @@ Fill ONLY the following fields and return strict JSON with field_key as keys:
                    course_guide_text, cite, context)
     values = _complete_batch(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
     values = _fix_timing(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
-    return {**values, **_with_web_references(values, targets, context)}
+    return {**values, **_with_web_references(values, targets, context, found)}
 
 
 _STREAM_CHUNK_SIZE = 4
@@ -1165,7 +1206,8 @@ def generate_full_streaming(context: dict, fields, course_guide_text: str = "", 
     # Built once per plan: every chunk shares this exact prefix.
     cite = course_guide_citation
     excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
-    lesson = _lesson_block(context, excerpt, cite)
+    found, refs_block = _plan_references(fields, context)
+    lesson = _lesson_block(context, excerpt, cite) + refs_block
 
     all_values = {}
     for i, chunk in enumerate(chunks, start=1):
@@ -1218,7 +1260,7 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
             yield {"type": "section_done", "section": "Session timing",
                    "index": len(chunks), "total": len(chunks), "values": changed}
 
-    referenced = _with_web_references(all_values, fields, context)
+    referenced = _with_web_references(all_values, fields, context, found)
     if referenced:
         all_values.update(referenced)
         yield {"type": "section_done", "section": "Online references",
@@ -1255,8 +1297,9 @@ _REFERENCES_SYSTEM = (
     "results you are given. Return strict JSON: {\"references\": [\"...\", ...]}. Each is one "
     "APA 7 reference: Author or organization. (Year, or n.d.). Title. Site Name. URL, with the "
     "URL copied exactly from a search result and nothing after it. Prefer educational, "
-    "government (DepEd), university and reputable reference pages that teach the topic; never "
-    "social media, shops, forums or pages behind a login. Never invent a source or a URL."
+    "government (DepEd), university and reputable reference pages that teach the topic itself "
+    "(definitions, explanations, examples), each from a different website; never social media, "
+    "shops, forums, videos or pages behind a login. Never invent a source or a URL."
 )
 
 
@@ -1302,11 +1345,42 @@ def find_references(context: dict, count: int = _WEB_REFERENCES) -> list:
     return grounding._check_lines(found, "")[:count]
 
 
-def _with_web_references(values: dict, fields, context: dict) -> dict:
+_REFERENCE_PAGES = 4
+_REFERENCE_PAGE_BUDGET = 5000
+
+
+def reference_material(lines, context: dict) -> str:
+    """What the references' pages say about the lesson's topic: for each of
+    the first few links, the passages of the page that cover the topic,
+    labelled with its reference line. "" when no page could be read."""
+    urls = grounding.reference_urls(lines)[:_REFERENCE_PAGES]
+    if not urls:
+        return ""
+    with ThreadPoolExecutor(max_workers=len(urls)) as pool:
+        texts = list(pool.map(grounding.page_text, urls))
+    by_url = {u: next((str(l).strip() for l in lines if u in str(l)), u) for u in urls}
+    parts = [f"[From: {by_url[u]}]\n{guide_excerpt(t, context, _REFERENCE_PAGE_BUDGET)}"
+             for u, t in zip(urls, texts) if t.strip()]
+    return "\n\n".join(parts)
+
+
+def _references_block(lines, material: str) -> str:
+    """The references and what their pages say, for the lesson proper."""
+    if not lines:
+        return ""
+    listed = "\n".join(str(l).strip() for l in lines if str(l).strip())
+    block = f"\nThe lesson's online references:\n{listed}\n"
+    if material:
+        block += f"\nWhat those references' pages say about the topic (the online references' content):\n---\n{material}\n---\n"
+    return block
+
+
+def _with_web_references(values: dict, fields, context: dict, found=None) -> dict:
     """The reference fields with found references added after what they hold
     (the course guide's own citation stays first). {} when nothing changes."""
     refs = [f for f in fields if grounding.is_reference_field(f)]
-    found = find_references(context) if refs else []
+    if found is None:
+        found = find_references(context) if refs else []
     changed = {}
     for f in refs if found else []:
         value = values.get(f.field_key)
@@ -1344,6 +1418,8 @@ def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
                        "Every \"use\" choice is the answer for a single day, not the whole week.")
     turns = "\n".join(f"{'Teacher' if t.get('role') == 'teacher' else 'Owl'}: {t.get('text', '')}" for t in history)
     typed = f'What the teacher has typed in it so far: "{current}"' if str(current).strip() else "The field is still empty."
+    if grounding.is_lesson_proper_field(field):
+        lesson += _lesson_references(prior_values, context)
     locked = bool(getattr(field, "locked", False))
     if locked:
         weekly_note += ("\nThe supervising teacher locked this field: the student must write it in their own words. "
@@ -1360,7 +1436,8 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
 {f"Conversation so far:{chr(10)}{turns}{chr(10)}" if turns else ""}Teacher: {message}
 """
     data = _call(_OWL_SYSTEM_INSTRUCTION, [lesson, task], "Owl chat")
-    answer = _clean_owl_reply(data)
+    # A lesson proper is the whole lesson; other options are short.
+    answer = _clean_owl_reply(data, 6000 if grounding.is_lesson_proper_field(field) else 1500)
     if locked:
         # Whatever the model sends, nothing ready-made goes into a locked field.
         return {**answer, "choices": [c for c in answer["choices"] if c["type"] == "ask"]}
@@ -1373,6 +1450,23 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
                     "why": "Real pages found for this topic, in APA 7; every link was checked and opens."}
             answer = {**answer, "choices": [card] + [c for c in answer["choices"] if c["type"] != "use"][:_MAX_CHOICES - 1]}
     return answer
+
+
+def _lesson_references(prior_values: dict, context: dict) -> str:
+    """For the lesson proper in Guided: the references the student listed in
+    the plan and what their pages say, so Alan teaches from them."""
+    lines = []
+    for key, value in (prior_values or {}).items():
+        if "reference" in str(key).lower():
+            for v in value if isinstance(value, list) else [value]:
+                lines += [l.strip() for l in str(v or "").split("\n") if l.strip()]
+    if not grounding.reference_urls(lines):
+        return ("\nThe student has not listed any online references yet. Say so in the reply: the discussion "
+                "should come from references they choose, so they should add them in the references part "
+                "first. Meanwhile use only the course guide.\n")
+    return _references_block(lines, reference_material(lines, context)) + (
+        "\nIn the reply, remind the student in one short sentence that their discussion must come from "
+        "these references.\n")
 
 
 def _ground_choices(answer, field, guide_text, citation):
@@ -1394,7 +1488,7 @@ def _ground_choices(answer, field, guide_text, citation):
     return {**answer, "choices": choices}
 
 
-def _clean_owl_reply(data) -> dict:
+def _clean_owl_reply(data, max_text: int = 1500) -> dict:
     if not isinstance(data, dict):
         data = {}
     reply = str(data.get("reply") or "").strip()
@@ -1410,7 +1504,7 @@ def _clean_owl_reply(data) -> dict:
         label = str(c.get("label") or text).strip()
         if not text:
             continue
-        choice = {"type": kind, "label": label[:80], "text": text[:1500]}
+        choice = {"type": kind, "label": label[:80], "text": text[:max_text]}
         why = str(c.get("why") or "").strip()
         if kind == "use" and why:
             choice["why"] = why[:240]  # the option's explanation, shown under it

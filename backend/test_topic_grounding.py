@@ -59,7 +59,8 @@ def main():
     proper = Field("lesson_proper", "Lesson Proper")
     got = _grounding_directive(proper, {"duration_minutes": 45})
     assert "lasts 45 minutes" in got, got
-    assert _grounding_directive(proper, {}) == "", "no duration, no timing line"
+    # No duration, no timing line: only the lesson-as-taught instruction.
+    assert "lasts" not in _grounding_directive(proper, {}), "no duration, no timing line"
     # One part of the procedure (4A's "Activity") must not be told it is the
     # whole discussion, or it may take all the minutes.
     assert _grounding_directive(Field("activity", "Activity"), {"duration_minutes": 45}) == ""
@@ -89,6 +90,10 @@ def main():
     from services.ai_service import _lesson_block
     block = _lesson_block({"topic": "Cell formulas", "term": "2nd Term", "week": "3"}, "guide text")
     assert "Cell formulas" in block and "term and week" not in block, block[:300]
+    # College names its syllabus week.
+    college = _lesson_block({"topic": "Cell formulas", "week": "5"}, "guide text")
+    assert "Week 5 of the course syllabus" in college, college[:400]
+    assert "of the course syllabus" not in _lesson_block({"topic": "Cell formulas"}, "guide text")
     print("  topic picks the row OK")
 
     print("grounding OK")

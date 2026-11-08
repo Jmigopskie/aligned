@@ -77,6 +77,25 @@ def is_reference_field(field) -> bool:
     return bool(_REFERENCE_FIELD.search(_haystack(field)))
 
 
+# The part that teaches the topic itself (TUP's "Lesson Proper").
+_LESSON_PROPER_FIELD = re.compile(r"lesson.proper|discussion", re.I)
+
+
+def is_lesson_proper_field(field) -> bool:
+    return bool(_LESSON_PROPER_FIELD.search(_haystack(field)))
+
+
+def reference_urls(lines) -> list:
+    """The links in a references list, in order, each once."""
+    seen = []
+    for line in lines:
+        for u in _URL.findall(str(line or "")):
+            u = u.rstrip(".,;")
+            if u not in seen:
+                seen.append(u)
+    return seen
+
+
 # Facts about the class session that no guide contains: which school, which day,
 # what time, which room or section. A model asked to fill them made them up
 # ("Philippine National High School", "October 15, 2026"), so they are only
@@ -319,11 +338,12 @@ def _public_host(url) -> bool:
 _REDIRECTS = (301, 302, 303, 307, 308)
 
 
-def _status(method, url):
+def _status(method, url, read=0):
     """(status, Location) for one request, made to the very address
     _public_ip approved. Connecting by that IP, with the real host name for
     TLS and the Host header, is what defeats DNS rebinding: letting the HTTP
-    library look the name up again could get a different, internal answer."""
+    library look the name up again could get a different, internal answer.
+    With read > 0: (status, Location, Content-Type, up to `read` bytes of body)."""
     ip = _public_ip(url)
     if not ip:
         return None
@@ -343,10 +363,67 @@ def _status(method, url):
         resp = pool.urlopen(method, path, headers={**_UA, "Host": host}, redirect=False,
                             preload_content=False, retries=False)
         result = (resp.status, resp.headers.get("location"))
+        if read:
+            body = resp.read(read, decode_content=True) if resp.status < 300 else b""
+            result += (resp.headers.get("content-type") or "", body or b"")
         resp.release_conn()
         return result
     finally:
         pool.close()
+
+
+_PAGE_BYTES = 600_000
+_PAGE_CHARS = 60_000
+_DROP_BLOCKS = re.compile(r"<(script|style|noscript|svg|nav|header|footer|form|aside)\b.*?</\1\s*>", re.I | re.S)
+_BLOCK_TAG = re.compile(r"<(?:br|/p|/div|/li|/h[1-6]|/tr|/section|/article)\b[^>]*>", re.I)
+
+
+# Pages read, by URL; like _WORKING, a failure is not remembered.
+_PAGES = {}
+
+
+def page_text(url: str) -> str:
+    """The readable text of a public web page ("" when it can't be read):
+    fetched like link_works (public addresses only, every redirect re-checked),
+    HTML pages only, markup and page chrome stripped."""
+    if url in _PAGES:
+        return _PAGES[url]
+    text = _read_page(url)
+    if text and len(_PAGES) < 200:
+        _PAGES[url] = text
+    return text
+
+
+def _read_page(url: str) -> str:
+    current = url
+    try:
+        for _ in range(_MAX_REDIRECTS + 1):
+            result = _status("GET", current, read=_PAGE_BYTES)
+            if result is None:
+                return ""
+            status, location, ctype, body = result
+            if status in _REDIRECTS and location:
+                current = urljoin(current, location)
+                continue
+            break
+        else:
+            return ""
+    except (urllib3.exceptions.HTTPError, OSError, ValueError):
+        return ""
+    if status >= 300 or "html" not in ctype.lower():
+        return ""
+    charset = re.search(r"charset=([\w-]+)", ctype, re.I)
+    try:
+        html = body.decode(charset.group(1) if charset else "utf-8", errors="ignore")
+    except LookupError:
+        html = body.decode("utf-8", errors="ignore")
+    main = re.search(r"<(main|article)\b.*?</\1\s*>", html, re.I | re.S)
+    html = _DROP_BLOCKS.sub(" ", main.group(0) if main else html)
+    text = re.sub(r"<[^>]+>", " ", _BLOCK_TAG.sub("\n", html))
+    for entity, char in (("&nbsp;", " "), ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'), ("&#39;", "'")):
+        text = text.replace(entity, char)
+    lines = [re.sub(r"[ \t\r\f\v]+", " ", line).strip() for line in text.split("\n")]
+    return "\n".join(line for line in lines if line)[:_PAGE_CHARS]
 
 
 # Only links that opened are remembered: a failure may be a passing timeout,
