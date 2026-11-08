@@ -182,6 +182,7 @@ function planActions(p) {
     draft && { action: "rename", icon: "edit", label: "Rename" },
     { action: "preview", icon: "eye", label: "Preview" },
     { action: "export", icon: "download", label: "Download" },
+    { action: "pdf", icon: "file", label: "Save as PDF" },
     mine && { action: "visibility", icon: p.is_public ? "lock" : "globe", label: p.is_public ? "Make private" : "Make public" },
     mine && student && { action: "submit", icon: "inbox", label: "Submit to class" },
     mine && { action: "delete", icon: "trash", label: "Delete", danger: true },
@@ -198,6 +199,12 @@ async function runRowAction(action, plan) {
     renamePlan(planId);
   } else if (action === "export") {
     exportPlan(planId, plan.title || "");
+  } else if (action === "pdf") {
+    // The preview draws the plan's page; that page is what prints.
+    await openPreview(planId);
+    if (!previewBody.querySelector(".preview-error")) {
+      printPlanDocument(previewBody.querySelector(".lp-doc") || previewBody, plan.title || "Lesson plan");
+    }
   } else if (action === "submit") {
     openSubmitModal(planId);
   } else if (action === "visibility") {

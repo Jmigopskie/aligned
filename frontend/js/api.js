@@ -480,6 +480,33 @@ function exportPlan(planId, suggestedName) {
   });
 }
 
+// Save a plan as PDF through the browser's print dialog ("Save as PDF"), on a
+// clean copy of its page: the server has no Word-to-PDF converter, so the page
+// as drawn here is what prints. The dialog names the file after the title.
+// ponytail: browser print; a server PDF (LibreOffice) if exact Word fidelity is needed.
+function printPlanDocument(source, name) {
+  if (!source) {
+    showToast("Open the plan's document first.", true);
+    return;
+  }
+  const root = document.createElement("div");
+  root.id = "print-root";
+  root.append(source.cloneNode(true));
+  root.querySelectorAll("[contenteditable]").forEach((el) => el.removeAttribute("contenteditable"));
+  document.body.append(root);
+  document.body.classList.add("print-doc");
+  const title = document.title;
+  document.title = String(name || "Lesson plan").replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim() || "Lesson plan";
+  const done = () => {
+    window.removeEventListener("afterprint", done);
+    root.remove();
+    document.body.classList.remove("print-doc");
+    document.title = title;
+  };
+  window.addEventListener("afterprint", done);
+  window.print();
+}
+
 function showToast(message, isError = false) {
   let el = document.getElementById("toast");
   if (!el) {

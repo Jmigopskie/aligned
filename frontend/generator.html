@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-11-08a" />
+  <link rel="stylesheet" href="css/style.css?v=2026-11-09a" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -252,18 +252,16 @@
 
           <div id="unlocked-content" hidden>
             <section class="panel generate-panel">
-              <div class="setup-intro">
-                <h2>Generate content</h2>
-                <p class="text-sm mt-0">Let AI write the whole plan at once, or write it yourself field by field with Alan's help.</p>
-              </div>
-
-              <div class="mode-switch" id="mode-switch">
+              <!-- The finished document has no generate-with-selection: Alan writes
+                   from the setup flow ("Which parts should I write?"). The mode
+                   switch and button stay hidden for the code that drives them. -->
+              <div class="mode-switch" id="mode-switch" hidden>
                 <button type="button" class="active" data-mode="full">Building Proficiency</button>
                 <button type="button" data-mode="step">Guided mode</button>
               </div>
 
-              <section id="full-controls" class="mt-24">
-                <div class="generator-actions">
+              <section id="full-controls">
+                <div class="generator-actions" hidden>
                   <button type="button" id="generate-full-btn" class="btn btn-primary">Generate full plan</button>
                 </div>
                 <div id="generation-progress" class="gen-loader mt-16" hidden aria-live="polite">
@@ -272,10 +270,6 @@
                     <strong class="gen-loader-title">Alan is writing your plan&hellip;</strong>
                     <div id="generation-progress-list" class="generation-progress"></div>
                   </div>
-                </div>
-                <div id="own-fields-note" class="alert alert-info mt-16" role="status" hidden>
-                  <span id="own-fields-note-text"></span>
-                  <button type="button" id="own-fields-generate-btn" class="btn btn-secondary btn-sm">Generate these too</button>
                 </div>
               </section>
 
@@ -300,8 +294,8 @@
               </section>
 
               <div id="live-doc-hint" class="text-sm mt-24" hidden>
-                This mirrors your format's real reference document. Watch it fill in as content is generated,
-                or click into any spot to edit and style it directly.
+                This is your lesson plan in your format's real document. Click into any spot to edit and
+                style it, then save it, export it as Word or save it as PDF.
               </div>
 
               <!-- Toolbar and canvas share one stage because the stage is what
@@ -379,6 +373,7 @@
                       <option value="a4">A4 (210 × 297 mm)</option>
                     </select>
                   </label>
+                  <button type="button" id="pdf-btn" class="btn btn-secondary">Save as PDF</button>
                   <a id="export-btn" class="btn btn-primary" style="pointer-events:none; opacity:0.5;">Export as Word</a>
                 </div>
               </div>
@@ -426,11 +421,11 @@
   <div class="modal-overlay" id="leave-overlay" hidden>
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="leave-title" style="max-width:480px;">
       <div class="modal-header">
-        <h2 id="leave-title">Leave without saving?</h2>
+        <h2 id="leave-title">Are you sure you want to leave?</h2>
         <button type="button" class="modal-close" id="leave-close" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
-        <p>Your latest changes to this lesson plan haven't been saved to your account yet. If you leave now, they may be lost, and they won't show up if you open the plan on another device.</p>
+        <p>Your lesson plan won't be saved. What you've done so far isn't in your account yet, so it may be lost and won't show up on another device.</p>
       </div>
       <div class="gen-review-footer" style="flex-wrap:wrap;">
         <button type="button" class="btn btn-danger" id="leave-discard">Leave anyway</button>
@@ -456,12 +451,12 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-10-30a"></script>
+  <script src="js/api.js?v=2026-11-09a"></script>
   <script src="js/icons.js?v=2026-10-26q"></script>
   <script src="js/doc-toolbar.js?v=2026-10-06c"></script>
   <script src="js/setup-flow-steps.js?v=2026-11-08a"></script>
   <script src="js/part-guides.js?v=2026-11-08a"></script>
-  <script src="js/generator.js?v=2026-11-08a"></script>
+  <script src="js/generator.js?v=2026-11-09a"></script>
   <script type="importmap">
     { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
   </script>

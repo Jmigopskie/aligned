@@ -177,9 +177,6 @@ const sectionNav = document.getElementById("section-nav");
 const stepProgressLabel = document.getElementById("step-progress-label");
 const generateFullBtn = document.getElementById("generate-full-btn");
 const generationProgressEl = document.getElementById("generation-progress");
-const ownFieldsNote = document.getElementById("own-fields-note");
-const ownFieldsNoteText = document.getElementById("own-fields-note-text");
-const ownFieldsGenerateBtn = document.getElementById("own-fields-generate-btn");
 const generationProgressList = document.getElementById("generation-progress-list");
 const stepContinueBtn = document.getElementById("step-continue-btn");
 const stepClearBtn = document.getElementById("step-clear-btn");
@@ -2439,8 +2436,17 @@ function enableExport() {
 exportBtn.addEventListener("click", (e) => {
   e.preventDefault();
   if (!planId) return;
+  exportPlan(planId, exportName());
+});
+
+function exportName() {
   const topic = topicInput.value.trim() || mainTopicInput.value.trim();
-  exportPlan(planId, [topic, fmt && fmt.name].filter(Boolean).join(" - "));
+  return [topic, fmt && fmt.name].filter(Boolean).join(" - ");
+}
+
+// The page as it is on screen, so it needs no save first.
+document.getElementById("pdf-btn").addEventListener("click", () => {
+  printPlanDocument(liveDocWrap.querySelector(".lp-doc") || (resultsEl.children.length ? resultsEl : null), exportName());
 });
 
 // ---- Same plan on two devices ----------------------------------------------
@@ -2537,8 +2543,18 @@ const leaveOverlay = document.getElementById("leave-overlay");
 let leaveHref = null;
 let leavingConfirmed = false;
 
+// Unsaved: changes the server doesn't have yet, or a plan under way (a format
+// picked, in the setup flow or Guided) that was never saved to the account at
+// all: its answers live only in this browser's draft.
 function hasUnsavedWork() {
-  return dirty && worthSaving() && !leavingConfirmed;
+  if (leavingConfirmed) return false;
+  return (dirty && worthSaving()) || (!!fmt && !planId);
+}
+
+function openLeaveDialog() {
+  // "Save and leave" only when there is a plan worth saving yet.
+  document.getElementById("leave-save").hidden = !worthSaving();
+  openDialog(leaveOverlay);
 }
 
 function leaveTo(href) {
@@ -2558,7 +2574,7 @@ document.addEventListener("click", (e) => {
   if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
   e.preventDefault();
   leaveHref = link.href;
-  openDialog(leaveOverlay);
+  openLeaveDialog();
 }, true);
 
 window.addEventListener("beforeunload", (e) => {
@@ -2957,12 +2973,6 @@ function renderProgress(sectionStates) {
 }
 
 
-// "Generate these too": only the student's own fields that are still blank,
-// leaving everything already written untouched.
-ownFieldsGenerateBtn.addEventListener("click", () => {
-  const blank = selfFieldKeys().filter((key) => !isFieldComplete(key));
-  if (blank.length) runGeneration(blank);
-});
 
 // Generates exactly `includeKeys`: the full plan's selection, or just the
 // student's own fields when they ask for those after the fact.
@@ -2993,7 +3003,6 @@ async function runGeneration(includeKeys) {
   }
 
   errorBox.hidden = true;
-  ownFieldsNote.hidden = true;
   setButtonLoading(generateFullBtn, true, "Generating");
   setOwlState("thinking", "Thinking hard about your lesson...");
   generating = true;
@@ -3054,17 +3063,9 @@ async function runGeneration(includeKeys) {
   }
 }
 
-generateFullBtn.addEventListener("click", () => {
-  if (!updateGate()) {
-    showError("Fill in the cooperating teacher and subject, and choose a Budget of Work or Curriculum Guide first.");
-    return;
-  }
-  openReview();
-});
-
 // ---- Field review: before generating, the teacher picks which fields Alan
-// writes. The document behind the popup marks each field as it is chosen. ----
-const reviewOverlay = document.getElementById("gen-review-overlay");
+// writes, on the setup flow's "Which parts should I write?" screen (mountReview).
+// The finished document has no generate-with-selection of its own (testers). ----
 const reviewList = document.getElementById("gen-review-list");
 const reviewConfirm = document.getElementById("gen-review-confirm");
 const reviewHint = document.getElementById("gen-review-hint");
@@ -3168,46 +3169,6 @@ document.querySelectorAll("[data-review-all]").forEach((btn) => {
   });
 });
 
-let reviewReturnFocus = null;
-// Where each part of the review list lives in the popup, recorded before the
-// flow ever moves it: [node, parent, next sibling].
-const reviewHome = [".gen-review-intro", ".gen-review-bulk", "#gen-review-list", "#gen-review-hint"]
-  .map((sel) => document.querySelector(sel))
-  .filter(Boolean)
-  .map((node) => [node, node.parentNode, node.nextSibling]);
-
-function openReview() {
-  // The setup flow borrows the list for its "Which parts should I write?"
-  // screen (mountReview); bring it home before the popup shows it.
-  reviewHome.forEach(([node, parent, before]) => parent.insertBefore(node, before));
-  reviewReturnFocus = document.activeElement;
-  delete reviewList.dataset.lastPulse;
-  renderReviewList();
-  reviewOverlay.hidden = false;
-  const first = reviewOverlay.querySelector(".gen-review-row input:checked") || reviewConfirm;
-  first.focus();
-}
-
-function closeReview() {
-  reviewOverlay.hidden = true;
-  liveDocWrap.querySelectorAll(".lp-field-review-gen, .lp-field-review-static, .lp-field-review-pulse")
-    .forEach((el) => el.classList.remove("lp-field-review-gen", "lp-field-review-static", "lp-field-review-pulse"));
-  paintStaticMarks();
-  if (reviewReturnFocus && reviewReturnFocus.focus) reviewReturnFocus.focus();
-}
-
-document.getElementById("gen-review-close").addEventListener("click", closeReview);
-document.getElementById("gen-review-cancel").addEventListener("click", closeReview);
-reviewOverlay.addEventListener("click", (e) => {
-  if (e.target === reviewOverlay) closeReview();
-});
-reviewOverlay.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeReview();
-});
-reviewConfirm.addEventListener("click", () => {
-  closeReview();
-  runGeneration(selectedGenerateKeys());
-});
 
 // What the owl says once generation stops. The server only reports on the
 // fields it was asked for (`missing`/`missing_labels`), so an empty
@@ -3238,17 +3199,10 @@ function reportGenerationOutcome(finalEvent, requestedKeys) {
   const yoursKeys = yoursFields.map((f) => f.field_key);
   const ownKeys = ownFields.map((f) => f.field_key);
 
-  if (ownFields.length) {
-    const labels = joinLabels(ownFields.map((f) => f.label || f.field_key));
-    ownFieldsNoteText.textContent = `${labels} ${ownFields.length === 1 ? "is" : "are"} yours to fill in. Want me to write ${ownFields.length === 1 ? "it" : "them"} too?`;
-    ownFieldsNote.hidden = false;
-  } else {
-    ownFieldsNote.hidden = true;
-  }
-
   if (!missingLabels.length && !yoursKeys.length && !guideLabels.length) {
     if (ownKeys.length) {
-      setOwlState("guide", `I wrote everything else. ${ownFieldsNoteText.textContent}`);
+      const labels = joinLabels(ownFields.map((f) => f.label || f.field_key));
+      setOwlState("guide", `I wrote everything else. ${labels} ${ownFields.length === 1 ? "is" : "are"} yours to fill in.`);
       highlightEmptyFields(ownKeys);
       return;
     }
@@ -3720,6 +3674,7 @@ async function loadFormat(formatId) {
     // A different format mid-run: reload on the same run. The answers live in
     // the run's draft, so they come back; the new format's blanks start empty.
     writeDraft();
+    leavingConfirmed = true;
     location.replace(`${location.pathname}?run=${encodeURIComponent(currentRunId || "")}&format_id=${encodeURIComponent(formatId)}`);
     return new Promise(() => {});
   }

@@ -7616,3 +7616,18 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
   .flow-sources-head > .flow-more { height: 34px; }
   .flow-chips { max-height: 80px; gap: 4px 8px; }
 }
+
+/* Save as PDF (printPlanDocument in api.js): only the copied page prints, at
+   its true size, without the editing highlights. The page carries its own
+   margins (inline, from the .docx), so the sheet has none of its own. */
+#print-root { display: none; }
+@media print {
+  @page { margin: 0; }
+  body.print-doc { background: #fff; }
+  body.print-doc > *:not(#print-root) { display: none !important; }
+  body.print-doc #print-root { display: block; }
+  body.print-doc #print-root .lp-doc { margin: 0 auto; box-shadow: none; zoom: 1; }
+  body.print-doc #print-root .lp-field,
+  body.print-doc #print-root .lp-field.lp-filled { background: none !important; box-shadow: none !important; }
+  body.print-doc #print-root .lp-field:empty::before { content: none; }
+}

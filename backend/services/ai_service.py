@@ -18,6 +18,7 @@ import logging
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlparse
 
 import requests
 
@@ -431,7 +432,9 @@ def _field_directive(field):
             "create), affective (e.g. value, show willingness to, demonstrate respect for, cooperate "
             "in, practice), and psychomotor (e.g. perform, construct, operate, assemble, demonstrate "
             "the procedure for) ONLY when the lesson has a real hands-on skill; never force a "
-            "psychomotor objective. Order them from lower to higher thinking."
+            "psychomotor objective. Order them from lower to higher thinking. Each is about today's "
+            "specific topic and something the lesson proper can teach and the evaluation can check in "
+            "this session."
         )
     if grounding.is_copy_only_field(field):
         return (
@@ -542,6 +545,8 @@ def _grounding_directive(field, context: dict) -> str:
         out += f" The whole discussion lasts {span}. Where the procedure gives times, they must add up to that."
     if grounding.is_lesson_proper_field(field):
         out += _LESSON_PROPER_DIRECTIVE
+    if _ASSESSMENT_FIELD.search(haystack) and "mastery" not in haystack:
+        out += _ALIGNED_ASSESSMENT
     return out + _assessment_directive(haystack, context)
 
 
@@ -555,8 +560,17 @@ _LESSON_PROPER_DIRECTIVE = (
     "symbols it uses'), and concrete examples ('Binary has 2 digits (0 and 1), so its base is 2.'). "
     "One point per line: '• ' before a bullet point, '1. ' before a numbered one, nothing before a "
     "heading. Every fact, term, definition and example comes from the online references' content or "
-    "the course guide given above; never invent one, and leave out what they don't cover. The length "
-    "limits do not apply to this field."
+    "the course guide given above; never invent one, and leave out what they don't cover. It teaches "
+    "every learning objective already written for this plan, in order, so learners can do each one by "
+    "the end. The length limits do not apply to this field."
+)
+
+# Testers found objectives, content and assessment drifting apart: the check
+# is held to what the objectives promise and what the lesson taught.
+_ALIGNED_ASSESSMENT = (
+    " Every item, task step or rubric criterion checks one of the learning objectives already "
+    "written for this plan (cover each objective at least once), using only the terms, facts and "
+    "examples the lesson proper taught; never test anything the lesson did not teach."
 )
 
 
@@ -1291,7 +1305,7 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
 # 7 form, and the link opens.
 
 _WEB_REFERENCES = 4
-_WEB_RESULTS = 8
+_WEB_RESULTS = 10
 _REFERENCES_SYSTEM = (
     "You list online references for a Philippine K-12 lesson plan, using ONLY the web search "
     "results you are given. Return strict JSON: {\"references\": [\"...\", ...]}. Each is one "
@@ -1320,29 +1334,77 @@ def _web_search_post(system_instruction: str, prompt: str):
     )
     response.raise_for_status()
     message = response.json()["choices"][0]["message"]
-    urls = {(a.get("url_citation") or {}).get("url", "") for a in message.get("annotations") or []
-            if a.get("type") == "url_citation"}
-    return message.get("content") or "", {u.rstrip("/") for u in urls if u}
+    cited = {}
+    for a in message.get("annotations") or []:
+        if a.get("type") == "url_citation":
+            c = a.get("url_citation") or {}
+            if c.get("url"):
+                cited.setdefault(c["url"].rstrip("/"), str(c.get("title") or "").strip())
+    return message.get("content") or "", cited
+
+
+def _apa_from_result(url: str, title: str) -> str:
+    """An APA 7 line for a search result the model didn't list: the site's
+    own name (from its title, "Topic - Site", or its address), n.d., title."""
+    host = (urlparse(url).hostname or "").removeprefix("www.")
+    title = re.sub(r"\s+", " ", title or "").strip()
+    head, sep, site = title.rpartition(" - ") if " - " in title else title.rpartition(" | ")
+    if sep and 2 <= len(site) <= 40:
+        title = head.strip()
+    else:
+        site = host
+    title = title.rstrip(" .?!:;") or host
+    return grounding.to_apa(f"{site}. (n.d.). {title}. {site}. {url}")
+
+
+# References found, by topic; a search that found nothing isn't remembered.
+_FOUND_REFERENCES = {}
+_MIN_PAGE_TEXT = 800
 
 
 def find_references(context: dict, count: int = _WEB_REFERENCES) -> list:
-    """Up to `count` APA 7 references for the lesson's topic whose links came
-    from a web search and open; [] when search is unavailable or finds none."""
+    """Up to `count` APA 7 references for the lesson's topic, each from a
+    different website, whose pages came from a web search and really open
+    with readable text; [] when search is unavailable or finds none."""
     topic = str(context.get("topic") or context.get("main_topic") or "").strip()
     if PROVIDER != "openrouter" or not topic:
         return []
     about = ", ".join(str(context.get(k)) for k in ("subject", "grade_level") if context.get(k))
-    prompt = (f"Find {count} accessible online pages a teacher could use to teach this lesson, and list "
-              f"them as APA 7 references.\nLesson topic: {topic}" + (f"\nFor: {about}" if about else ""))
+    key = (topic.lower(), about.lower())
+    if key in _FOUND_REFERENCES:
+        return _FOUND_REFERENCES[key][:count]
+    prompt = (f"Find {count * 2} accessible online pages, each on a different website, that a teacher could "
+              f"use to teach this lesson, and list them as APA 7 references.\nLesson topic: {topic}"
+              + (f"\nFor: {about}" if about else ""))
     try:
-        text, urls = _web_search_post(_REFERENCES_SYSTEM, prompt)
+        text, cited = _web_search_post(_REFERENCES_SYSTEM, prompt)
         lines = _parse_json(text).get("references") or []
     except Exception as exc:  # noqa: BLE001 - no references is better than a failed plan
         _log.warning("Reference search failed: %s", exc)
         return []
-    found = [str(l) for l in lines if isinstance(l, str)
-             and any(u.rstrip(".,;/") in urls for u in re.findall(r"https?://\S+", l))]
-    return grounding._check_lines(found, "")[:count]
+    lines = [grounding.to_apa(str(l)) for l in lines if isinstance(l, str)]
+    lines = [l for l in lines if l and any(u.rstrip("/") in cited for u in grounding.reference_urls([l]))]
+    # Testers mostly got one reference: the search's other results become
+    # references too, rather than being lost when the model lists only one.
+    listed = {u.rstrip("/") for u in grounding.reference_urls(lines)}
+    lines += [l for l in (_apa_from_result(u, t) for u, t in cited.items() if u not in listed) if l]
+    urls = [grounding.reference_urls([l])[0] for l in lines]
+    # A link that only answers a status check can still fail in a browser, so
+    # each page must actually open with readable text; one per website.
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        texts = list(pool.map(grounding.page_text, urls)) if urls else []
+    kept, sites = [], set()
+    for line, url, page in zip(lines, urls, texts):
+        site = (urlparse(url).hostname or "").removeprefix("www.")
+        if len(page) < _MIN_PAGE_TEXT or site in sites:
+            continue
+        sites.add(site)
+        kept.append(line)
+        if len(kept) == count:
+            break
+    if kept and len(_FOUND_REFERENCES) < 500:
+        _FOUND_REFERENCES[key] = kept
+    return kept
 
 
 _REFERENCE_PAGES = 4
@@ -1435,16 +1497,27 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
 
 {f"Conversation so far:{chr(10)}{turns}{chr(10)}" if turns else ""}Teacher: {message}
 """
-    data = _call(_OWL_SYSTEM_INSTRUCTION, [lesson, task], "Owl chat")
+    # The references search runs beside the reply instead of after it (testers
+    # found Alan slow on the references part).
+    pool = ThreadPoolExecutor(max_workers=1) if grounding.is_reference_field(field) and not locked else None
+    searching = pool.submit(find_references, context) if pool else None
+    try:
+        data = _call(_OWL_SYSTEM_INSTRUCTION, [lesson, task], "Owl chat")
+    finally:
+        if pool:
+            pool.shutdown(wait=False)
     # A lesson proper is the whole lesson; other options are short.
     answer = _clean_owl_reply(data, 6000 if grounding.is_lesson_proper_field(field) else 1500)
     if locked:
         # Whatever the model sends, nothing ready-made goes into a locked field.
         return {**answer, "choices": [c for c in answer["choices"] if c["type"] == "ask"]}
     answer = _ground_choices(answer, field, course_guide_text, course_guide_citation)
-    if grounding.is_reference_field(field):
+    if searching:
         # References Alan offers are real pages from a web search, not the model's guesses.
-        found = find_references(context)
+        try:
+            found = searching.result(timeout=60)
+        except Exception:  # noqa: BLE001 - the reply still stands without them
+            found = []
         if found:
             card = {"type": "use", "label": "Online references", "text": "\n".join(found),
                     "why": "Real pages found for this topic, in APA 7; every link was checked and opens."}

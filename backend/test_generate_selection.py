@@ -235,10 +235,13 @@ def check_web_references():
         "no apa here https://www.w3schools.com/html/",                      # not APA
     ]})
     calls = []
-    real_post, real_provider, real_works = ai_service._web_search_post, ai_service.PROVIDER, grounding.link_works
-    ai_service._web_search_post = lambda system, prompt: (calls.append(prompt), (answer, {real, "https://www.w3schools.com/html"}))[1]
+    real_post, real_provider, real_works = ai_service._web_search_post, ai_service.PROVIDER, grounding.page_text
+    # Search results by URL and title; the second is the same site, so only one is kept.
+    cited = {real: "HTML Images - W3Schools", "https://www.w3schools.com/html": "HTML Tutorial - W3Schools"}
+    ai_service._web_search_post = lambda system, prompt: (calls.append(prompt), (answer, cited))[1]
     ai_service.PROVIDER = "openrouter"
-    grounding.link_works = lambda url: url == real
+    grounding.page_text = lambda url: "page text " * 200 if url in cited else ""
+    ai_service._FOUND_REFERENCES.clear()
     try:
         found = ai_service.find_references({"topic": "HTML images", "subject": "ICT"})
         assert found == [f"W3Schools. (n.d.). HTML images. W3Schools. {real}"], found
@@ -253,9 +256,10 @@ def check_web_references():
         def boom(system, prompt):
             raise RuntimeError("search down")
         ai_service._web_search_post = boom
-        assert ai_service.find_references({"topic": "HTML images"}) == []
+        assert ai_service.find_references({"topic": "HTML tables"}) == []
     finally:
-        ai_service._web_search_post, ai_service.PROVIDER, grounding.link_works = real_post, real_provider, real_works
+        ai_service._web_search_post, ai_service.PROVIDER, grounding.page_text = real_post, real_provider, real_works
+        ai_service._FOUND_REFERENCES.clear()
     print("  web references OK")
 
 
@@ -273,7 +277,9 @@ def check_assessment_type():
     mastery = Field("developing_mastery", "Developing mastery (leads to Formative Assessment 3)")
     assert "quiz" not in ai_service._grounding_directive(mastery, {"assessment_type": "a 3-item multiple-choice quiz"})
     assert "quiz" not in ai_service._grounding_directive(Field("flow", "Flow"), {"assessment_type": "a 3-item multiple-choice quiz"})
-    assert ai_service._grounding_directive(evaluation, {}) == ""
+    # Setup never asked: no quiz or task, only the tie to the objectives.
+    unasked = ai_service._grounding_directive(evaluation, {})
+    assert "quiz" not in unasked and "Rubric:" not in unasked and "learning objectives" in unasked, unasked
     # 5, 10, 15 or 20 items: a two-digit count is read whole.
     twenty = {"assessment_type": "a 20-item multiple-choice quiz"}
     assert "exactly 20 items" in ai_service._grounding_directive(evaluation, twenty)
