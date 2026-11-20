@@ -2860,6 +2860,12 @@ body.auth-page {
   gap: 6px;
 }
 
+/* A submission's three buttons wrap on a phone instead of running off the card. */
+.submission-card .row-actions,
+#review-body .row-actions {
+  flex-wrap: wrap;
+}
+
 .row-action-btn {
   width: 32px;
   height: 32px;

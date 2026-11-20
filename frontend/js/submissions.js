@@ -133,7 +133,7 @@ function renderSubmissions(plans) {
         ${p.teacher_feedback ? `<div class="feedback-box"><strong>Your feedback:</strong> ${escapeHtml(p.teacher_feedback)}</div>` : ""}
         <div class="row-actions" style="margin-top:12px;">
           <button class="btn btn-secondary" type="button" data-action="review" data-plan="${p.id}">Open &amp; review</button>
-          <button class="btn btn-secondary" type="button" data-action="export" data-plan="${p.id}" data-title="${escapeHtml(p.title || "")}">Download</button>
+          ${fileButtons(p)}
         </div>
       </div>`
     )
@@ -142,9 +142,26 @@ function renderSubmissions(plans) {
   submissionsList.querySelectorAll("[data-action='review']").forEach((btn) => {
     btn.addEventListener("click", () => openReview(btn.dataset.plan));
   });
-  submissionsList.querySelectorAll("[data-action='export']").forEach((btn) => {
+  wireFileButtons(submissionsList);
+}
+
+// Download (Word) and Save as PDF for a student's submitted plan, on its card
+// and inside the review dialog.
+function fileButtons(p) {
+  const attrs = `data-plan="${p.id}" data-title="${escapeHtml(p.title || "")}"`;
+  return `<button class="btn btn-secondary" type="button" data-action="export" ${attrs}>Download</button>
+          <button class="btn btn-secondary" type="button" data-action="pdf" ${attrs}>Save as PDF</button>`;
+}
+
+function wireFileButtons(root) {
+  root.querySelectorAll("[data-action='export']").forEach((btn) => {
+    btn.addEventListener("click", () => exportPlan(btn.dataset.plan, btn.dataset.title));
+  });
+  root.querySelectorAll("[data-action='pdf']").forEach((btn) => {
     btn.addEventListener("click", () => {
-      exportPlan(btn.dataset.plan, btn.dataset.title);
+      closeReview();
+      // The list page's own Save as PDF: opens the plan's page, then prints it.
+      runRowAction("pdf", { id: btn.dataset.plan, title: btn.dataset.title });
     });
   });
 }
@@ -168,7 +185,8 @@ async function openReview(planId) {
         <span><strong>Quarter:</strong> ${escapeHtml(plan.quarter || "\u2013")}</span>
         <span><strong>Date:</strong> ${escapeHtml(plan.date || "\u2013")}</span>
         <span><strong>Status:</strong> ${statusLabel(plan.status)}</span>
-      </div>`;
+      </div>
+      <div class="row-actions" style="margin-bottom:16px;">${fileButtons(plan)}</div>`;
 
     const fields = (fmt.fields || []).slice().sort((a, b) => a.sort_order - b.sort_order);
     let currentSection = undefined;
@@ -201,6 +219,7 @@ async function openReview(planId) {
       </div>`;
 
     reviewBody.innerHTML = meta + (sectionsHtml || `<p>This format has no fields defined.</p>`) + feedbackForm;
+    wireFileButtons(reviewBody);
 
     document.getElementById("mark-reviewed-btn").addEventListener("click", async (e) => {
       const btn = e.currentTarget;
