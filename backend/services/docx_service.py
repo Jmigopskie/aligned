@@ -1397,6 +1397,17 @@ class _RichLineParser(_html_parser.HTMLParser):
                 self._new_line(list_type)
             else:
                 self.lines[-1]["list"] = list_type
+        elif tag == "tr":
+            # A rubric edited on screen: each row becomes one " | " line, which
+            # pipe_rows_to_tables turns back into a Word table on save.
+            if self.lines[-1]["runs"]:
+                self._new_line()
+            self.cell_index = 0
+        elif tag in ("td", "th"):
+            if getattr(self, "cell_index", 0):
+                self.lines[-1]["runs"].append({"text": " | ", "bold": False, "italic": False, "underline": False,
+                                               "size": None, "color": None, "highlight": None})
+            self.cell_index = getattr(self, "cell_index", 0) + 1
         elif tag == "span":
             classes = set((dict(attrs).get("class") or "").split())
             a = dict(attrs)
@@ -1442,6 +1453,9 @@ class _RichLineParser(_html_parser.HTMLParser):
             # Text after a list is a line of its own, not part of the last item.
             if not self.list_stack and self.lines[-1]["runs"]:
                 self._new_line()
+        elif tag in ("p", "table") and self.lines[-1]["runs"]:
+            # Text after a paragraph or table starts its own line.
+            self._new_line()
         elif tag == "span" and self.span_stack:
             frame = self.span_stack.pop()
             if frame.get("cap"):

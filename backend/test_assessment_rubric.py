@@ -82,6 +82,15 @@ def main():
     assert nested.tables and nested.tables[0].rows[1].cells[0].text == "Accuracy"
     assert nested._tc[-1].tag == qn("w:p"), "a cell must end with a paragraph"
     print("  rubric rows become Word tables OK")
+
+    # A rubric edited on screen arrives as an HTML table in the rich value.
+    lines = docx_service.parse_rich_value(
+        "<p>Rubric:</p><table><tbody><tr><th>Criteria</th><th>Excellent (4)</th><th>Good (3)</th></tr>"
+        "<tr><td>Accuracy</td><td>All <b>correct</b></td><td>One error</td></tr></tbody></table><p>Total: 8 points</p>")
+    texts = ["".join(r["text"] for r in line["runs"]) for line in lines]
+    assert texts == ["Rubric:", "Criteria | Excellent (4) | Good (3)", "Accuracy | All correct | One error",
+                     "Total: 8 points"], texts
+    print("  an edited rubric table exports as rows OK")
     print("assessment and rubric OK")
 
 
