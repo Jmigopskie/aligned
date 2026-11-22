@@ -1340,8 +1340,11 @@ def _web_search_post(system_instruction: str, prompt: str):
         "messages": [{"role": "system", "content": system_instruction}, {"role": "user", "content": prompt}],
         "plugins": [{"id": "web", "max_results": _WEB_RESULTS}],
         "response_format": {"type": "json_object"},
-        "reasoning": {"enabled": False},
     }
+    # The same setting as the writing calls: Mistral Large 4 refuses a request
+    # that turns reasoning off (400), which silently emptied every search.
+    if not Config.OPENROUTER_REASONING:
+        payload["reasoning"] = {"enabled": False}
     response = requests.post(
         _OPENROUTER_URL,
         headers={"Authorization": f"Bearer {Config.OPENROUTER_API_KEY}", "Content-Type": "application/json"},

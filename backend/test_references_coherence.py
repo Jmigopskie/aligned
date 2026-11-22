@@ -111,6 +111,27 @@ def main():
     finally:
         ai_service.PROVIDER, ai_service._web_search_post, grounding.page_text, ai_service._call = real
 
+    # --- The search sends the reasoning setting the writing calls use ---
+    sent = []
+    real_post, real_flag = ai_service.requests.post, ai_service.Config.OPENROUTER_REASONING
+
+    class Reply:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"choices": [{"message": {"content": "{}", "annotations": []}}]}
+
+    try:
+        ai_service.requests.post = lambda url, **kw: sent.append(kw["json"]) or Reply()
+        for flag in (True, False):
+            ai_service.Config.OPENROUTER_REASONING = flag
+            ai_service._web_search_post("system", "prompt")
+        assert "reasoning" not in sent[0] and sent[1]["reasoning"] == {"enabled": False}, sent
+    finally:
+        ai_service.requests.post, ai_service.Config.OPENROUTER_REASONING = real_post, real_flag
+    print("  search follows OPENROUTER_REASONING OK")
+
     # --- Objectives, lesson and evaluation line up ---
     ctx = {"topic": "Number systems"}
     lesson = ai_service._grounding_directive(Field("lesson_proper", "Lesson Proper"), ctx)
