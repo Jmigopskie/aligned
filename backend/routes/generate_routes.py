@@ -158,6 +158,7 @@ def generate_full():
             context, fields,
             course_guide_text=_guide_sources(guides) + _resolve_sources(data, user),
             include_keys=include_keys, course_guide_citation=_guide_citation(guides),
+            written=_written_values(data, include_keys, fmt),
         )
     except Exception:
         if charge:
@@ -165,6 +166,18 @@ def generate_full():
         raise
     _settle_write(user, data, charge, field_values, include_keys, fields)
     return jsonify({"status": "ok", "field_values": field_values})
+
+
+def _written_values(data, include_keys, fmt):
+    """The parts the page keeps as they are (a regenerate's unticked parts),
+    as context for Alan: only this format's own parts, never one being
+    written now. Capped in ai_service._written_block."""
+    raw = data.get("written_values")
+    if not isinstance(raw, dict):
+        return None
+    keys = {f.field_key for f in fmt.fields}
+    writing = set(include_keys) if include_keys is not None else keys
+    return {k: v for k, v in raw.items() if k in keys and k not in writing and isinstance(v, (str, list))}
 
 
 def _settle_write(user, data, charge, values, include_keys, fields):
@@ -204,12 +217,14 @@ def generate_full_stream():
     if refused:
         return refused
 
+    written = _written_values(data, include_keys, fmt)
+
     def _stream():
         settled = False
         try:
             for event in ai_service.generate_full_streaming(
                 context, fields, course_guide_text=course_guide_text, include_keys=include_keys,
-                course_guide_citation=citation,
+                course_guide_citation=citation, written=written,
             ):
                 if event.get("type") == "complete":
                     _settle_write(user, data, charge, event.get("values"), include_keys, fields)
@@ -217,9 +232,16 @@ def generate_full_stream():
                 yield json.dumps(event) + "\n"
         except Exception as exc:
             current_app.logger.exception("Streamed generation failed")
-            if charge and not settled:
-                points_routes.refund_regenerate(charge)
             yield json.dumps({"type": "error", "message": str(exc)}) + "\n"
+        finally:
+            # Also when the student closes the tab mid-way (GeneratorExit):
+            # a regenerate that never finished gives its points back.
+            if charge and not settled:
+                try:
+                    db.session.rollback()
+                    points_routes.refund_regenerate(charge)
+                except Exception:  # noqa: BLE001 - logged; never raise out of the stream
+                    current_app.logger.exception("Regenerate refund failed (event %s)", charge)
 
     return Response(stream_with_context(_stream()), mimetype="application/x-ndjson")
 

@@ -3072,7 +3072,11 @@ async function runGeneration(includeKeys) {
   // fresh read of the checklist that could have drifted (it can't change
   // mid-stream since the panel is part of the same disabled controls, but
   // recomputing it separately would be one more place for the two to disagree).
-  const payload = { ...baseGenerationPayload(), include_keys: includeKeys };
+  // The parts that stay as they are go along as context, so what Alan writes
+  // fits them (a regenerate of chosen parts, or a plan with parts kept static).
+  const writing = new Set(includeKeys);
+  const written = Object.fromEntries(Object.entries(fieldValues).filter(([k, v]) => !writing.has(k) && hasValue(v)));
+  const payload = { ...baseGenerationPayload(), include_keys: includeKeys, written_values: written };
 
   try {
     const finalEvent = await Api.generateFullStream(payload, (event) => {

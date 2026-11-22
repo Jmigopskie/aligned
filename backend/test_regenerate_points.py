@@ -24,7 +24,7 @@ from services import ai_service
 BEHAVIOUR = {"mode": "ok"}
 
 
-def fake_stream(context, fields, course_guide_text="", include_keys=None, course_guide_citation=""):
+def fake_stream(context, fields, course_guide_text="", include_keys=None, course_guide_citation="", written=None):
     if BEHAVIOUR["mode"] == "raise":
         raise RuntimeError("model down")
     values = {"motivation": "" if BEHAVIOUR["mode"] == "empty" else "A short game."}

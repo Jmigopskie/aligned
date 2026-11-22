@@ -1250,15 +1250,39 @@ def _plan_references(fields, context: dict):
     return found, _references_block(found, reference_material(found, context) if teaches and found else "")
 
 
+# The parts a regenerate leaves as they are: told to the model so the new ones
+# fit them (the final review found they were never sent). Capped per part and
+# in all, so a long plan can't flood every call.
+_WRITTEN_PART_BUDGET = 3000
+_WRITTEN_BUDGET = 16000
+
+
+def _written_block(written) -> str:
+    if not written:
+        return ""
+    parts, used = {}, 0
+    for key, value in written.items():
+        text = "\n".join(str(v) for v in value) if isinstance(value, list) else str(value or "")
+        text = text.strip()[:_WRITTEN_PART_BUDGET]
+        if not text or used + len(text) > _WRITTEN_BUDGET:
+            continue
+        parts[str(key)[:80]] = text
+        used += len(text)
+    if not parts:
+        return ""
+    return ("\nParts of this plan that stay as they are (the parts you write must fit them: the objectives "
+            f"are taught and assessed; do not repeat them):\n{json.dumps(parts)}\n")
+
+
 def generate_full(context: dict, fields, course_guide_text: str = "", include_keys=None,
-                  course_guide_citation: str = "") -> dict:
+                  course_guide_citation: str = "", written=None) -> dict:
     targets, _ = _split_uncopyable(select_fields(fields, include_keys), course_guide_text)
     if not targets:
         return {}
     cite = course_guide_citation
     excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
     found, refs_block = _plan_references(targets, context)
-    lesson = _lesson_block(context, excerpt, cite) + refs_block
+    lesson = _lesson_block(context, excerpt, cite) + refs_block + _written_block(written)
     task = f"""
 Fill ONLY the following fields and return strict JSON with field_key as keys:
 {_schema_block(targets, context)}
@@ -1278,7 +1302,7 @@ def _chunk_label(chunk):
 
 
 def generate_full_streaming(context: dict, fields, course_guide_text: str = "", include_keys=None,
-                            course_guide_citation: str = ""):
+                            course_guide_citation: str = "", written=None):
     """Fields have no meaningful grouping anymore (section_group isn't
     collected — see the format builder), so this batches them in fixed-size
     groups by document order instead: enough fields per AI call to stay fast
@@ -1297,7 +1321,7 @@ def generate_full_streaming(context: dict, fields, course_guide_text: str = "", 
     cite = course_guide_citation
     excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
     found, refs_block = _plan_references(fields, context)
-    lesson = _lesson_block(context, excerpt, cite) + refs_block
+    lesson = _lesson_block(context, excerpt, cite) + refs_block + _written_block(written)
 
     all_values = {}
     for i, chunk in enumerate(chunks, start=1):
@@ -1622,8 +1646,11 @@ def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
                         "Never write the field's content for them; offer only \"direction\" and \"ask\" choices.")
     chosen = ""
     if direction:
-        chosen = (f"\nThe student chose this direction: {direction.get('label', '')}: {direction.get('text', '')}\n"
-                  "Write the complete part in that direction as one \"use\" choice.")
+        picked = f"{direction.get('label', '')}: {direction.get('text', '')}"
+        chosen = (f"\nThe student chose this direction: {picked}\n"
+                  + ("Coach them toward it: say what the part should contain in that direction and ask guiding "
+                     "questions, but do not write it; offer only \"ask\" choices." if locked else
+                     "Write the complete part in that direction as one \"use\" choice."))
     task = f"""
 Fields already written (do not repeat them):
 {json.dumps(written)}
@@ -1704,9 +1731,15 @@ _FIX_STEP = ("The student writes every part themselves: each fix is a specific i
              "rubric on layout, accuracy and creativity'); never write the content for them.")
 
 
+# A plan read by the coherence check: each part and the whole are capped, so
+# the free check can't be made to spend credits on a huge paste.
+_COHERENCE_PART_BUDGET = 6000
+_COHERENCE_BUDGET = 40000
+
+
 def _plan_text(fields, values: dict) -> str:
     """The plan as 'Label (key):' blocks; a weekly part as 'Day: answer' lines."""
-    blocks = []
+    blocks, used = [], 0
     for f in fields:
         value = values.get(f.field_key)
         if isinstance(value, list):
@@ -1715,8 +1748,10 @@ def _plan_text(fields, values: dict) -> str:
                              for i, v in enumerate(value) if str(v or "").strip())
         else:
             text = str(value or "").strip()
-        if text:
+        text = text[:_COHERENCE_PART_BUDGET]
+        if text and used + len(text) <= _COHERENCE_BUDGET:
             blocks.append(f"{f.label} ({f.field_key}):\n{text}")
+            used += len(text)
     return "\n\n".join(blocks)
 
 
@@ -1735,16 +1770,24 @@ def check_coherence(context: dict, fields, values: dict, mode: str) -> dict:
             + f"\nThe lesson plan:\n{_plan_text(fields, values)}")
     data = _call(_COHERENCE_SYSTEM, [task], "Coherence check")
     data = data if isinstance(data, dict) else {}
+    # A model often names a part by its label; matched either way.
+    by_label = {str(label).strip().lower(): key for key, label in labels.items()}
     issues = []
     for i in data.get("issues") or []:
-        if not isinstance(i, dict) or i.get("part_key") not in labels:
+        if not isinstance(i, dict):
             continue
+        named = str(i.get("part_key") or "").strip()
+        key = named if named in labels else by_label.get(named.lower())
         problem, fix = str(i.get("problem") or "").strip(), str(i.get("fix") or "").strip()
-        if problem:
-            issues.append({"part_key": i["part_key"], "part_label": labels[i["part_key"]],
+        if key and problem:
+            issues.append({"part_key": key, "part_label": labels[key],
                            "problem": problem[:600], "fix": fix[:_MAX_USE_TEXT]})
+    # Coherent only when the model says so and lists nothing; an issue we
+    # couldn't place still means the plan doesn't line up.
+    coherent = data.get("coherent") is True and not issues
     summary = str(data.get("summary") or "").strip()[:300]
-    return {"coherent": not issues, "summary": summary or ("Everything lines up." if not issues else ""),
+    return {"coherent": coherent,
+            "summary": summary or ("Everything lines up." if coherent else "Some parts don't line up yet."),
             "issues": issues}
 
 

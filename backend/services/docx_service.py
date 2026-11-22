@@ -1999,11 +1999,17 @@ def _blank_run_props(para_el):
             rpr.remove(el)
     if not len(rpr):
         return None
-    # Word wants rFonts first and the sizes in schema order.
-    order = {qn("w:rFonts"): 0, qn("w:sz"): 2, qn("w:szCs"): 3}
-    for child in sorted(rpr, key=lambda c: order.get(c.tag, 1)):
+    # Word reads run properties in schema order (CT_RPr); a size after the
+    # language is ignored by desktop Word.
+    order = {qn(f"w:{t}"): i for i, t in enumerate(_RPR_ORDER)}
+    for child in sorted(rpr, key=lambda c: order.get(c.tag, len(order))):
         rpr.append(child)
     return rpr
+
+
+_RPR_ORDER = ("rStyle rFonts b bCs i iCs caps smallCaps strike dstrike outline shadow emboss imprint noProof "
+              "snapToGrid vanish webHidden color spacing w kern position sz szCs highlight u effect bdr shd "
+              "fitText vertAlign rtl cs em lang eastAsianLayout specVanish oMath").split()
 
 
 def _add_blank_run(para, para_el, text):
@@ -2301,7 +2307,13 @@ def _insert_table(doc, before_el, rows):
         for k, v in (("val", "single"), ("sz", "4"), ("space", "0"), ("color", "000000")):
             b.set(qn(f"w:{k}"), v)
         borders.append(b)
-    tbl_pr.append(borders)
+    # tblBorders comes before tblLook (and the cell margins etc.) in CT_TblPr.
+    after = next((c for c in tbl_pr if c.tag in (qn("w:shd"), qn("w:tblLayout"), qn("w:tblCellMar"),
+                                                   qn("w:tblLook"))), None)
+    if after is not None:
+        after.addprevious(borders)
+    else:
+        tbl_pr.append(borders)
     # The rows' own font, so the table reads like the rest of the plan.
     first_run = before_el.find(qn("w:r"))
     rpr = first_run.find(qn("w:rPr")) if first_run is not None else None
