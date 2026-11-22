@@ -222,10 +222,14 @@ def owl_chat():
     ]
     context = _build_context(data, guides)
     prior_values = data.get("prior_values") or {}
+    # The direction the student picked from Alan's two (Guided), if any.
+    raw = data.get("direction")
+    direction = ({"label": str(raw.get("label") or "").strip()[:300], "text": str(raw.get("text") or "").strip()[:300]}
+                 if isinstance(raw, dict) and str(raw.get("label") or "").strip() else None)
 
     answer = ai_service.owl_chat(context, field, prior_values,
                                  _guide_sources(guides) + _resolve_sources(data, current_user()), history, message,
-                                 course_guide_citation=_guide_citation(guides))
+                                 course_guide_citation=_guide_citation(guides), direction=direction)
     return jsonify({"status": "ok", **answer})
 
 @generate_bp.get("/lesson-plans")

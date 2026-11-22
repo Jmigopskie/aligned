@@ -150,36 +150,48 @@ _ANCHOR_SYSTEM_INSTRUCTION = (
     "signature lines like 'Prepared by', and anything that already looks answered."
 )
 
+# Guided coaching (the user's design, 2026-11-22): the student chooses a
+# direction first and only then sees the complete part, so Guided stays about
+# analysing and choosing, not copying. A request that already says exactly
+# what is wanted is answered in full straight away.
 _OWL_SYSTEM_INSTRUCTION = (
     "You are the AlignED owl, an assistant inside a lesson-plan editor used by K-12 ICT/TLE "
-    "teachers in the Philippines. The teacher writes one field of the lesson plan at a time "
-    "and chats with you about it.\n\n"
+    "teachers in the Philippines. The student writes one part of the lesson plan at a time "
+    "and chats with you about it. Answer what they actually ask, about this lesson plan.\n\n"
     "Rules (follow strictly):\n"
-    "- Reply briefly and organised: one or two short sentences, or, when the answer has "
-    "several points or steps, one short lead-in line and then each point on its own line "
-    "starting with '- ' (or '1. ', '2. ' for steps in order), at most 5 points of a few words "
-    "each. Never run a list together in one sentence. No greetings, no praise, no filler, no "
-    "headings, tables or other markdown. Answer exactly what was asked.\n"
-    "- Always give 2 to 4 choices.\n"
-    "- A \"use\" choice is an example of finished content for the current field, shown as "
-    "an option to read and learn from (it is never inserted; the writer writes the field "
-    "in their own words): classroom-ready, in DepEd K-12 terminology, grounded in the lesson's "
-    "topic, subject and course guide. Fit the field: one line for a short text field; for "
-    f"a list, one item per line and at most {_MAX_LIST_ITEMS} complete items; for learning objectives, exactly "
-    "3 objectives, one per line (no competency, no lead-in); for the lesson proper or discussion, the "
-    "whole lesson as that field's instructions describe (headings, definitions, terms, examples), taken "
-    "only from the references' content given. Its label names the option in at most "
-    "6 words. Its \"why\" explains that option in one short sentence (at most 25 words): "
-    "why it fits this field and lesson, or what it does for the learners.\n"
-    "- An \"ask\" choice is a follow-up question the teacher may want to ask next, at most "
-    "8 words; its label and text are that question.\n"
-    "- When the teacher wants content, suggestions or examples, give mostly \"use\" "
-    "choices that differ from each other in approach, not just in wording.\n"
-    "- Never repeat content already written in other fields. If asked about something "
-    "unrelated to the lesson plan, say so in one sentence and offer lesson-related choices.\n\n"
-    "Return strict JSON: {\"reply\": \"...\", \"choices\": [{\"type\": \"use\" or \"ask\", "
-    "\"label\": \"...\", \"text\": \"...\", \"why\": \"...\" (\"use\" only)}]}"
+    "- The reply is a short lead-in: one or two sentences, or one line and at most 5 short "
+    "'- ' points. No greetings, praise, filler or markdown. Content goes in the choices, not the reply.\n"
+    "- A GENERAL request for help or ideas for this part (\"help me\", \"give me ideas\", \"what "
+    "should I write\"): give exactly 2 directions, as choices of type \"direction\", that differ "
+    "in approach (e.g. for objectives: 'Introductory: recall and identify' vs 'Performance: apply "
+    "and create'; for a motivation: two different activities). Its label names it in at most 6 "
+    "words, its text says in one or two sentences what that direction focuses on, its why says in "
+    "at most 25 words why it fits this lesson. No \"use\" choice yet: the student chooses first. "
+    "Add up to 2 \"ask\" choices.\n"
+    "- When the student HAS CHOSEN a direction (it is named below), or the request already says "
+    "exactly what is wanted (e.g. 'a game called Bit Hunt with its directions and questions'): "
+    "give ONE \"use\" choice holding the complete part, written in that direction, nothing left "
+    "out: for learning objectives exactly 3, one per line (no competency, no lead-in); for an "
+    "activity, game or motivation its title, materials, complete step-by-step directions and every "
+    "question with its answer; for an assessment the complete quiz with its answer key and/or the "
+    "task with its rubric rows (cells separated by ' | '); for the lesson proper or discussion the "
+    "whole lesson as that part's instructions describe, taken only from the references' content "
+    "given. Its label names it in at most 6 words, its why says in one sentence why it fits. "
+    "Add 1 or 2 \"ask\" choices.\n"
+    "- A \"use\" choice is read and learned from, never inserted: the student writes the part in "
+    "their own words. Classroom-ready, DepEd K-12 terminology, grounded in the topic and guide.\n"
+    "- Everything fits what is already written: the objectives are taught by the lesson proper "
+    "and checked by the assessment; never test what the lesson does not teach. Never repeat "
+    "content already written in other parts.\n"
+    "- An \"ask\" choice is a follow-up question the student may want to ask next, at most 8 "
+    "words; its label and text are that question.\n"
+    "- If asked about something unrelated to the lesson plan, say so in one sentence and offer "
+    "lesson-related choices.\n\n"
+    "Return strict JSON: {\"reply\": \"...\", \"choices\": [{\"type\": \"direction\", \"use\" or "
+    "\"ask\", \"label\": \"...\", \"text\": \"...\", \"why\": \"...\" (direction and use only)}]}"
 )
+_MAX_DIRECTIONS = 2
+_MAX_USE_TEXT = 8000
 
 
 # ---------------------------------------------------------------------------
@@ -1582,9 +1594,10 @@ _MAX_CHOICES = 4
 
 
 def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
-             history: list, message: str, course_guide_citation: str = "") -> dict:
-    """One turn of the Guided mode chat about `field`. Returns
-    {"reply": str, "choices": [{"type": "use"|"ask", "label": str, "text": str, "why": str ("use" only)}]}."""
+             history: list, message: str, course_guide_citation: str = "", direction=None) -> dict:
+    """One turn of the Guided mode chat about `field`. `direction` is the
+    {label, text} the student picked from Alan's two directions, if any. Returns
+    {"reply": str, "choices": [{"type": "direction"|"use"|"ask", "label", "text", "why" (not "ask")}]}."""
     excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
     lesson = _lesson_block(context, excerpt, course_guide_citation)
     written = {k: v for k, v in (prior_values or {}).items() if v and k != field.field_key}
@@ -1606,13 +1619,17 @@ def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
     if locked:
         weekly_note += ("\nThe supervising teacher locked this field: the student must write it in their own words. "
                         "Coach them instead: say what it should contain, ask guiding questions, point to the guide. "
-                        "Never write the field's content for them; offer only \"ask\" choices.")
+                        "Never write the field's content for them; offer only \"direction\" and \"ask\" choices.")
+    chosen = ""
+    if direction:
+        chosen = (f"\nThe student chose this direction: {direction.get('label', '')}: {direction.get('text', '')}\n"
+                  "Write the complete part in that direction as one \"use\" choice.")
     task = f"""
 Fields already written (do not repeat them):
 {json.dumps(written)}
 
 The teacher is writing the field "{field.label}" ({field.field_type}).
-{f"What belongs in it: {field.ai_hint}" if field.ai_hint else ""}{_field_directive(field)}{_grounding_directive(field, context)}{weekly_note}
+{f"What belongs in it: {field.ai_hint}" if field.ai_hint else ""}{_field_directive(field)}{_grounding_directive(field, context)}{weekly_note}{chosen}
 {typed}
 
 {f"Conversation so far:{chr(10)}{turns}{chr(10)}" if turns else ""}Teacher: {message}
@@ -1626,11 +1643,26 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
     finally:
         if pool:
             pool.shutdown(wait=False)
-    # A lesson proper is the whole lesson; other options are short.
-    answer = _clean_owl_reply(data, 6000 if grounding.is_lesson_proper_field(field) else 1500)
+    answer = _clean_owl_reply(data, _MAX_USE_TEXT)
+    choices = answer["choices"]
+    if direction:
+        # Chosen: the complete part, not another round of directions.
+        choices = [c for c in choices if c["type"] != "direction"]
+    elif any(c["type"] == "direction" for c in choices):
+        # Directions offered: the student chooses before any finished content.
+        choices = [c for c in choices if c["type"] != "use"]
+        kept, seen = [], 0
+        for c in choices:
+            if c["type"] == "direction":
+                seen += 1
+                if seen > _MAX_DIRECTIONS:
+                    continue
+            kept.append(c)
+        choices = kept
+    answer = {**answer, "choices": choices[:_MAX_CHOICES]}
     if locked:
         # Whatever the model sends, nothing ready-made goes into a locked field.
-        return {**answer, "choices": [c for c in answer["choices"] if c["type"] == "ask"]}
+        return {**answer, "choices": [c for c in answer["choices"] if c["type"] != "use"]}
     answer = _ground_choices(answer, field, course_guide_text, course_guide_citation)
     if searching:
         # References Alan offers are real pages from a web search, not the model's guesses.
@@ -1690,7 +1722,7 @@ def _clean_owl_reply(data, max_text: int = 1500) -> dict:
     for c in data.get("choices") or []:
         if not isinstance(c, dict):
             continue
-        kind = c.get("type") if c.get("type") in ("use", "ask") else "ask"
+        kind = c.get("type") if c.get("type") in ("use", "ask", "direction") else "ask"
         text = c.get("text")
         if isinstance(text, list):
             text = "\n".join(str(t).strip() for t in text if str(t).strip())
@@ -1698,11 +1730,11 @@ def _clean_owl_reply(data, max_text: int = 1500) -> dict:
         label = str(c.get("label") or text).strip()
         if not text:
             continue
-        choice = {"type": kind, "label": label[:80], "text": text[:max_text]}
+        choice = {"type": kind, "label": label[:80], "text": text[:max_text if kind == "use" else 600]}
         why = str(c.get("why") or "").strip()
-        if kind == "use" and why:
+        if kind in ("use", "direction") and why:
             choice["why"] = why[:240]  # the option's explanation, shown under it
         choices.append(choice)
-        if len(choices) == _MAX_CHOICES:
+        if len(choices) == 2 * _MAX_CHOICES:  # owl_chat filters, then caps at _MAX_CHOICES
             break
     return {"reply": reply[:700] or "Here are some options for this field.", "choices": choices}
