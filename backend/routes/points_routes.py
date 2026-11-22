@@ -7,7 +7,9 @@ from sqlalchemy.exc import IntegrityError
 
 from extensions import db
 from models.lesson_plan import LessonPlan
-from models.points import BUILD_COST, POINTS_STARTED_UTC, Build, PointEvent
+from datetime import datetime
+
+from models.points import BUILD_COST, POINTS_STARTED_UTC, REGENERATE_COST, Build, PointEvent
 from models.section import Section, SectionMembership
 from models.user import User
 from routes.auth_routes import current_user, enrollment_required, login_required
@@ -63,6 +65,70 @@ def build_for(user, data):
     if user.role != "student" or not key:
         return None
     return Build.query.filter_by(student_id=user.id, run_key=key).first()
+
+
+# ---- Regenerate: 5 points for every write after the first build finished ----
+
+def _plan_build(user, data):
+    """(the build this request writes, whether it counts as finished). A
+    plan from before points, with no build, counts as finished."""
+    plan = _own_plan(user, data)
+    if plan and plan.build_id:
+        build = db.session.get(Build, plan.build_id)
+    else:
+        build = build_for(user, data)
+    if build is not None:
+        return build, build.completed_at is not None
+    return None, bool(plan and _plan_paid(plan))
+
+
+def charge_regenerate(user, data):
+    """(refusal response or None, PointEvent id when 5 points were taken).
+    Free for teachers and admins, and while the plan's first build hasn't
+    finished (a failed first build is retried free). The server decides."""
+    if user.role != "student":
+        return None, None
+    build, finished = _plan_build(user, data)
+    if not finished:
+        return None, None
+    taken = db.session.execute(
+        text("UPDATE users SET points = points - :cost WHERE id = :id AND points >= :cost"),
+        {"cost": REGENERATE_COST, "id": user.id},
+    ).rowcount
+    if not taken:
+        db.session.rollback()
+        have = db.session.get(User, user.id).points or 0
+        refusal = jsonify({"status": "error", "code": "no_points", "points": have, "cost": REGENERATE_COST,
+                           "message": f"Regenerating uses {REGENERATE_COST} points, and you have {have}. "
+                                      "Ask your teacher for more points."})
+        return (refusal, 402), None
+    event = PointEvent(student_id=user.id, delta=-REGENERATE_COST, reason="regenerate",
+                       build_id=build.id if build else None)
+    db.session.add(event)
+    db.session.commit()
+    return None, event.id
+
+
+def mark_build_completed(user, data):
+    """The plan's first build finished: later writes are regenerates."""
+    if user.role != "student":
+        return
+    build, _ = _plan_build(user, data)
+    if build is not None and build.completed_at is None:
+        build.completed_at = datetime.utcnow()
+        db.session.commit()
+
+
+def refund_regenerate(event_id):
+    """Give back the points a regenerate took when it failed or came back empty."""
+    event = db.session.get(PointEvent, event_id)
+    if event is None:
+        return
+    db.session.execute(text("UPDATE users SET points = points + :cost WHERE id = :id"),
+                       {"cost": -event.delta, "id": event.student_id})
+    db.session.add(PointEvent(student_id=event.student_id, delta=-event.delta, reason="regenerate_refund",
+                              build_id=event.build_id))
+    db.session.commit()
 
 
 @points_bp.post("/builds")

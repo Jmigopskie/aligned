@@ -338,6 +338,12 @@ def _migrate_section_columns():
     _add_column("sections", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
 
 
+def _migrate_build_columns():
+    """Add completed_at (when a plan's first build finished; writes after it
+    are regenerates, 5 points each) to databases from before Regenerate."""
+    _add_column("builds", "completed_at", "DATETIME")
+
+
 def _migrate_announcement_columns():
     """Add the section_id column (lets a teacher scope an announcement to
     one of their own sections instead of everyone) to databases created
@@ -430,6 +436,7 @@ def create_app():
         _migrate_format_field_columns()
         _migrate_announcement_columns()
         _migrate_section_columns()
+        _migrate_build_columns()
         # Before seeding, which writes the full built-in guide texts.
         _widen_course_guide_text()
         _widen_course_guide_doc_type()

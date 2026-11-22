@@ -11,6 +11,8 @@ from datetime import datetime
 from extensions import db, iso_utc
 
 BUILD_COST = 30
+# Rewriting parts of a plan whose first build already finished (Regenerate).
+REGENERATE_COST = 5
 # Plans saved before points existed (deployed 2026-10-26 ~13:07 +08:00) never
 # carried a build; they stay free to write. Every plan saved after that
 # deploy carries its build, so a few minutes' slack costs nothing.
@@ -29,6 +31,9 @@ class Build(db.Model):
     run_key = db.Column(db.String(64), nullable=False)
     points = db.Column(db.Integer, nullable=False, default=BUILD_COST)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # When Alan first finished writing this plan. Until then a failed build is
+    # retried free; after it, every write is a regenerate (REGENERATE_COST).
+    completed_at = db.Column(db.DateTime)
 
     def to_dict(self):
         return {"id": self.id, "run_key": self.run_key, "points": self.points, "created_at": iso_utc(self.created_at)}
@@ -42,7 +47,7 @@ class PointEvent(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     delta = db.Column(db.Integer, nullable=False)
-    reason = db.Column(db.String(20), nullable=False)  # "grant" | "build"
+    reason = db.Column(db.String(20), nullable=False)  # "grant" | "build" | "regenerate" | "regenerate_refund"
     by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
     build_id = db.Column(db.Integer, db.ForeignKey("builds.id"))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

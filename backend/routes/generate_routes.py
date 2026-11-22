@@ -12,7 +12,7 @@ from models.supplementary_source import SupplementarySource
 from models.section import Section, SectionMembership
 from routes.auth_routes import login_required, enrollment_required, current_user
 from routes import points_routes
-from services import ai_service, docx_service, field_roles, grounding
+from services import ai_limits, ai_service, docx_service, field_roles, grounding
 from services.notify import notify
 
 generate_bp = Blueprint("generate", __name__)
@@ -146,13 +146,35 @@ def generate_full():
         return err
 
     context = _build_context(data, guides)
+    user = current_user()
+    fields = grounding.competency_view(fmt.fields)
+    include_keys = _generatable_keys(_include_keys(data, fmt), fmt)
+    refused, charge = points_routes.charge_regenerate(user, data)
+    if refused:
+        return refused
 
-    field_values = ai_service.generate_full(
-        context, grounding.competency_view(fmt.fields),
-        course_guide_text=_guide_sources(guides) + _resolve_sources(data, current_user()),
-        include_keys=_generatable_keys(_include_keys(data, fmt), fmt), course_guide_citation=_guide_citation(guides),
-    )
+    try:
+        field_values = ai_service.generate_full(
+            context, fields,
+            course_guide_text=_guide_sources(guides) + _resolve_sources(data, user),
+            include_keys=include_keys, course_guide_citation=_guide_citation(guides),
+        )
+    except Exception:
+        if charge:
+            points_routes.refund_regenerate(charge)
+        raise
+    _settle_write(user, data, charge, field_values, include_keys, fields)
     return jsonify({"status": "ok", "field_values": field_values})
+
+
+def _settle_write(user, data, charge, values, include_keys, fields):
+    """After Alan wrote: a write that filled none of the requested parts gives
+    a regenerate's points back; one that did finishes the plan's first build."""
+    keys = include_keys if include_keys is not None else [f.field_key for f in fields]
+    if any(ai_limits.is_answered((values or {}).get(k)) for k in keys):
+        points_routes.mark_build_completed(user, data)
+    elif charge:
+        points_routes.refund_regenerate(charge)
 
 @generate_bp.post("/generate/full-stream")
 @login_required
@@ -175,16 +197,28 @@ def generate_full_stream():
     # context is gone, so `request`/`data` can't be touched from inside it.
     include_keys = _generatable_keys(_include_keys(data, fmt), fmt)
     citation = _guide_citation(guides)
+    user = current_user()
+    # Charged before the stream opens, so a refusal is a plain 402; given back
+    # from inside it when the write fails or fills nothing.
+    refused, charge = points_routes.charge_regenerate(user, data)
+    if refused:
+        return refused
 
     def _stream():
+        settled = False
         try:
             for event in ai_service.generate_full_streaming(
                 context, fields, course_guide_text=course_guide_text, include_keys=include_keys,
                 course_guide_citation=citation,
             ):
+                if event.get("type") == "complete":
+                    _settle_write(user, data, charge, event.get("values"), include_keys, fields)
+                    settled = True
                 yield json.dumps(event) + "\n"
         except Exception as exc:
             current_app.logger.exception("Streamed generation failed")
+            if charge and not settled:
+                points_routes.refund_regenerate(charge)
             yield json.dumps({"type": "error", "message": str(exc)}) + "\n"
 
     return Response(stream_with_context(_stream()), mimetype="application/x-ndjson")

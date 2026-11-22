@@ -109,18 +109,20 @@ def main():
         assert res.status_code == 201, res.get_json()
         plan_id = res.get_json()["lesson_plan"]["id"]
         assert res.get_json()["lesson_plan"]["build_id"] == Build.query.filter_by(run_key="run-1").one().id
-        # Reopened later (no run key, just the plan): still free.
+        # Reopened later (no run key, just the plan): no second build charge,
+        # but its first build finished, so writing again is a regenerate (5).
         assert client.post("/api/builds", json={"plan_id": plan_id}).get_json()["charged"] is False
         assert generate(plan_id=plan_id).status_code == 200
-        # A second plan needs 30 more, and only 15 are left.
+        assert points("ana") == 10
+        # A second plan needs 30 more, and only 10 are left.
         assert client.post("/api/builds", json={"run_key": "run-2"}).status_code == 402
         assert generate(run_key="run-2").status_code == 402
-        assert points("ana") == 15
-        print("  one charge per plan OK")
+        assert points("ana") == 10
+        print("  one charge per plan, 5 per regenerate OK")
 
         # --- The Guided plan, written by Alan once there are points: charged once ---
         login("tina")
-        client.post(f"/api/sections/{sec_id}/points", json={"student_ids": [ids["ana"]], "add": 15})
+        client.post(f"/api/sections/{sec_id}/points", json={"student_ids": [ids["ana"]], "add": 20})
         login("ana")
         res = client.post("/api/builds", json={"plan_id": guided_id, "run_key": "g-1"})
         assert res.status_code == 200 and res.get_json()["charged"] is True and points("ana") == 0, res.get_json()
@@ -129,11 +131,13 @@ def main():
         assert generate(plan_id=guided_id).status_code == 200
         print("  Guided plan written by Alan later OK")
 
-        # --- Someone else's plan or run is no way in; older plans stay free ---
+        # --- Someone else's plan or run is no way in; an older plan needs no
+        # build, but it was written before, so rewriting it is a regenerate ---
         login("ben")
         assert generate(plan_id=plan_id).status_code == 402
         assert generate(run_key="run-1").status_code == 402
-        assert generate(plan_id=legacy_id).status_code == 200
+        res = generate(plan_id=legacy_id)  # Ben has 0 points left
+        assert res.status_code == 402 and "Regenerating uses 5 points" in res.get_json()["message"], res.get_json()
         print("  others' plans and older plans OK")
 
         # --- Teachers never pay ---
@@ -144,7 +148,7 @@ def main():
         print("  teachers free OK")
 
         events = [(e.reason, e.delta) for e in PointEvent.query.filter_by(student_id=ids["ana"]).order_by(PointEvent.id)]
-        assert events == [("grant", 45), ("build", -30), ("grant", 15), ("build", -30)], events
+        assert events == [("grant", 45), ("build", -30), ("regenerate", -5), ("grant", 20), ("build", -30)], events
     print("points OK")
 
 
