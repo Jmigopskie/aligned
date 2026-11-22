@@ -240,17 +240,19 @@ def check_web_references():
     cited = {real: "HTML Images - W3Schools", "https://www.w3schools.com/html": "HTML Tutorial - W3Schools"}
     ai_service._web_search_post = lambda system, prompt: (calls.append(prompt), (answer, cited))[1]
     ai_service.PROVIDER = "openrouter"
-    grounding.page_text = lambda url: "page text " * 200 if url in cited else ""
+    grounding.page_text = lambda url: "HTML images: the img tag shows an image on a page. " * 40 if url in cited else ""
     ai_service._FOUND_REFERENCES.clear()
     try:
         found = ai_service.find_references({"topic": "HTML images", "subject": "ICT"})
-        assert found == [f"W3Schools. (n.d.). HTML images. W3Schools. {real}"], found
+        assert found == [f"W3Schools. (n.d.). HTML images. {real}"], found
         assert "HTML images" in calls[0]
         refs = Field("references", "References")
-        merged = ai_service._with_web_references({"references": "DepEd. (2023). CG. https://deped.gov.ph/cg.pdf"},
-                                                 [refs, Field("flow", "Flow")], {"topic": "HTML images"})
-        assert merged["references"].split("\n")[0].startswith("DepEd."), merged
-        assert merged["references"].split("\n")[1].startswith("W3Schools."), merged
+        guide = "DepEd. (2023). CG. https://deped.gov.ph/cg.pdf"
+        # The guide's citation leads; a link the model wrote itself gives way to the checked ones.
+        merged = ai_service._with_web_references({"references": f"{guide}\nModel. (n.d.). Home. https://m.org"},
+                                                 [refs, Field("flow", "Flow")], {"topic": "HTML images"},
+                                                 citation=guide)
+        assert merged["references"].split("\n") == [guide, found[0]], merged
         assert ai_service._with_web_references({}, [Field("flow", "Flow")], {"topic": "x"}) == {}
 
         def boom(system, prompt):

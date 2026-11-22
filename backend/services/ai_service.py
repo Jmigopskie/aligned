@@ -560,7 +560,10 @@ _LESSON_PROPER_DIRECTIVE = (
     "symbols it uses'), and concrete examples ('Binary has 2 digits (0 and 1), so its base is 2.'). "
     "One point per line: '• ' before a bullet point, '1. ' before a numbered one, nothing before a "
     "heading. Every fact, term, definition and example comes from the online references' content or "
-    "the course guide given above; never invent one, and leave out what they don't cover. It teaches "
+    "the course guide given above; never invent one, and leave out what they don't cover. Draw on every "
+    "reference whose content covers part of the topic, and end each definition, fact or example taken "
+    "from one with its APA 7 in-text citation: the author's surname or organization and the year as "
+    "that reference lists them, e.g. (Department of Education, n.d.). It teaches "
     "every learning objective already written for this plan, in order, so learners can do each one by "
     "the end. The length limits do not apply to this field."
 )
@@ -1191,7 +1194,7 @@ Fill ONLY the following fields and return strict JSON with field_key as keys:
                    course_guide_text, cite, context)
     values = _complete_batch(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
     values = _fix_timing(lesson, targets, values, "Building Proficiency", course_guide_text, cite, context)
-    return {**values, **_with_web_references(values, targets, context, found)}
+    return {**values, **_with_web_references(values, targets, context, found, cite)}
 
 
 _STREAM_CHUNK_SIZE = 4
@@ -1274,7 +1277,7 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
             yield {"type": "section_done", "section": "Session timing",
                    "index": len(chunks), "total": len(chunks), "values": changed}
 
-    referenced = _with_web_references(all_values, fields, context, found)
+    referenced = _with_web_references(all_values, fields, context, found, cite)
     if referenced:
         all_values.update(referenced)
         yield {"type": "section_done", "section": "Online references",
@@ -1304,16 +1307,29 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
 # reference is kept only if its URL is one the search returned, it is in APA
 # 7 form, and the link opens.
 
-_WEB_REFERENCES = 4
+# Testers saw two references at most, usually beside the course guide: one
+# search's ten results thinned out by the checks below. Two searches now run
+# side by side, and every page that passes is kept, up to this ceiling (it
+# bounds how much reading goes into the lesson proper's prompt).
+_WEB_REFERENCES = 10
 _WEB_RESULTS = 10
+_REFERENCE_SEARCHES = (
+    "Find {n} accessible online pages, each on a different website, that explain this lesson's topic "
+    "itself (definitions, key terms, explanations, examples), and list them as APA 7 references.",
+    "Find {n} accessible online pages from government (DepEd), university, school or other educational "
+    "organizations, each on a different website, that teach this lesson's topic, and list them as APA 7 "
+    "references.",
+)
 _REFERENCES_SYSTEM = (
     "You list online references for a Philippine K-12 lesson plan, using ONLY the web search "
     "results you are given. Return strict JSON: {\"references\": [\"...\", ...]}. Each is one "
     "APA 7 reference: Author or organization. (Year, or n.d.). Title. Site Name. URL, with the "
-    "URL copied exactly from a search result and nothing after it. Prefer educational, "
+    "author's name as the page gives it, the site name left out when it is the author, and the "
+    "URL copied exactly from a search result with nothing after it. Prefer educational, "
     "government (DepEd), university and reputable reference pages that teach the topic itself "
     "(definitions, explanations, examples), each from a different website; never social media, "
-    "shops, forums, videos or pages behind a login. Never invent a source or a URL."
+    "Wikipedia, blogs, shops, forums, videos, homework or document-sharing sites, or pages behind "
+    "a login. Never invent a source or a URL."
 )
 
 
@@ -1354,18 +1370,34 @@ def _apa_from_result(url: str, title: str) -> str:
     else:
         site = host
     title = title.rstrip(" .?!:;") or host
-    return grounding.to_apa(f"{site}. (n.d.). {title}. {site}. {url}")
+    return grounding.to_apa(f"{site}. (n.d.). {title}. {url}")
 
 
-# References found, by topic; a search that found nothing isn't remembered.
+def _search_references(prompt: str) -> tuple:
+    """(APA lines the model listed from this search's results, {url: title}
+    of every result). Nothing when this one search fails."""
+    try:
+        text, cited = _web_search_post(_REFERENCES_SYSTEM, prompt)
+        lines = _parse_json(text).get("references") or []
+    except Exception as exc:  # noqa: BLE001 - the other search may still find some
+        _log.warning("Reference search failed: %s", exc)
+        return [], {}
+    lines = [grounding.to_apa(str(l)) for l in lines if isinstance(l, str)]
+    return [l for l in lines if l and any(u.rstrip("/") in cited for u in grounding.reference_urls([l]))], cited
+
+
+# References found, by topic. Only a full set is remembered, so a topic that
+# came back thin is searched again next time rather than staying thin.
 _FOUND_REFERENCES = {}
 _MIN_PAGE_TEXT = 800
+_REMEMBER_AT = 5
 
 
 def find_references(context: dict, count: int = _WEB_REFERENCES) -> list:
-    """Up to `count` APA 7 references for the lesson's topic, each from a
-    different website, whose pages came from a web search and really open
-    with readable text; [] when search is unavailable or finds none."""
+    """Up to `count` APA 7 references for the lesson's topic: pages a web
+    search returned that come from a reliable kind of site, really open with
+    readable text that covers the topic, one per website, government, school
+    and university pages first. [] when search is unavailable or finds none."""
     topic = str(context.get("topic") or context.get("main_topic") or "").strip()
     if PROVIDER != "openrouter" or not topic:
         return []
@@ -1373,57 +1405,69 @@ def find_references(context: dict, count: int = _WEB_REFERENCES) -> list:
     key = (topic.lower(), about.lower())
     if key in _FOUND_REFERENCES:
         return _FOUND_REFERENCES[key][:count]
-    prompt = (f"Find {count * 2} accessible online pages, each on a different website, that a teacher could "
-              f"use to teach this lesson, and list them as APA 7 references.\nLesson topic: {topic}"
-              + (f"\nFor: {about}" if about else ""))
-    try:
-        text, cited = _web_search_post(_REFERENCES_SYSTEM, prompt)
-        lines = _parse_json(text).get("references") or []
-    except Exception as exc:  # noqa: BLE001 - no references is better than a failed plan
-        _log.warning("Reference search failed: %s", exc)
-        return []
-    lines = [grounding.to_apa(str(l)) for l in lines if isinstance(l, str)]
-    lines = [l for l in lines if l and any(u.rstrip("/") in cited for u in grounding.reference_urls([l]))]
-    # Testers mostly got one reference: the search's other results become
-    # references too, rather than being lost when the model lists only one.
-    listed = {u.rstrip("/") for u in grounding.reference_urls(lines)}
-    lines += [l for l in (_apa_from_result(u, t) for u, t in cited.items() if u not in listed) if l]
-    urls = [grounding.reference_urls([l])[0] for l in lines]
+    ask = f"\nLesson topic: {topic}" + (f"\nFor: {about}" if about else "")
+    with ThreadPoolExecutor(max_workers=len(_REFERENCE_SEARCHES)) as pool:
+        results = list(pool.map(_search_references, [q.format(n=count) + ask for q in _REFERENCE_SEARCHES]))
+    lines, cited = [], {}
+    for listed, found in results:
+        lines += listed
+        for u, t in found.items():
+            cited.setdefault(u, t)
+    # Every result is a candidate, not only the ones the model wrote up; the
+    # model's own APA line wins for a page it listed (it read the author).
+    by_url = {}
+    for line in lines:
+        by_url.setdefault(grounding.reference_urls([line])[0].rstrip("/"), line)
+    for u, t in cited.items():
+        if u not in by_url:
+            line = _apa_from_result(u, t)
+            if line:
+                by_url[u] = line
+    candidates = [(u, l) for u, l in by_url.items() if not grounding.is_unreliable_site(u)]
     # A link that only answers a status check can still fail in a browser, so
-    # each page must actually open with readable text; one per website.
+    # each page must actually open, with readable text about this topic.
     with ThreadPoolExecutor(max_workers=8) as pool:
-        texts = list(pool.map(grounding.page_text, urls)) if urls else []
+        texts = list(pool.map(grounding.page_text, [grounding.reference_urls([l])[0] for _, l in candidates]))
+    terms = grounding.topic_terms(topic)
+    ranked = []
+    for (u, line), page in zip(candidates, texts):
+        if len(page) >= _MIN_PAGE_TEXT and grounding.covers_topic(page, terms):
+            share, mentions = grounding.topic_coverage(page, terms)
+            ranked.append((grounding.source_rank(u), -share, -mentions, u, line))
+    ranked.sort(key=lambda r: r[:3])
     kept, sites = [], set()
-    for line, url, page in zip(lines, urls, texts):
-        site = (urlparse(url).hostname or "").removeprefix("www.")
-        if len(page) < _MIN_PAGE_TEXT or site in sites:
+    for *_, u, line in ranked:
+        site = grounding.site_of(u)
+        if site in sites:
             continue
         sites.add(site)
         kept.append(line)
         if len(kept) == count:
             break
-    if kept and len(_FOUND_REFERENCES) < 500:
+    if len(kept) >= min(_REMEMBER_AT, count) and len(_FOUND_REFERENCES) < 500:
         _FOUND_REFERENCES[key] = kept
     return kept
 
 
-_REFERENCE_PAGES = 4
-_REFERENCE_PAGE_BUDGET = 5000
+# What the lesson proper reads from its references: every one of them, each
+# page's share of this budget (never under the floor).
+_REFERENCE_MATERIAL_BUDGET = 24000
+_REFERENCE_PAGE_FLOOR = 2400
 
 
 def reference_material(lines, context: dict) -> str:
-    """What the references' pages say about the lesson's topic: for each of
-    the first few links, the passages of the page that cover the topic,
-    labelled with its reference line. "" when no page could be read."""
-    urls = grounding.reference_urls(lines)[:_REFERENCE_PAGES]
+    """What the references' pages say about the lesson's topic: for each
+    link, the passages of the page that cover the topic, labelled with its
+    reference line. "" when no page could be read."""
+    urls = grounding.reference_urls(lines)[:_WEB_REFERENCES + 2]
     if not urls:
         return ""
-    with ThreadPoolExecutor(max_workers=len(urls)) as pool:
+    with ThreadPoolExecutor(max_workers=min(8, len(urls))) as pool:
         texts = list(pool.map(grounding.page_text, urls))
     by_url = {u: next((str(l).strip() for l in lines if u in str(l)), u) for u in urls}
-    parts = [f"[From: {by_url[u]}]\n{guide_excerpt(t, context, _REFERENCE_PAGE_BUDGET)}"
-             for u, t in zip(urls, texts) if t.strip()]
-    return "\n\n".join(parts)
+    readable = [(u, t) for u, t in zip(urls, texts) if t.strip()]
+    budget = max(_REFERENCE_PAGE_FLOOR, _REFERENCE_MATERIAL_BUDGET // max(1, len(readable)))
+    return "\n\n".join(f"[From: {by_url[u]}]\n{guide_excerpt(t, context, budget)}" for u, t in readable)
 
 
 def _references_block(lines, material: str) -> str:
@@ -1431,23 +1475,26 @@ def _references_block(lines, material: str) -> str:
     if not lines:
         return ""
     listed = "\n".join(str(l).strip() for l in lines if str(l).strip())
-    block = f"\nThe lesson's online references:\n{listed}\n"
+    block = f"\nThe lesson's online references (the lesson proper is taught from these and cites them):\n{listed}\n"
     if material:
         block += f"\nWhat those references' pages say about the topic (the online references' content):\n---\n{material}\n---\n"
     return block
 
 
-def _with_web_references(values: dict, fields, context: dict, found=None) -> dict:
-    """The reference fields with found references added after what they hold
-    (the course guide's own citation stays first). {} when nothing changes."""
+def _with_web_references(values: dict, fields, context: dict, found=None, citation: str = "") -> dict:
+    """The reference fields as the course guide's own citation first, then
+    the references found and checked online. Links the model wrote itself are
+    dropped once checked ones exist: they open, but often onto a home page
+    that isn't about the topic. {} when nothing changes."""
     refs = [f for f in fields if grounding.is_reference_field(f)]
     if found is None:
         found = find_references(context) if refs else []
+    guide = {l.strip() for l in str(citation or "").split("\n") if l.strip()}
     changed = {}
     for f in refs if found else []:
         value = values.get(f.field_key)
         first = value[0] if isinstance(value, list) and value else value
-        lines = [l for l in str(first or "").split("\n") if l.strip()]
+        lines = [l for l in str(first or "").split("\n") if l.strip() in guide] if guide else []
         merged = "\n".join(lines + [l for l in found if l not in lines])
         # A weekly field cites its references once, on its first day.
         changed[f.field_key] = [merged] + list(value[1:]) if isinstance(value, list) and value else merged

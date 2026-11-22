@@ -25,12 +25,18 @@ class Field:
         self.ai_hint, self.locked = None, False
 
 
+ON_TOPIC = "A number system is a way of writing numbers. Each number system has a base. " * 30
 PAGES = {
-    "https://a.edu/numbers": "x" * 2000,
-    "https://www.b.org/binary": "y" * 2000,
-    "https://a.edu/other": "z" * 2000,   # same site as the first
-    "https://c.com/broken": "",          # doesn't open
-    "https://d.net/thin": "short",       # opens, but no real text
+    "https://a.edu/numbers": ON_TOPIC,
+    "https://www.b.org/binary": ON_TOPIC,
+    "https://www.f.gov.ph/number-systems": ON_TOPIC,
+    "https://g.com/numbers": ON_TOPIC,
+    "https://a.edu/other": "Number systems, briefly. " + "x " * 900,   # same site as the first, thinner
+    "https://c.com/broken": "",                                          # doesn't open
+    "https://d.net/thin": "number systems",                              # opens, but no real text
+    "https://e.com/adobo": "Adobo is a Filipino dish of meat in vinegar. " * 40,  # not about the topic
+    "https://en.wikipedia.org/wiki/Numeral_system": ON_TOPIC,            # not a source a plan cites
+    "https://www.youtube.com/watch?v=1": ON_TOPIC,
 }
 
 
@@ -50,12 +56,36 @@ def main():
         grounding.page_text = lambda url: PAGES.get(url, "")
         found = ai_service.find_references({"topic": "Number systems", "subject": "ICT"})
         urls = [grounding.reference_urls([l])[0] for l in found]
-        assert urls == ["https://a.edu/numbers", "https://www.b.org/binary"], found
-        assert found[0].startswith("Kids Learn.") and grounding.to_apa(found[1]) == found[1], found
-        assert "different website" in calls[0] and "Find 8" in calls[0]
-        # Found once per topic.
-        assert ai_service.find_references({"topic": "Number systems", "subject": "ICT"}) == found and len(calls) == 1
-        print("  several readable references, one per site OK")
+        # Every page that passes, not two: school/government first, then .org, then the rest.
+        assert urls == ["https://a.edu/numbers", "https://www.f.gov.ph/number-systems",
+                        "https://www.b.org/binary", "https://g.com/numbers"], found
+        # APA 7: the model's line, with the site dropped where it repeats the author.
+        assert found[0] == "Kids Learn. (2025). Number systems. https://a.edu/numbers", found
+        assert all(grounding.to_apa(l) == l for l in found), found
+        assert len(calls) == 2 and all("Find 10" in c and "different website" in c for c in calls), calls
+        assert any("DepEd" in c for c in calls)
+        print("  every reliable, on-topic, readable reference, one per site OK")
+
+        # Four is a thin set: searched again next time, not remembered.
+        ai_service.find_references({"topic": "Number systems", "subject": "ICT"})
+        assert len(calls) == 4, len(calls)
+        # A full set is remembered for the topic.
+        ai_service._FOUND_REFERENCES.clear()
+        full = ai_service.find_references({"topic": "Number systems", "subject": "ICT"}, count=3)
+        assert ai_service.find_references({"topic": "Number systems", "subject": "ICT"}) == full and len(calls) == 6
+        print("  only a full set is cached OK")
+
+        # The rules on their own.
+        assert grounding.is_unreliable_site("https://m.facebook.com/x") and grounding.is_unreliable_site("https://youtu.be/x")
+        assert not grounding.is_unreliable_site("https://www.deped.gov.ph/x")
+        assert [grounding.source_rank(u) for u in ("https://deped.gov.ph/a", "https://up.edu.ph/a",
+                                                   "https://unesco.org/a", "https://khan.com/a")] == [0, 0, 1, 2]
+        assert grounding.topic_terms("What is a Number Systems?") == ["number", "system"]
+        assert grounding.to_apa("W3Schools. (n.d.). HTML images. W3Schools. https://w3schools.com/a") == \
+            "W3Schools. (n.d.). HTML images. https://w3schools.com/a"
+        assert grounding.to_apa("Cruz, J. (2024). Binary. Kids Learn. https://k.org/b") == \
+            "Cruz, J. (2024). Binary. Kids Learn. https://k.org/b"
+        print("  reliability, topic and APA rules OK")
 
         # --- The references search runs beside the reply ---
         ai_service._FOUND_REFERENCES.clear()

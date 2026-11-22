@@ -307,7 +307,13 @@ def guide_citation(title, source_url, text="", author="Department of Education")
 
 
 _URL = re.compile(r"https?://[^\s<>\"')\]]+")
-_UA = {"User-Agent": "Mozilla/5.0 (AlignED reference check)"}
+# A browser's identity: many sites turn away an unknown bot with a 403 that a
+# teacher clicking the same link never sees, and those were good references lost.
+_UA = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/124.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+}
 _MAX_REDIRECTS = 5
 
 
@@ -481,7 +487,71 @@ def to_apa(line: str) -> str:
     stray spaces); anything missing an author, year or title is not guessed at."""
     line = _APA6_LEFTOVER.sub(" ", re.sub(r"\s+", " ", line or "").strip())
     line = re.sub(r"(https?://\S+?)[.,;]+$", r"\1", line)
+    # APA 7: when the author and the site are the same, the site isn't repeated.
+    line = re.sub(r"^([^()]{2,}?)\. (\([^)]*\)\. .+?\.) \1\. (?=https?://)", r"\1. \2 ", line)
     return line if _APA.match(line) else ""
+
+
+# ---------------------------------------------------------------------------
+# Which found pages make good references
+# ---------------------------------------------------------------------------
+
+# Not sources a lesson plan cites: social media, video, forums and Q&A,
+# homework and file-dump sites, shops, personal blogs, and Wikipedia (which
+# schools don't accept as a reference).
+_UNRELIABLE_SITES = {
+    "facebook", "fb", "instagram", "tiktok", "twitter", "x", "threads", "youtube", "youtu", "vimeo",
+    "pinterest", "reddit", "quora", "medium", "substack", "blogspot", "blogger", "wordpress", "tumblr",
+    "scribd", "slideshare", "slideplayer", "coursehero", "studocu", "brainly", "quizlet", "chegg",
+    "answers", "wikipedia", "wikiwand", "fandom", "amazon", "shopee", "lazada", "ebay", "etsy",
+}
+_OFFICIAL = re.compile(r"\.(?:gov|edu|ac|int|mil)(?:\.[a-z]{2})?$")
+_ORG = re.compile(r"\.org(?:\.[a-z]{2})?$")
+
+
+def site_of(url: str) -> str:
+    return (urlparse(url).hostname or "").lower().removeprefix("www.")
+
+
+def is_unreliable_site(url: str) -> bool:
+    return any(label in _UNRELIABLE_SITES for label in site_of(url).split("."))
+
+
+def source_rank(url: str) -> int:
+    """0 for government, DepEd, school and university pages, 1 for other
+    organizations, 2 for everything else: the order references are kept in."""
+    site = site_of(url)
+    if _OFFICIAL.search(site) or site.endswith("deped.gov.ph"):
+        return 0
+    return 1 if _ORG.search(site) else 2
+
+
+_TOPIC_STOP = _STOP | set("what how why using use lesson introduction basic basics grade quarter week "
+                          "about understanding".split())
+
+
+def topic_terms(topic: str) -> list:
+    """The words that say what the topic is about, plural endings cut so
+    "systems" also finds "system"."""
+    words = re.findall(r"[a-z0-9]+", (topic or "").lower())
+    terms = [w for w in words if len(w) >= 3 and w not in _TOPIC_STOP] or words
+    return list(dict.fromkeys(w[:-1] if len(w) > 4 and w.endswith("s") else w for w in terms))
+
+
+def topic_coverage(text: str, terms) -> tuple:
+    """(share of the topic's terms the text mentions, how often it mentions them)."""
+    if not terms:
+        return 0.0, 0
+    low = (text or "").lower()
+    hits = [low.count(t) for t in terms]
+    return sum(1 for h in hits if h) / len(terms), sum(hits)
+
+
+def covers_topic(text: str, terms) -> bool:
+    """A page about the topic: most of its terms appear (all of them for a one-
+    or two-word topic), and more than in passing."""
+    share, mentions = topic_coverage(text, terms)
+    return share >= 0.6 and mentions >= 3
 
 
 def _check_lines(lines, citation):
