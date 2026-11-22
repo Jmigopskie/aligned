@@ -451,7 +451,45 @@ function addOwlMessage(text, choices = [], { error = false, unread = true } = {}
           why.textContent = choice.why;
           card.append(why);
         }
+        // Copy only puts the text on the clipboard: the student still writes
+        // (or pastes) the part themselves; nothing is filled in for them.
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.className = "owl-choice-copy";
+        copy.innerHTML = `${Icons.copy || ""}<span>Copy</span>`;
+        copy.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(choice.text);
+            showToast("Copied. Paste it into the part and make it your own.");
+          } catch (err) {
+            showToast("Couldn't copy here. Select the text and copy it instead.", true);
+          }
+        });
+        card.append(copy);
         list.appendChild(card);
+        return;
+      }
+      if (choice.type === "direction") {
+        // One of Alan's two directions: tapping it only tells him which one,
+        // and he answers with the complete part written that way.
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "owl-choice owl-choice-direction";
+        const label = document.createElement("span");
+        label.className = "owl-choice-label";
+        label.textContent = choice.label;
+        const text = document.createElement("span");
+        text.className = "owl-choice-text";
+        text.textContent = choice.text;
+        btn.append(label, text);
+        if (choice.why) {
+          const why = document.createElement("span");
+          why.className = "owl-choice-why";
+          why.textContent = choice.why;
+          btn.append(why);
+        }
+        btn.addEventListener("click", () => pickOwlChoice(choice));
+        list.appendChild(btn);
         return;
       }
       const btn = document.createElement("button");
@@ -548,7 +586,7 @@ function introduceFieldInChat() {
   scrollChatToEnd();
 }
 
-async function sendToOwl(text) {
+async function sendToOwl(text, extra = {}) {
   text = (text || "").trim();
   if (!text || chat.busy) return;
   const key = stepFieldKeys[stepIndex];
@@ -573,6 +611,7 @@ async function sendToOwl(text) {
       prior_values: { ...fieldValues },
       history,
       message: text,
+      ...(extra.direction ? { direction: extra.direction } : {}),
     });
     typing.remove();
     recordTurn(key, "teacher", text);
@@ -591,6 +630,10 @@ async function sendToOwl(text) {
 
 // Only follow-up questions are tappable; options are read, not inserted.
 function pickOwlChoice(choice) {
+  if (choice.type === "direction") {
+    sendToOwl(`Go with: ${choice.label}`, { direction: { label: choice.label, text: choice.text } });
+    return;
+  }
   sendToOwl(choice.text);
 }
 

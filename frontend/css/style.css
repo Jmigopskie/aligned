@@ -4529,6 +4529,39 @@ body.owl-chat-shown .dash-main {
   color: var(--text-body);
 }
 
+/* One of Alan's two directions: a card the student taps to choose it. */
+.owl-choice-direction {
+  display: grid;
+  gap: 3px;
+  padding: 9px 12px;
+  border: 1px solid var(--primary);
+  background: var(--surface);
+  color: var(--text-body);
+  cursor: pointer;
+}
+.owl-choice-direction:hover:not(:disabled) { background: var(--primary-tint); }
+.owl-choice-direction .owl-choice-label { color: var(--primary); }
+
+/* Copy on a complete card: the text goes to the clipboard, never into the part. */
+.owl-choice-copy {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-heading);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.owl-choice-copy:hover { background: var(--primary-tint); }
+.owl-choice-copy svg { width: 14px; height: 14px; }
+
 .owl-choice-label { font-size: 13px; font-weight: 700; color: var(--text-heading); }
 
 .owl-choice-text {
