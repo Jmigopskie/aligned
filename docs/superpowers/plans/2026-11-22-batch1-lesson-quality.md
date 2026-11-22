@@ -218,6 +218,27 @@ The four-choice setup step, `_assessment_directive`, the ` | ` rubric rows and t
 - [ ] **Step 4:** Manual check: tick two parts → only they change, others identical; lesson proper ticks references; a teacher sees no points text; a student with 3 points sees the 402 message.
 - [ ] **Step 5:** Bump cache-busters; commit `feat(regenerate): pick the parts to rewrite, 5 points`.
 
+### Task 10b: Export fixes — Word keeps the format's font, PDF has no input lines
+
+User report (2026-11-22): exporting to Word changes the font; Save as PDF shows the input lines.
+Root cause first (superpowers:systematic-debugging): reproduce each on the local seeded server
+with a built-in format (DLP, TUP SDLP) and a plan whose values include rich (bold/list) and plain
+parts, then find where the font/lines come from before changing anything.
+
+**Files:**
+- Likely Modify: `backend/services/docx_service.py` (value-writing paths: `_set_paragraph_text`, `_set_paragraph_rich`, `_build_lines_from_style`, `_append_in_cell(_rich)`, `_fill_inline_value`, `_insert_table` from Task 1), `frontend/css/style.css` (`body.print-doc` / `#print-root` print rules for `.lp-slot`/`[data-field-key]` borders, dashed underlines, placeholders), `frontend/js/api.js` (`printPlanDocument` clone clean-up)
+- Test: `backend/test_export_font.py` (create), manual print check
+
+**Interfaces:**
+- Produces: every run the export writes carries the run properties (font name, size) of the template paragraph/label it fills, so Word shows the format's own font; the print clone carries no slot outline, underline, placeholder text or empty-slot box.
+
+- [ ] **Step 1: Write the failing test** `test_export_font.py`: build a small template .docx whose body and table text use a non-default font (e.g. `Arial Narrow`, 11pt) with labels and blank answer spots, export a plan with plain, multi-line, rich (`<b>`, `<ul>`) and rubric-row values through `export_lesson_plan` (or the template path function it calls), then assert every run in the filled spots has an effective font of `Arial Narrow` (run `rFonts` or inherited from its paragraph style, read the way Word resolves it) — no run falls back to Calibri/the document default.
+- [ ] **Step 2:** Run → fails, confirming which path drops the font (record it in the commit message).
+- [ ] **Step 3:** Fix at the shared point: written runs copy the template run's `rPr` (font, size, color unless the rich value sets it), and new paragraphs copy the template paragraph's `pPr` style. Rubric table cells (Task 1 `_insert_table`) use the same font.
+- [ ] **Step 4:** PDF: reproduce Save as PDF from the document view and from the plan list; add print rules so `#print-root` hides slot borders, dashed/underline input lines, `data-placeholder` text and empty-slot minimum heights, and strip `contenteditable` styling in the clone (`printPlanDocument`). Manual check: print preview shows only the document's own table borders and the filled text.
+- [ ] **Step 5:** Run `test_export_font.py`, `test_assessment_rubric.py`, `test_doc_edits.py`, `test_plan_revisions.py` → OK.
+- [ ] **Step 6:** Bump cache-busters; commit `fix(export): Word keeps the format's font; PDF without input lines`.
+
 ### Task 11: Verify, deploy, push
 
 **Files:** none new.
