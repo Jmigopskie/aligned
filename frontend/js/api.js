@@ -514,7 +514,7 @@ function printPlanDocument(source, name) {
   window.print();
 }
 
-function showToast(message, isError = false) {
+function showToast(message, isError = false, action = null) {
   let el = document.getElementById("toast");
   if (!el) {
     el = document.createElement("div");
@@ -528,10 +528,23 @@ function showToast(message, isError = false) {
     document.body.appendChild(el);
   }
   el.textContent = message;
+  // An optional next step ({label, onClick}), e.g. "Check coherence" after a
+  // regenerate; such a toast stays long enough to be clicked.
+  if (action) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "toast-action";
+    btn.textContent = action.label;
+    btn.addEventListener("click", () => {
+      el.classList.remove("show");
+      action.onClick();
+    });
+    el.append(" ", btn);
+  }
   el.classList.toggle("toast-error", isError);
   el.classList.add("show");
   clearTimeout(el._timer);
-  el._timer = setTimeout(() => el.classList.remove("show"), 3200);
+  el._timer = setTimeout(() => el.classList.remove("show"), action ? 9000 : 3200);
 }
 
 // Every modal on the site is the same .modal-overlay/.modal-dialog pair,

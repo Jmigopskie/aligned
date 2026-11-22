@@ -26,6 +26,8 @@ let syncedWithServer = false;
 // stream write the rest into what is now the OTHER mode's slot, splitting
 // the plan across both and overwriting whatever the teacher had typed there.
 let generating = false;
+// The running write is a Regenerate of chosen parts (not the first build).
+let regenerating = false;
 // Tells the setup flow when Alan starts, finishes or fails writing the plan,
 // so the big Alan can show it (start / done / error with detail.message).
 const generationEvents = new EventTarget();
@@ -2759,6 +2761,7 @@ function paintRestoredValues(blankMissing = false) {
   } else if (blankMissing || hasAnyValue()) {
     renderResults();
   }
+  syncRegenerateBtn(); // the document can open before the saved values arrive
 }
 
 // Populate the page from a plan row fetched by id, so reopening a draft shows
@@ -3098,18 +3101,40 @@ async function runGeneration(includeKeys) {
         }
       }
     });
-    generateFullBtn.dataset.originalLabel = "Regenerate full plan";
     reportGenerationOutcome(finalEvent, payload.include_keys);
     emitGeneration("done");
-    celebrate();
+    if (regenerating) {
+      // Rewritten parts can drift from the rest: offer the check right away.
+      showToast("Parts rewritten. Check that the plan still lines up?", false, { label: "Check coherence", onClick: checkCoherence });
+    } else {
+      celebrate();
+    }
   } catch (err) {
     showError(err.message);
     emitGeneration("error", { message: err.message });
   } finally {
     generating = false;
+    regenerating = false;
     setButtonLoading(generateFullBtn, false);
     generationProgressEl.hidden = true;
     startGenerateCooldown();
+    refreshPoints();
+    syncRegenerateBtn();
+  }
+}
+
+// The balance after Alan wrote (the server charges and refunds), for the
+// points notes; quiet when it can't be read.
+async function refreshPoints() {
+  if (!currentUser || currentUser.role !== "student") return;
+  try {
+    const data = await Api.me();
+    if (data && data.user && typeof data.user.points === "number") {
+      currentUser.points = data.user.points;
+      cacheUser(currentUser);
+    }
+  } catch (err) {
+    /* the note just shows the last known balance */
   }
 }
 
@@ -3589,6 +3614,99 @@ function closeGeneratorPreview() {
 }
 
 previewBtn.addEventListener("click", openGeneratorPreview);
+// ---- Regenerate (Building Proficiency): rewrite only the ticked parts ----
+// A student pays 5 points per regenerate (the server decides and refunds a
+// failed one); the untouched parts are sent as already written, so the new
+// ones fit them. Ticking the lesson proper ticks the references too: the
+// lesson is taught from those pages, so they change together.
+const regenBtn = document.getElementById("regenerate-btn");
+const regenOverlay = document.getElementById("regen-overlay");
+const regenList = document.getElementById("regen-list");
+const regenAll = document.getElementById("regen-all");
+const regenConfirm = document.getElementById("regen-confirm");
+const regenPoints = document.getElementById("regen-points");
+const REGENERATE_COST = 5;
+const isReferencePart = (f) => /reference/i.test(`${f.field_key} ${f.label}`);
+
+function syncRegenerateBtn() {
+  regenBtn.hidden = !(fmt && flowFlags.mode !== "step" && hasAnyValue());
+}
+
+function regenFields() {
+  return fieldsInDocumentOrder().filter((f) => !f.locked && !f.reflection);
+}
+
+function syncRegenModal() {
+  const boxes = Array.from(regenList.querySelectorAll("input[type=checkbox]"));
+  const lessonTicked = boxes.some((b) => b.checked && b.dataset.lesson === "1");
+  boxes.filter((b) => b.dataset.ref === "1").forEach((b) => {
+    // Ticked along with the lesson, so unticked with it too (unless the
+    // student had ticked it themselves first).
+    if (lessonTicked && !b.checked) {
+      b.checked = true;
+      b.dataset.auto = "1";
+    } else if (!lessonTicked && b.dataset.auto === "1") {
+      b.checked = false;
+      delete b.dataset.auto;
+    }
+    b.disabled = lessonTicked;
+    b.closest(".regen-row").querySelector(".regen-note").textContent =
+      lessonTicked ? "Updated too: the lesson is taught from these pages" : "";
+  });
+  const n = boxes.filter((b) => b.checked).length;
+  const student = currentUser && currentUser.role === "student";
+  regenAll.checked = n === boxes.length && n > 0;
+  regenConfirm.disabled = n === 0;
+  regenConfirm.textContent = n ? `Regenerate ${n} part${n === 1 ? "" : "s"}${student ? ` (${REGENERATE_COST} points)` : ""}` : "Regenerate";
+  regenPoints.textContent = student ? `Regenerating uses ${REGENERATE_COST} of your ${currentUser.points || 0} points.` : "";
+}
+
+function openRegenerate() {
+  const locked = fieldsInDocumentOrder().filter((f) => f.locked || f.reflection);
+  regenList.innerHTML = regenFields().map((f) => `
+    <label class="regen-row">
+      <input type="checkbox" value="${escapeHtml(f.field_key)}"${isLessonProper(f) ? ' data-lesson="1"' : ""}${isReferencePart(f) ? ' data-ref="1"' : ""} />
+      <span class="regen-label">${escapeHtml(f.label || f.field_key)}</span>
+      <span class="regen-note"></span>
+    </label>`).join("") + locked.map((f) => `
+    <div class="regen-row is-off">
+      <input type="checkbox" disabled />
+      <span class="regen-label">${escapeHtml(f.label || f.field_key)}</span>
+      <span class="regen-note">${f.reflection ? "Written after the lesson" : "You write this part"}</span>
+    </div>`).join("");
+  regenList.querySelectorAll("input[type=checkbox]:not(:disabled)").forEach((b) => b.addEventListener("change", syncRegenModal));
+  syncRegenModal();
+  regenOverlay.hidden = false;
+}
+
+function closeRegenerate() {
+  regenOverlay.hidden = true;
+}
+
+regenBtn.addEventListener("click", openRegenerate);
+regenAll.addEventListener("change", () => {
+  regenList.querySelectorAll("input[type=checkbox][value]").forEach((b) => {
+    b.checked = regenAll.checked;
+    delete b.dataset.auto;
+  });
+  syncRegenModal();
+});
+regenConfirm.addEventListener("click", async () => {
+  const keys = Array.from(regenList.querySelectorAll("input[type=checkbox][value]:checked")).map((b) => b.value);
+  if (!keys.length) return;
+  closeRegenerate();
+  regenerating = true;
+  await runGeneration(keys);
+});
+document.getElementById("regen-close").addEventListener("click", closeRegenerate);
+document.getElementById("regen-cancel").addEventListener("click", closeRegenerate);
+regenOverlay.addEventListener("click", (e) => {
+  if (e.target === regenOverlay) closeRegenerate();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !regenOverlay.hidden) closeRegenerate();
+});
+
 // ---- Coherence check: do the objectives, lesson and assessment line up? ----
 // Reads the plan as it is on the page (saved or not) and lists each mismatch
 // with its fix: complete content in Building Proficiency, an instruction in
@@ -3898,7 +4016,7 @@ async function payForBuild() {
 // What each mode costs a student, for the mode step; "" for teachers.
 function pointsNote() {
   if (!currentUser || currentUser.role !== "student") return "";
-  if (flowFlags.paid) return "This lesson plan is already paid for, so Alan writes it again for free. Guided is always free.";
+  if (flowFlags.paid) return `This lesson plan is already paid for. Regenerating parts of it later uses ${REGENERATE_COST} points. Guided is always free.`;
   const have = currentUser.points || 0;
   return have >= 30
     ? `Building Proficiency uses 30 of your ${have} points. Guided is free.`
@@ -4002,6 +4120,7 @@ function showDocument() {
   flowFlags.stage = "doc";
   saveDraft();
   syncOwlVisibility();
+  syncRegenerateBtn();
   window.scrollTo({ top: 0 });
 }
 

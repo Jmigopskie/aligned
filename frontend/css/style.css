@@ -758,6 +758,21 @@ a.btn-primary:hover {
   background: var(--danger);
 }
 
+/* A toast with a next step: its button can be clicked while it shows. */
+.toast.show:has(.toast-action) { pointer-events: auto; }
+.toast-action {
+  margin-left: 10px;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  background: transparent;
+  color: #FFFFFF;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.toast-action:hover { background: rgba(255, 255, 255, 0.12); }
+
 .spinner {
   width: 16px;
   height: 16px;
@@ -4528,6 +4543,21 @@ body.owl-chat-shown .dash-main {
   background: var(--surface);
   color: var(--text-body);
 }
+
+/* Regenerate: tick the parts Alan rewrites. */
+.regen-dialog { max-width: 560px; }
+.regen-warning { margin: 0 0 12px; padding: 10px 12px; border-radius: var(--radius); background: var(--warning-bg); color: var(--warning-text); line-height: 1.45; }
+.regen-all { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 700; cursor: pointer; }
+.regen-list { display: grid; gap: 2px; max-height: 46vh; overflow-y: auto; padding: 4px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.regen-row { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; padding: 7px 4px; border-radius: var(--radius-sm); cursor: pointer; }
+.regen-row:hover { background: var(--primary-tint); }
+.regen-row.is-off { cursor: default; color: var(--text-body); opacity: 0.7; }
+.regen-row.is-off:hover { background: none; }
+.regen-label { color: var(--text-heading); }
+.regen-note { grid-column: 2; font-size: 12.5px; color: var(--text-body); }
+.regen-note:empty { display: none; }
+.regen-points { margin: 10px 0 0; }
+.regen-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 
 /* Coherence check results: one section per part that doesn't line up. */
 .coherence-dialog { max-width: 720px; }
