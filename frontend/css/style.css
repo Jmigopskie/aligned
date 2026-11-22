@@ -7758,7 +7758,10 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
   body.print-doc > *:not(#print-root) { display: none !important; }
   body.print-doc #print-root { display: block; }
   body.print-doc #print-root .lp-doc { margin: 0 auto; box-shadow: none; zoom: 1; }
+  /* The editing marks never print: the setup review's outlines (solid for
+     "generate", dashed for "static") stay on the slots, and printed as lines
+     around every answer (user report, 2026-11-22). */
   body.print-doc #print-root .lp-field,
-  body.print-doc #print-root .lp-field.lp-filled { background: none !important; box-shadow: none !important; }
+  body.print-doc #print-root .lp-field.lp-filled { background: none !important; box-shadow: none !important; outline: none !important; }
   body.print-doc #print-root .lp-field:empty::before { content: none; }
 }

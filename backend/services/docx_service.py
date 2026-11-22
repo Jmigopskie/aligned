@@ -1555,10 +1555,12 @@ def _set_paragraph_rich(doc, para_el, line, template_run=None):
         if i < len(existing):
             run = existing[i]
             run.text = r["text"]
-        else:
+        elif template_run is not None:
             run = para.add_run(r["text"])
-            if template_run is not None:
-                _copy_run_style(template_run, run)
+            _copy_run_style(template_run, run)
+        else:
+            # A blank paragraph: the format's font, as for a plain value.
+            run = _add_blank_run(para, para_el, r["text"])
         _apply_run_marks(run, r)
 
     for extra in existing[len(runs):]:
@@ -1969,6 +1971,49 @@ def _strip_text_from_drawing_runs(para):
                 r._r.remove(t)
 
 
+_EMPHASIS = ("w:b", "w:bCs", "w:i", "w:iCs", "w:u", "w:caps", "w:smallCaps", "w:strike", "w:highlight")
+_MARK_ONLY = ("w:ins", "w:del", "w:moveFrom", "w:moveTo", "w:rPrChange")
+
+
+def _blank_run_props(para_el):
+    """The run properties a value written into a blank (a paragraph with no
+    runs, like the empty cell beside a label) should have: the blank's own
+    paragraph-mark formatting, with any font or size it lacks taken from the
+    nearest text before it (normally the label), never the label's emphasis.
+    A bare run fell back to the document default instead: the font changed
+    on export (user report, 2026-11-22). None when there's nothing to go by."""
+    ppr = para_el.find(qn("w:pPr"))
+    mark = ppr.find(qn("w:rPr")) if ppr is not None else None
+    rpr = copy.deepcopy(mark) if mark is not None else OxmlElement("w:rPr")
+    for tag in _MARK_ONLY:
+        for el in rpr.findall(qn(tag)):
+            rpr.remove(el)
+    near = para_el.xpath("preceding::w:r[w:t[normalize-space()]][1]")
+    near_rpr = near[0].find(qn("w:rPr")) if near else None
+    if near_rpr is not None:
+        for tag in ("w:rFonts", "w:sz", "w:szCs"):
+            if rpr.find(qn(tag)) is None and near_rpr.find(qn(tag)) is not None:
+                rpr.append(copy.deepcopy(near_rpr.find(qn(tag))))
+    for tag in _EMPHASIS:
+        for el in rpr.findall(qn(tag)):
+            rpr.remove(el)
+    if not len(rpr):
+        return None
+    # Word wants rFonts first and the sizes in schema order.
+    order = {qn("w:rFonts"): 0, qn("w:sz"): 2, qn("w:szCs"): 3}
+    for child in sorted(rpr, key=lambda c: order.get(c.tag, 1)):
+        rpr.append(child)
+    return rpr
+
+
+def _add_blank_run(para, para_el, text):
+    run = para.add_run(text)
+    rpr = _blank_run_props(para_el)
+    if rpr is not None:
+        run._r.insert(0, rpr)
+    return run
+
+
 def _set_paragraph_text(doc, para_el, text):
     para = Paragraph(para_el, doc)
     _strip_text_from_drawing_runs(para)
@@ -1980,7 +2025,7 @@ def _set_paragraph_text(doc, para_el, text):
         for extra in runs[1:]:
             extra.text = ""
     else:
-        para.add_run(text)
+        _add_blank_run(para, para_el, text)
 
 def _build_lines_from_template(doc, template_el, lines):
     built = []
