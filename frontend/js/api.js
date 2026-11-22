@@ -228,6 +228,13 @@ const Api = {
       body: JSON.stringify(payload),
     }),
 
+  // Whether the plan's parts line up; payload = generation payload + field_values + mode.
+  checkCoherence: (payload) =>
+    apiFetch("/api/lesson-plans/coherence", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
   // params: { status: "draft"|"submitted"|"reviewed", limit: number }
   listLessonPlans: (params = {}) => {
     const qs = new URLSearchParams(params).toString();

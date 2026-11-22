@@ -4529,6 +4529,17 @@ body.owl-chat-shown .dash-main {
   color: var(--text-body);
 }
 
+/* Coherence check results: one section per part that doesn't line up. */
+.coherence-dialog { max-width: 720px; }
+.coherence-summary { margin: 0 0 14px; font-weight: 600; color: var(--text-heading); }
+.coherence-summary.is-ok { color: var(--primary); }
+.coherence-issue { padding: 14px 0; border-top: 1px solid var(--border); }
+.coherence-issue h3 { margin: 0 0 4px; font-size: 15px; color: var(--text-heading); }
+.coherence-issue p { margin: 0 0 10px; line-height: 1.5; }
+.coherence-fix-label { margin-bottom: 4px; font-size: 12px; font-weight: 700; color: var(--text-muted, var(--text-body)); text-transform: uppercase; letter-spacing: 0.04em; }
+.coherence-fix { padding: 10px 12px; border-radius: var(--radius); background: var(--primary-tint); white-space: pre-wrap; line-height: 1.5; }
+.coherence-fix .lp-rubric { white-space: normal; background: var(--surface); }
+
 /* One of Alan's two directions: a card the student taps to choose it. */
 .owl-choice-direction {
   display: grid;
@@ -7477,12 +7488,14 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
   font-size: 17px;
   font-weight: 600;
   white-space: nowrap;
-  box-shadow: 0 2px 4px rgba(22, 35, 30, 0.12), 0 14px 28px -12px rgba(28, 92, 78, 0.55);
+  box-shadow: 0 2px 4px rgba(22, 35, 30, 0.14), 0 12px 24px -12px rgba(22, 35, 30, 0.4);
+  outline: 2px solid transparent;
+  outline-offset: 0;
   transform: translateX(-50%);
   transition: background-color 0.2s var(--flow-ease), box-shadow 0.2s var(--flow-ease);
 }
 .alan-chat-cue svg { display: block; width: 20px; height: 20px; }
-.flow-alan:hover .alan-chat-cue { background: var(--primary-hover); box-shadow: 0 3px 6px rgba(22, 35, 30, 0.16), 0 18px 32px -12px rgba(28, 92, 78, 0.6); }
+.flow-alan:hover .alan-chat-cue { background: var(--primary-hover); box-shadow: 0 3px 6px rgba(22, 35, 30, 0.18), 0 16px 28px -12px rgba(22, 35, 30, 0.45); }
 /* A reply is waiting: a gold mark beside the words. */
 .alan-chat-cue.is-unread::after {
   content: "";
@@ -7492,11 +7505,12 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
   border-radius: 50%;
   background: #f2c46d;
 }
-/* One ripple out from the label, twice, when a part appears or the chat closes. */
+/* One ring out from the label, twice, when a part appears or the chat closes:
+   an outline that grows and fades, not a glow. */
 .alan-chat-cue.is-nudging { animation: cue-nudge 1.3s var(--flow-ease) 0.4s 2; }
 @keyframes cue-nudge {
-  0% { box-shadow: 0 2px 4px rgba(22, 35, 30, 0.12), 0 14px 28px -12px rgba(28, 92, 78, 0.55), 0 0 0 0 rgba(28, 92, 78, 0.45); }
-  100% { box-shadow: 0 2px 4px rgba(22, 35, 30, 0.12), 0 14px 28px -12px rgba(28, 92, 78, 0.55), 0 0 0 16px rgba(28, 92, 78, 0); }
+  0% { outline-color: var(--primary); outline-offset: 0; }
+  100% { outline-color: transparent; outline-offset: 14px; }
 }
 /* The chat takes his place; he keeps animating underneath, ready to return. */
 .flow-stage.is-chatting .flow-alan,

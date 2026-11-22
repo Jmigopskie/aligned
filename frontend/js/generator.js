@@ -3589,6 +3589,68 @@ function closeGeneratorPreview() {
 }
 
 previewBtn.addEventListener("click", openGeneratorPreview);
+// ---- Coherence check: do the objectives, lesson and assessment line up? ----
+// Reads the plan as it is on the page (saved or not) and lists each mismatch
+// with its fix: complete content in Building Proficiency, an instruction in
+// Guided and for locked parts (the student writes those). Nothing is changed.
+const coherenceOverlay = document.getElementById("coherence-overlay");
+const coherenceBody = document.getElementById("coherence-body");
+const coherenceBtn = document.getElementById("coherence-btn");
+
+function closeCoherence() {
+  coherenceOverlay.hidden = true;
+}
+
+async function checkCoherence() {
+  if (!fmt) return;
+  const guided = flowFlags.mode === "step";
+  coherenceBody.innerHTML = `<div class="preview-loading">Alan is reading your whole plan&hellip;</div>`;
+  coherenceOverlay.hidden = false;
+  setButtonLoading(coherenceBtn, true, "Checking");
+  try {
+    if (docTemplateData) syncActiveStepValue();
+    const data = await Api.checkCoherence({
+      ...baseGenerationPayload(),
+      field_values: { ...fieldValues },
+      mode: guided ? "step" : "full",
+    });
+    const head = `<p class="coherence-summary${data.coherent ? " is-ok" : ""}">${escapeHtml(
+      data.summary || (data.coherent ? "Everything lines up." : "Some parts don't line up yet."))}</p>`;
+    const items = (data.issues || []).map((issue, i) => `
+      <section class="coherence-issue">
+        <h3>${escapeHtml(issue.part_label)}</h3>
+        <p>${escapeHtml(issue.problem)}</p>
+        <div class="coherence-fix-label">${guided ? "What to change" : "Fix"}</div>
+        <div class="coherence-fix">${rubricHtml(issue.fix) || escapeHtml(issue.fix)}</div>
+        ${guided ? "" : `<button type="button" class="owl-choice-copy" data-fix="${i}">${Icons.copy || ""}<span>Copy</span></button>`}
+      </section>`).join("");
+    coherenceBody.innerHTML = head + items;
+    coherenceBody.querySelectorAll("[data-fix]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(data.issues[Number(btn.dataset.fix)].fix);
+          showToast("Copied.");
+        } catch (err) {
+          showToast("Couldn't copy here. Select the text and copy it instead.", true);
+        }
+      });
+    });
+  } catch (err) {
+    coherenceBody.innerHTML = `<div class="preview-error">${escapeHtml(err.message || "The check couldn't run. Please try again.")}</div>`;
+  } finally {
+    setButtonLoading(coherenceBtn, false);
+  }
+}
+
+coherenceBtn.addEventListener("click", checkCoherence);
+document.getElementById("coherence-close").addEventListener("click", closeCoherence);
+coherenceOverlay.addEventListener("click", (e) => {
+  if (e.target === coherenceOverlay) closeCoherence();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !coherenceOverlay.hidden) closeCoherence();
+});
+
 previewClose.addEventListener("click", closeGeneratorPreview);
 previewOverlay.addEventListener("click", (e) => {
   if (e.target === previewOverlay) closeGeneratorPreview();
@@ -4024,6 +4086,7 @@ window.Generator = {
   lessonReferences: (key) => (fieldByKey(key) && isLessonProper(fieldByKey(key)) ? planReferences() : null),
   quickParts: () => incompleteEasyFieldKeys().map(partInfo),
   fieldValue: (key) => fieldValues[key],
+  checkCoherence,
   isFieldComplete,
   setGuidedValue,
   // The part screens' formatting toolbox: the formatted answer, read and

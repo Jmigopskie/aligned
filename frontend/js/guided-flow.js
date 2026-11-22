@@ -501,6 +501,12 @@ export function createGuided(ui) {
         ? "Click a part to change it. Then open the document to check the layout, save and export."
         : "A part is still empty. Click it to finish it, or open the document as it is.",
       body: (answer) => {
+        // Before opening the document: does the plan hang together? Alan says
+        // what to change; the student changes it.
+        const check = el("button", { type: "button", class: "flow-back flow-more flow-check" },
+          icon("checkSquare"), "Check coherence");
+        check.addEventListener("click", () => G.checkCoherence());
+        answer.append(check);
         const list = el("div", { class: "flow-details" });
         parts.forEach((p, i) => {
           const row = el("button", { type: "button", class: `flow-detail${G.isFieldComplete(p.key) ? "" : " is-missing"}` },
