@@ -580,29 +580,55 @@ _ALIGNED_ASSESSMENT = (
 # The evaluation part, not a practice activity that merely "leads to" one.
 _ASSESSMENT_FIELD = re.compile(r"assess|evaluat|quiz|\btest\b", re.I)
 _QUIZ_ITEMS = re.compile(r"(\d+)-item multiple-choice quiz")
-# A 20-item quiz (question, four options, then the key) or a task and rubric.
-_MAX_ASSESSMENT_LINES = 160
+# A 20-item quiz (question, four options, then the key) and a task and rubric.
+_MAX_ASSESSMENT_LINES = 200
+# A rubric row is five cells on one line; the usual 40-word ceiling cut rows short.
+_MAX_ASSESSMENT_LINE_WORDS = 90
+
+# The rubric is a table: rows of cells separated by " | ", which the document,
+# the preview and the Word export draw as a real table.
+_QUIZ_HOW = ("a multiple-choice quiz: each item a numbered question with four options, a. to d., one per "
+             "line, then 'Answer key:' with the correct letter for every item")
+_TASK_HOW = ("a performance task: the task, its step-by-step instructions, then 'Rubric:' followed by the "
+             "rubric as a table, one row per line with its cells separated by ' | ': first the header row "
+             "'Criteria | Excellent (4) | Good (3) | Fair (2) | Needs Improvement (1)', then one row for each "
+             "of 3 to 5 criteria, its name and then what each level looks like in at most 10 words per cell "
+             "(e.g. 'Accuracy | All steps correct | One minor error | Several errors | Mostly incorrect'), "
+             "then a line 'Total: N points'")
+_NO_LIMITS = " The length limits do not apply to this field."
 
 
 def _assessment_directive(haystack: str, context: dict) -> str:
-    """The assessment the setup chose (step 2), for the field that assesses:
-    a multiple-choice quiz of its item count with an answer key, or a
-    performance task with its rubric. Nothing when the setup didn't ask."""
+    """The assessment the setup chose (step 2), for the field that assesses: a
+    multiple-choice quiz of its item count with an answer key, a performance
+    task with its rubric table, both, or whichever the objectives call for.
+    Nothing when the setup didn't ask."""
     kind = str(context.get("assessment_type") or "")
     if not kind or not _ASSESSMENT_FIELD.search(haystack) or "mastery" in haystack:
         return ""
     quiz = _QUIZ_ITEMS.search(kind)
-    if quiz:
-        n = int(quiz.group(1))
-        return (f" Assess with a multiple-choice quiz of exactly {n} item{'s' if n > 1 else ''} on the lesson's "
-                "specific topic: each item a numbered question with four options, a. to d., one per line, "
-                "then 'Answer key:' with the correct letter for every item. The length limits do not apply "
-                "to this field.")
-    if "performance task" in kind:
-        return (" Assess with a performance task on the lesson's specific topic: the task, its step-by-step "
-                "instructions, then 'Rubric:' with 3 to 5 criteria, one per line, each giving its levels and "
-                "points (e.g. 'Accuracy: Excellent 5 | Good 4 | Fair 3 | Needs improvement 2'), then the total "
-                "points. The length limits do not apply to this field.")
+    n = int(quiz.group(1)) if quiz else 0
+    items = f"exactly {n} item{'s' if n > 1 else ''}"
+    if "objectives" in kind:
+        return (" Choose the assessment from the learning objectives already written for this plan. A "
+                "cognitive objective (identify, define, describe, explain, compare, classify) is checked by "
+                "multiple-choice items; a psychomotor objective (perform, assemble, construct, operate, "
+                "prepare, demonstrate the procedure) is checked by a performance task; an affective objective "
+                "(value, cooperate, show willingness, practice) is checked by a criterion row in the task's "
+                "rubric when there is a task, otherwise by one line 'Observed: <the behaviour the teacher "
+                "watches for>' after the quiz. Use only what the objectives need: just a quiz, just a task, "
+                "or both when the objectives include both kinds. Head each part on its own line, 'Multiple-choice "
+                f"quiz:' or 'Performance task:'. The quiz has {f'up to {n} items' if n else 'up to 10 items'} "
+                f"and is {_QUIZ_HOW}. The task is {_TASK_HOW}.{_NO_LIMITS}")
+    task = "performance task" in kind
+    if n and task:
+        return (f" Assess with both, each headed on its own line: 'Multiple-choice quiz:' with {items}, "
+                f"{_QUIZ_HOW}; then 'Performance task:', {_TASK_HOW}. The quiz checks the objectives about "
+                f"knowing and understanding, the task the ones about doing or making.{_NO_LIMITS}")
+    if n:
+        return f" Assess with {items} on the lesson's specific topic in {_QUIZ_HOW}.{_NO_LIMITS}"
+    if task:
+        return f" Assess with {_TASK_HOW}, on the lesson's specific topic.{_NO_LIMITS}"
     return ""
 
 
@@ -889,7 +915,7 @@ def _trim(values, fields, guide_text="", citation="", context=None):
     )
     if assess:
         out.update(ai_limits.enforce_limits(
-            values, assess, max_items=_MAX_ASSESSMENT_LINES, max_item_words=_MAX_ITEM_WORDS,
+            values, assess, max_items=_MAX_ASSESSMENT_LINES, max_item_words=_MAX_ASSESSMENT_LINE_WORDS,
             max_sentences=_MAX_ASSESSMENT_LINES, max_prose_words=_MAX_ASSESSMENT_LINES * _MAX_ITEM_WORDS,
             keep_markers=True,
         ))

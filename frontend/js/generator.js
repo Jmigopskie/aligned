@@ -885,9 +885,13 @@ function getClassLabel() {
   return parts.join(" · ");
 }
 
+// What the backend's assessment directive reads (ai_service._assessment_directive).
 function assessmentText(a) {
-  if (a.assessment === "quiz") return `a ${a.quizItems || 5}-item multiple-choice quiz`;
+  const quiz = `a ${a.quizItems || 5}-item multiple-choice quiz`;
+  if (a.assessment === "objectives") return `based on the objectives: ${quiz}, a performance task with a rubric, or both`;
+  if (a.assessment === "quiz") return quiz;
   if (a.assessment === "task") return "a performance task with a rubric";
+  if (a.assessment === "both") return `${quiz} and a performance task with a rubric`;
   return "";
 }
 

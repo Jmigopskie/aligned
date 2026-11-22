@@ -52,8 +52,11 @@ function isStepAnswered(stepId, answers) {
   const a = answers || {};
   switch (stepId) {
     case "format": return filled(a.formatId); // the school is encouraged, not required
-    case "assessment": // a 5, 10, 15 or 20 item quiz, or a performance task with a rubric
-      return a.assessment === "task" || (a.assessment === "quiz" && QUIZ_SIZES.includes(a.quizItems));
+    // Whatever the objectives call for, a quiz, a performance task, or both;
+    // any choice that may hold a quiz has its 5, 10, 15 or 20 items.
+    case "assessment":
+      return a.assessment === "task"
+        || (["objectives", "quiz", "both"].includes(a.assessment) && QUIZ_SIZES.includes(a.quizItems));
     case "people": return filled(a.studentTeacher) && filled(a.coop);
     case "class":
       return a.levelType === "college" ? filled(a.program) && filled(a.year) : filled(a.grade);

@@ -378,18 +378,23 @@ function row(...cells) {
 // ---- answers per step ----
 const STEPS = {
   format: formatStep,
-  // A quiz (5, 10, 15 or 20 items, its count asked under it) or a performance task with a rubric.
+  // Testers: the assessment depends on the objectives, and one lesson may need a
+  // quiz and a performance task. So Alan can choose from the objectives, or the
+  // student picks a quiz (5, 10, 15 or 20 items), a task with a rubric, or both.
   assessment: () => {
     const wrap = el("div", { class: "flow-answer" });
     // A draft from when quizzes had 1 to 5 items starts at 5.
     const quizSize = () => (QUIZ_SIZES.includes(G.getAnswers().quizItems) ? G.getAnswers().quizItems : 5);
+    const hasQuiz = (kind) => ["objectives", "quiz", "both"].includes(kind);
     const paint = () => {
-      if (G.getAnswers().assessment === "quiz" && quizSize() !== G.getAnswers().quizItems) G.setAnswers({ quizItems: quizSize() });
+      if (hasQuiz(G.getAnswers().assessment) && quizSize() !== G.getAnswers().quizItems) G.setAnswers({ quizItems: quizSize() });
       const a = G.getAnswers();
       const choices = el("div", { class: "flow-choices flow-choices-stack flow-mode-choices", role: "group", "aria-labelledby": "flow-question" });
       [
+        { value: "objectives", title: "Based on my objectives (recommended)", sub: "Alan checks what each objective asks: a quiz for knowing, a performance task for doing, or both." },
         { value: "quiz", title: "Multiple-choice quiz", sub: "5, 10, 15 or 20 items, with an answer key." },
-        { value: "task", title: "Performance task with a rubric", sub: "Learners show the skill; a rubric scores it." },
+        { value: "task", title: "Performance task with a rubric", sub: "Learners show the skill; a rubric table scores it." },
+        { value: "both", title: "Both a quiz and a performance task", sub: "The quiz checks what they know, the task what they can do." },
       ].forEach((m) => {
         const btn = el("button", { type: "button", class: "flow-choice flow-format flow-mode", "aria-pressed": String(m.value === a.assessment) },
           twoLine(m.title, m.sub), tick());
@@ -400,8 +405,9 @@ const STEPS = {
         });
         choices.append(btn);
       });
-      const items = a.assessment === "quiz"
-        ? row(selectAnswer("flow-quiz-items", "Number of items", QUIZ_SIZES.map((n) => ({ value: n, label: `${n} items` })),
+      const items = hasQuiz(a.assessment)
+        ? row(selectAnswer("flow-quiz-items", a.assessment === "objectives" ? "Quiz items, if the objectives call for a quiz" : "Number of quiz items",
+          QUIZ_SIZES.map((n) => ({ value: n, label: `${n} items` })),
           quizSize(), (v) => G.setAnswers({ quizItems: parseInt(v, 10) })))
         : "";
       wrap.replaceChildren(choices, items);
@@ -971,8 +977,12 @@ function classText(a) {
 // [step that holds the answer, label, value]
 const DETAIL_ROWS = [
   ["format", "School", (a) => a.school],
-  ["assessment", "Assessment", (a) => (a.assessment === "quiz" ? `${a.quizItems || 5}-item multiple-choice quiz`
-    : a.assessment === "task" ? "Performance task with a rubric" : "")],
+  ["assessment", "Assessment", (a) => ({
+    objectives: `Based on the objectives (quiz of up to ${a.quizItems || 5} items, performance task, or both)`,
+    quiz: `${a.quizItems || 5}-item multiple-choice quiz`,
+    task: "Performance task with a rubric",
+    both: `${a.quizItems || 5}-item multiple-choice quiz and a performance task with a rubric`,
+  }[a.assessment] || "")],
   ["people", "Your name", (a) => a.studentTeacher],
   ["people", "Cooperating / Subject Teacher", (a) => a.coop],
   ["class", "Class", classText],

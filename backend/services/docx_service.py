@@ -2175,7 +2175,89 @@ def apply_paper_size(doc, key):
         section.page_width, section.page_height = width, height
 
 
+# A rubric is written as rows of cells separated by " | " (the assessment
+# prompt asks for that, and a teacher can type it). However a value reached the
+# document, consecutive rows of three or more cells become a real Word table.
+_PIPE_RULE = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$")
+
+
+def pipe_cells(line: str) -> list:
+    """The cells of a table row ("Criteria | Excellent (4) | ..."), or [] for
+    a line that isn't one (fewer than three cells, or a markdown |---| rule)."""
+    line = re.sub(r"^\s*[•·▪-]\s+", "", str(line or "")).strip()
+    if _PIPE_RULE.match(line):
+        return []
+    line = line[1:] if line.startswith("|") else line
+    line = line[:-1] if line.endswith("|") else line
+    cells = [c.strip() for c in line.split("|")]
+    return cells if len(cells) >= 3 else []
+
+
+def _p_text(p_el):
+    return "".join(t.text or "" for t in p_el.iter(qn("w:t")))
+
+
+def pipe_rows_to_tables(doc):
+    """Every run of two or more table-row paragraphs, in the body or in a
+    table cell, replaced by a bordered table (header row bold) in its place."""
+    done = set()
+    for p_el in list(doc.element.body.iter(qn("w:p"))):
+        if id(p_el) in done:
+            continue
+        group, el = [], p_el
+        while el is not None and el.tag == qn("w:p"):
+            text = _p_text(el)
+            cells = pipe_cells(text)
+            if not cells and not _PIPE_RULE.match(text.strip()):
+                break
+            group.append((el, cells))
+            el = el.getnext()
+        rows = [c for _, c in group if c]
+        done.update(id(e) for e, _ in group)
+        if len(rows) < 2:
+            continue
+        tbl = _insert_table(doc, group[0][0], rows)
+        for e, _ in group:
+            e.getparent().remove(e)
+        # Word needs a paragraph after a table that ends a cell.
+        if tbl.getparent().tag == qn("w:tc") and (tbl.getnext() is None or tbl.getnext().tag != qn("w:p")):
+            tbl.addnext(OxmlElement("w:p"))
+
+
+def _insert_table(doc, before_el, rows):
+    ncols = max(len(r) for r in rows)
+    table = doc.add_table(rows=len(rows), cols=ncols)
+    tbl = table._tbl
+    before_el.addprevious(tbl)
+    tbl_pr = tbl.tblPr
+    width = tbl_pr.find(qn("w:tblW"))
+    if width is None:
+        width = OxmlElement("w:tblW")
+        tbl_pr.append(width)
+    width.set(qn("w:type"), "pct")
+    width.set(qn("w:w"), "5000")
+    borders = OxmlElement("w:tblBorders")
+    for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        b = OxmlElement(f"w:{edge}")
+        for k, v in (("val", "single"), ("sz", "4"), ("space", "0"), ("color", "000000")):
+            b.set(qn(f"w:{k}"), v)
+        borders.append(b)
+    tbl_pr.append(borders)
+    # The rows' own font, so the table reads like the rest of the plan.
+    first_run = before_el.find(qn("w:r"))
+    rpr = first_run.find(qn("w:rPr")) if first_run is not None else None
+    for r, cells in enumerate(rows):
+        for c in range(ncols):
+            run = table.cell(r, c).paragraphs[0].add_run(cells[c] if c < len(cells) else "")
+            if rpr is not None:
+                run._r.insert(0, copy.deepcopy(rpr))
+            if r == 0:
+                run.bold = True
+    return tbl
+
+
 def _save(doc, plan) -> str:
+    pipe_rows_to_tables(doc)
     apply_paper_size(doc, plan.get_setup_context().get("pageSize"))
     os.makedirs(Config.GENERATED_FOLDER, exist_ok=True)
     filename = f"lesson_plan_{plan.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.docx"

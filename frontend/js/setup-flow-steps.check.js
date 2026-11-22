@@ -57,6 +57,11 @@ for (const n of [5, 10, 15, 20]) assert.strictEqual(answered("assessment", { ass
 assert.strictEqual(answered("assessment", { assessment: "quiz", quizItems: 3 }), false, "a quiz has 5, 10, 15 or 20 items");
 assert.strictEqual(answered("assessment", { assessment: "quiz", quizItems: 25 }), false);
 assert.strictEqual(answered("assessment", { assessment: "quiz" }), false, "a quiz needs its item count");
+for (const kind of ["objectives", "both"]) {
+  assert.strictEqual(answered("assessment", { assessment: kind, quizItems: 10 }), true, kind);
+  assert.strictEqual(answered("assessment", { assessment: kind }), false, `${kind} may hold a quiz, so it needs a count`);
+}
+assert.strictEqual(answered("assessment", { assessment: "essay" }), false);
 assert.strictEqual(answered("mode", { mode: "step" }), true);
 assert.strictEqual(answered("mode", {}), false);
 
