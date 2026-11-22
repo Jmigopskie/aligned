@@ -1678,6 +1678,76 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
     return answer
 
 
+# ---------------------------------------------------------------------------
+# Coherence check: does the finished plan hang together?
+# ---------------------------------------------------------------------------
+
+_COHERENCE_SYSTEM = (
+    "You review a Philippine K-12 lesson plan for coherence: whether its parts are connected. Check:\n"
+    "- every learning objective is taught in the lesson proper and checked by the assessment;\n"
+    "- the assessment tests only what the lesson proper taught;\n"
+    "- the assessment fits the objectives' domains (cognitive by test items, psychomotor by a "
+    "performance task with a rubric, affective by a rubric criterion or an observation);\n"
+    "- each objective's verb fits its domain and taxonomy (below), measurable, never understand/know/learn;\n"
+    "- the objectives are unpacked from the learning competency;\n"
+    "- the motivation and activities lead into today's topic;\n"
+    "- the assignment fits the next lesson's topic, when one is given.\n"
+    "Report only real mismatches, each on the part that must change, with what is wrong and why it "
+    "matters in one or two sentences.\n"
+    "Return strict JSON: {\"coherent\": true or false, \"summary\": \"one sentence\", \"issues\": "
+    "[{\"part_key\": \"...\", \"problem\": \"...\", \"fix\": \"...\"}]} with part_key exactly as given."
+)
+_FIX_FULL = ("Each fix is the complete corrected content for that part, ready to use (rubric rows with "
+             "cells separated by ' | ').")
+_FIX_STEP = ("The student writes every part themselves: each fix is a specific instruction of what to change "
+             "or add (e.g. 'Add a performance task where learners design a flyer on kitchen safety, with a "
+             "rubric on layout, accuracy and creativity'); never write the content for them.")
+
+
+def _plan_text(fields, values: dict) -> str:
+    """The plan as 'Label (key):' blocks; a weekly part as 'Day: answer' lines."""
+    blocks = []
+    for f in fields:
+        value = values.get(f.field_key)
+        if isinstance(value, list):
+            names = getattr(f, "parts_list", None) or []
+            text = "\n".join(f"{names[i] if i < len(names) else f'Day {i + 1}'}: {v}"
+                             for i, v in enumerate(value) if str(v or "").strip())
+        else:
+            text = str(value or "").strip()
+        if text:
+            blocks.append(f"{f.label} ({f.field_key}):\n{text}")
+    return "\n\n".join(blocks)
+
+
+def check_coherence(context: dict, fields, values: dict, mode: str) -> dict:
+    """{"coherent", "summary", "issues": [{"part_key", "part_label", "problem", "fix"}]} for a plan.
+    mode "full" (Building Proficiency) gets complete fixes, "step" (Guided)
+    and locked parts get instructions. Nothing in the plan is changed."""
+    labels = {f.field_key: f.label for f in fields}
+    locked = [f.label for f in fields if getattr(f, "locked", False)]
+    about = "\n".join(f"{k.replace('_', ' ').title()}: {context[k]}" for k in
+                      ("topic", "main_topic", "subject", "grade_level", "previous_topic", "next_topic",
+                       "assessment_type") if context.get(k))
+    task = (f"Lesson:\n{about}\n\nObjective verb taxonomies:\n{taxonomy_text()}\n\n"
+            f"{_FIX_FULL if mode == 'full' else _FIX_STEP}\n"
+            + (f"Locked parts (their fix is an instruction only): {', '.join(locked)}\n" if locked else "")
+            + f"\nThe lesson plan:\n{_plan_text(fields, values)}")
+    data = _call(_COHERENCE_SYSTEM, [task], "Coherence check")
+    data = data if isinstance(data, dict) else {}
+    issues = []
+    for i in data.get("issues") or []:
+        if not isinstance(i, dict) or i.get("part_key") not in labels:
+            continue
+        problem, fix = str(i.get("problem") or "").strip(), str(i.get("fix") or "").strip()
+        if problem:
+            issues.append({"part_key": i["part_key"], "part_label": labels[i["part_key"]],
+                           "problem": problem[:600], "fix": fix[:_MAX_USE_TEXT]})
+    summary = str(data.get("summary") or "").strip()[:300]
+    return {"coherent": not issues, "summary": summary or ("Everything lines up." if not issues else ""),
+            "issues": issues}
+
+
 def _lesson_references(prior_values: dict, context: dict) -> str:
     """For the lesson proper in Guided: the references the student listed in
     the plan and what their pages say, so Alan teaches from them."""

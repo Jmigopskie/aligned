@@ -232,6 +232,34 @@ def owl_chat():
                                  course_guide_citation=_guide_citation(guides), direction=direction)
     return jsonify({"status": "ok", **answer})
 
+@generate_bp.post("/lesson-plans/coherence")
+@login_required
+@enrollment_required
+def check_coherence():
+    """Whether the plan on the page hangs together (objectives, lesson proper,
+    assessment), with a fix per mismatch: complete content in Building
+    Proficiency (mode "full"), an instruction in Guided (mode "step") and for
+    locked parts. Reads the page's current values, so unsaved work is checked.
+    Free; changes nothing."""
+    data = request.get_json(silent=True) or {}
+    fmt = LessonPlanFormat.query.get_or_404(data.get("format_id"))
+    values = data.get("field_values") if isinstance(data.get("field_values"), dict) else {}
+    fields = grounding.competency_view(fmt.fields)
+
+    def written(f):
+        v = values.get(f.field_key)
+        return any(str(x or "").strip() for x in v) if isinstance(v, list) else bool(str(v or "").strip())
+
+    if not any(written(f) and (ai_service._is_objective_field(f) or ai_service._ASSESSMENT_FIELD.search(f.label or ""))
+               for f in fields):
+        return jsonify({"status": "error", "message": "Write the objectives and the assessment first."}), 400
+    guides, err = _resolve_guides(data)
+    if err:
+        return err
+    result = ai_service.check_coherence(_build_context(data, guides), fields, values,
+                                        "step" if data.get("mode") == "step" else "full")
+    return jsonify({"status": "ok", **result})
+
 @generate_bp.get("/lesson-plans")
 @login_required
 def list_lesson_plans():
