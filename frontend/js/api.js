@@ -70,6 +70,8 @@ const Api = {
 
   signup: (payload) =>
     apiFetch("/api/signup", { method: "POST", body: JSON.stringify(payload) }),
+  signupCode: (email) =>
+    apiFetch("/api/signup/code", { method: "POST", body: JSON.stringify({ email }) }),
   login: (payload) =>
     apiFetch("/api/login", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => apiFetch("/api/logout", { method: "POST" }),
@@ -1367,6 +1369,106 @@ function escapeHtml(str) {
   // here rather than relying on every call site to pick the safe context.
   return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
+
+// ---- Input checks, on every page (the user's request, 2026-11-22) ----
+// Every form is checked against its fields' own rules (required, type, min/
+// max, minlength/maxlength, pattern) before its page sees the submit, and a
+// field that fails says why, in plain words, right under it. data-error on a
+// field gives its own message. The server checks again: this is the friendly
+// first line, not the only one.
+function fieldLabel(el) {
+  const label = el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+  const text = (label ? label.textContent : el.getAttribute("aria-label") || el.placeholder || "This field").trim();
+  return text.replace(/[:*]\s*$/, "") || "This field";
+}
+
+function fieldMessage(el) {
+  // Only fields the user can see and fix: never block a form on a hidden one.
+  if (el.disabled || el.type === "hidden" || el.closest("[hidden]") || !el.getClientRects().length) return "";
+  // Spaces alone don't answer a required field.
+  const blank = el.required && typeof el.value === "string" && !el.value.trim() && el.type !== "file";
+  const v = el.validity;
+  if (!blank && v.valid) return "";
+  if (el.dataset.error && !blank) return el.dataset.error;
+  const label = fieldLabel(el);
+  if (blank || v.valueMissing) return el.tagName === "SELECT" ? `Choose ${label.toLowerCase()}.` : `${label} is required.`;
+  if (v.typeMismatch) return el.type === "email" ? "Enter a valid email address, like name@example.com." : `Enter a valid ${label.toLowerCase()}.`;
+  if (v.tooShort) return `${label} must be at least ${el.minLength} characters.`;
+  if (v.tooLong) return `${label} can be at most ${el.maxLength} characters.`;
+  if (v.badInput) return `Enter a number for ${label.toLowerCase()}.`;
+  if (v.rangeUnderflow) return `${label} must be at least ${el.min}.`;
+  if (v.rangeOverflow) return `${label} must be at most ${el.max}.`;
+  if (v.stepMismatch) return `${label} must be a whole number.`;
+  if (el.dataset.error) return el.dataset.error;
+  if (v.patternMismatch) return `${label} isn't in the right format.`;
+  return el.validationMessage || `Check ${label.toLowerCase()}.`;
+}
+
+function clearFieldError(el) {
+  const id = el.dataset.errorFor;
+  if (id) document.getElementById(id)?.remove();
+  delete el.dataset.errorFor;
+  el.removeAttribute("aria-invalid");
+  el.classList.remove("is-invalid");
+}
+
+function showFieldError(el, message, focus = true) {
+  clearFieldError(el);
+  const msg = document.createElement("p");
+  msg.className = "field-error";
+  msg.id = `err-${el.id || Math.random().toString(36).slice(2)}`;
+  msg.setAttribute("role", "alert");
+  msg.textContent = message;
+  // Under the field, or under its row when the field shares one with a button.
+  const anchor = el.closest(".signup-email-row, .export-name-field") || el;
+  anchor.after(msg);
+  el.dataset.errorFor = msg.id;
+  el.setAttribute("aria-invalid", "true");
+  el.setAttribute("aria-describedby", msg.id);
+  el.classList.add("is-invalid");
+  if (focus) el.focus();
+}
+
+// Checks a form (or a list of fields); shows each problem under its field and
+// focuses the first. True when everything is fine.
+function checkFields(scope) {
+  const fields = Array.isArray(scope) ? scope : Array.from(scope.querySelectorAll("input, select, textarea"));
+  let first = null;
+  fields.forEach((el) => {
+    const message = fieldMessage(el);
+    if (message) {
+      showFieldError(el, message, false);
+      first = first || el;
+    } else {
+      clearFieldError(el);
+    }
+  });
+  if (first) first.focus();
+  return !first;
+}
+
+// Every form on every page: the browser's own bubbles are replaced by the
+// messages above, and a form with a problem never reaches its page's handler.
+document.addEventListener("submit", (e) => {
+  const form = e.target;
+  if (!(form instanceof HTMLFormElement) || form.dataset.noCheck !== undefined) return;
+  if (!checkFields(form)) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+}, true);
+document.addEventListener("input", (e) => {
+  if (e.target.dataset && e.target.dataset.errorFor && !fieldMessage(e.target)) clearFieldError(e.target);
+}, true);
+document.addEventListener("change", (e) => {
+  if (e.target.dataset && e.target.dataset.errorFor && !fieldMessage(e.target)) clearFieldError(e.target);
+}, true);
+// Forms check themselves (above), so the browser's own bubbles are turned off.
+function quietNativeChecks() {
+  document.querySelectorAll("form").forEach((f) => { f.noValidate = true; });
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", quietNativeChecks);
+else quietNativeChecks();
 
 // Shared by any page that shows a read-only field label/value breakdown of
 // a lesson plan (the saved-plan preview modal, and the pre-save preview in

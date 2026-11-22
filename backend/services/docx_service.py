@@ -1692,6 +1692,8 @@ def _export_from_template(plan, fmt, template_path) -> str:
     # orphaning its own field. Before the fill, so the values land in the
     # document the teacher actually edited.
     apply_doc_edits(doc, items, plan.get_doc_edits())
+    # The format's own " | " lines, before any value: never made into a table.
+    template_pipes = template_pipe_lines(doc)
 
     # Weekly fields always fill their own day cells, never an inline blank.
     consumed = _fill_labeled_blanks(
@@ -1759,7 +1761,7 @@ def _export_from_template(plan, fmt, template_path) -> str:
             _add_styled_label(doc, field.label, body_style)
             _add_field_value(doc, field, values.get(field.field_key, ""), body_style)
 
-    return _save(doc, plan)
+    return _save(doc, plan, template_pipes)
 
 def _element_text(doc, el):
     if el.tag == qn("w:p"):
@@ -2262,9 +2264,16 @@ def _p_text(p_el):
     return "".join(t.text or "" for t in p_el.iter(qn("w:t")))
 
 
-def pipe_rows_to_tables(doc):
+def template_pipe_lines(doc) -> set:
+    """The " | " lines a format's own template already has (read before any
+    value is written), so they are never turned into a table."""
+    return {_p_text(p).strip() for p in doc.element.body.iter(qn("w:p")) if pipe_cells(_p_text(p))}
+
+
+def pipe_rows_to_tables(doc, keep=frozenset()):
     """Every run of two or more table-row paragraphs, in the body or in a
-    table cell, replaced by a bordered table (header row bold) in its place."""
+    table cell, replaced by a bordered table (header row bold) in its place.
+    Lines in `keep` (the template's own) stay as they are."""
     done = set()
     for p_el in list(doc.element.body.iter(qn("w:p"))):
         if id(p_el) in done:
@@ -2272,7 +2281,7 @@ def pipe_rows_to_tables(doc):
         group, el = [], p_el
         while el is not None and el.tag == qn("w:p"):
             text = _p_text(el)
-            cells = pipe_cells(text)
+            cells = [] if text.strip() in keep else pipe_cells(text)
             if not cells and not _PIPE_RULE.match(text.strip()):
                 break
             group.append((el, cells))
@@ -2327,8 +2336,8 @@ def _insert_table(doc, before_el, rows):
     return tbl
 
 
-def _save(doc, plan) -> str:
-    pipe_rows_to_tables(doc)
+def _save(doc, plan, keep=frozenset()) -> str:
+    pipe_rows_to_tables(doc, keep)
     apply_paper_size(doc, plan.get_setup_context().get("pageSize"))
     os.makedirs(Config.GENERATED_FOLDER, exist_ok=True)
     filename = f"lesson_plan_{plan.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.docx"

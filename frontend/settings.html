@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-11-09a" />
+  <link rel="stylesheet" href="css/style.css?v=2026-11-23a" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -102,11 +102,11 @@
                 <div class="settings-field-row">
                   <div class="field field-last">
                     <label for="profile-name">Full name</label>
-                    <input type="text" id="profile-name" required />
+                    <input type="text" id="profile-name" maxlength="120" required />
                   </div>
                   <div class="field field-last">
                     <label for="profile-email">Email</label>
-                    <input type="email" id="profile-email" required />
+                    <input type="email" id="profile-email" maxlength="120" required />
                   </div>
                 </div>
                 <div class="flex-between mt-16">
@@ -124,16 +124,16 @@
               <form id="password-form" class="settings-section-body">
                 <div class="field settings-field-half">
                   <label for="current-password">Current password</label>
-                  <input type="password" id="current-password" autocomplete="current-password" required />
+                  <input type="password" id="current-password" maxlength="128" autocomplete="current-password" required />
                 </div>
                 <div class="settings-field-row">
                   <div class="field field-last">
                     <label for="new-password">New password</label>
-                    <input type="password" id="new-password" autocomplete="new-password" minlength="8" required />
+                    <input type="password" id="new-password" maxlength="128" autocomplete="new-password" minlength="8" required />
                   </div>
                   <div class="field field-last">
                     <label for="confirm-password">Confirm new password</label>
-                    <input type="password" id="confirm-password" autocomplete="new-password" minlength="8" required />
+                    <input type="password" id="confirm-password" maxlength="128" autocomplete="new-password" minlength="8" required />
                   </div>
                 </div>
                 <div class="flex-between mt-16">
@@ -164,8 +164,8 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-11-09a"></script>
-  <script src="js/icons.js?v=2026-10-26q"></script>
+  <script src="js/api.js?v=2026-11-23a"></script>
+  <script src="js/icons.js?v=2026-11-23a"></script>
   <script src="js/settings.js?v=2026-10-26g"></script>
 </body>
 </html>

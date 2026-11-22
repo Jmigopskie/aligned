@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-11-09a" />
+  <link rel="stylesheet" href="css/style.css?v=2026-11-23a" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -137,11 +137,11 @@
           <input type="hidden" id="user-id" value="" />
           <div class="field">
             <label for="user-name">Full name</label>
-            <input type="text" id="user-name" name="full_name" autocomplete="name" required />
+            <input type="text" id="user-name" maxlength="120" name="full_name" autocomplete="name" required />
           </div>
           <div class="field">
             <label for="user-email">Email</label>
-            <input type="email" id="user-email" name="email" autocomplete="email"
+            <input type="email" id="user-email" maxlength="120" name="email" autocomplete="email"
                    inputmode="email" spellcheck="false" autocapitalize="none" required />
           </div>
           <div class="field">
@@ -154,7 +154,7 @@
           </div>
           <div class="field">
             <label for="user-password" id="user-password-label">Password</label>
-            <input type="password" id="user-password" name="password" autocomplete="new-password"
+            <input type="password" id="user-password" minlength="8" maxlength="128" name="password" autocomplete="new-password"
                    placeholder="At least 8 characters" aria-describedby="user-password-hint" />
             <p class="hint" id="user-password-hint">Leave blank to keep the current password.</p>
           </div>
@@ -164,8 +164,8 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-11-09a"></script>
-  <script src="js/icons.js?v=2026-10-26q"></script>
+  <script src="js/api.js?v=2026-11-23a"></script>
+  <script src="js/icons.js?v=2026-11-23a"></script>
   <script src="js/bulk-select.js"></script>
   <script src="js/admin-users.js"></script>
 </body>

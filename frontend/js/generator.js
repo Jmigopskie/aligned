@@ -3045,6 +3045,20 @@ async function runGeneration(includeKeys) {
     return;
   }
 
+  // A plan Alan already finished: writing it again (outside Regenerate, which
+  // shows its cost) is a 5-point regenerate, so the student is asked first.
+  if (!regenerating && currentUser && currentUser.role === "student" && flowFlags.paid) {
+    try {
+      const info = await Api.startBuild({ run_key: currentRunId, plan_id: planId || null });
+      if (info.finished && !confirm(`Alan already wrote this plan. Writing it again uses ${info.regenerate_cost || 5} of your ${info.points ?? 0} points. Continue?`)) {
+        emitGeneration("error", { message: "Not written again." });
+        return;
+      }
+    } catch (err) {
+      /* the server still decides and refuses if needed */
+    }
+  }
+
   // Every way Alan writes (Building Proficiency, Regenerate, "Generate these
   // too" after Guided) costs a student 30 points once per plan.
   try {

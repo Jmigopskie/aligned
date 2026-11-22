@@ -7,6 +7,7 @@ from models.user import User
 from models.section import Section, SectionMembership
 from models.lesson_plan import LessonPlan
 from models.course_guide import CourseGuide
+from models.activity_log import ActivityLog
 from routes.auth_routes import admin_required, current_user
 
 admin_bp = Blueprint("admin", __name__)
@@ -34,6 +35,28 @@ def stats():
 
 
 # ---- User management ----
+
+@admin_bp.get("/admin/activity")
+@admin_required
+def list_activity():
+    """The activity log, newest first: ?user_id= one user, ?q= words in the
+    action, detail or user's name/email, ?page= and ?per_page= (max 200)."""
+    query = ActivityLog.query.outerjoin(User, ActivityLog.user_id == User.id)
+    user_id = request.args.get("user_id", type=int)
+    if user_id:
+        query = query.filter(ActivityLog.user_id == user_id)
+    q = (request.args.get("q") or "").strip()[:100]
+    if q:
+        like = f"%{q}%"
+        query = query.filter(db.or_(ActivityLog.action.ilike(like), ActivityLog.detail.ilike(like),
+                                    User.full_name.ilike(like), User.email.ilike(like)))
+    per_page = max(1, min(request.args.get("per_page", 50, type=int), 200))
+    page = max(1, request.args.get("page", 1, type=int))
+    total = query.count()
+    rows = query.order_by(ActivityLog.id.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    return jsonify({"status": "ok", "entries": [r.to_dict() for r in rows], "total": total,
+                    "page": page, "pages": max(1, -(-total // per_page))})
+
 
 @admin_bp.get("/admin/users")
 @admin_required

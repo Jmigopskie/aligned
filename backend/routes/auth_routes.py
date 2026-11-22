@@ -1,4 +1,5 @@
 import os
+import re
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
@@ -9,6 +10,7 @@ from PIL import Image, UnidentifiedImageError
 
 from extensions import db, bcrypt
 from models.password_reset import PasswordReset
+from models.signup_code import SignupCode
 from models.user import User
 from services import mail
 
@@ -81,22 +83,90 @@ def current_user():
     user_id = session.get("user_id")
     return User.query.get(user_id) if user_id else None
 
+# Self sign-up is for TUP Cavite students only (the user's rule, 2026-11-22):
+# a school address, proven by a code emailed to it. Accounts an admin makes
+# are not limited.
+SIGNUP_DOMAIN = "gsfe.tupcavite.edu.ph"
+_SIGNUP_CODE_MINUTES = 15
+_SIGNUP_CODE_TRIES = 5
+_NAME_MAX = 120
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]{1,90}@" + re.escape(SIGNUP_DOMAIN) + r"$")  # users.email is 120 chars
+_WRONG_DOMAIN = f"Sign up with your TUP Cavite school email (ending in @{SIGNUP_DOMAIN})."
+
+
+def _signup_email(data):
+    return (data.get("email") or "").strip().lower()
+
+
+@auth_bp.post("/signup/code")
+def signup_code():
+    """Emails a 6-digit sign-up code to a @gsfe.tupcavite.edu.ph address."""
+    data = request.get_json(silent=True) or {}
+    email = _signup_email(data)
+    if not _EMAIL_RE.match(email):
+        return jsonify({"status": "error", "message": _WRONG_DOMAIN}), 400
+    if User.query.filter_by(email=email).first():
+        return jsonify({"status": "error", "message": "That email already has an account. Log in instead."}), 409
+    if not mail.configured():
+        return jsonify({"status": "error", "message": "Sign-up emails aren't set up yet. Ask your admin."}), 503
+    reply = jsonify({"status": "ok", "message": f"We sent a 6-digit code to {email}. It works for "
+                                                f"{_SIGNUP_CODE_MINUTES} minutes."})
+    now = datetime.utcnow()
+    pending = SignupCode.query.filter_by(email=email, used_at=None).all()
+    if any(p.created_at and now - p.created_at < timedelta(minutes=1) for p in pending):
+        return reply  # once a minute; the last code still works
+    for p in pending:
+        p.used_at = now  # only the newest code works
+    code = f"{secrets.randbelow(10**6):06d}"
+    db.session.add(SignupCode(email=email, code_hash=bcrypt.generate_password_hash(code).decode("utf-8"),
+                              expires_at=now + timedelta(minutes=_SIGNUP_CODE_MINUTES), created_at=now))
+    db.session.commit()
+    text = (f"Your AlignED sign-up code is {code}\n\nIt works for {_SIGNUP_CODE_MINUTES} minutes. "
+            "If you didn't try to sign up for AlignED, ignore this email.")
+    html = (f"<p>Your AlignED sign-up code is</p><p style=\"font-size:28px;font-weight:700;letter-spacing:6px;\">"
+            f"{code}</p><p>It works for {_SIGNUP_CODE_MINUTES} minutes. If you didn't try to sign up for AlignED, "
+            "ignore this email.</p>")
+    try:
+        mail.send_email(email, "Your AlignED sign-up code", text, html)
+    except mail.MailError:
+        current_app.logger.exception("Sign-up code email failed")
+        return jsonify({"status": "error", "message": "The code couldn't be sent. Please try again."}), 502
+    return reply
+
+
 @auth_bp.post("/signup")
 def signup():
-    """Public self-signup only ever creates student accounts. Teacher and
+    """Public self-signup only ever creates student accounts, and only for a
+    @gsfe.tupcavite.edu.ph address with the code emailed to it. Teacher and
     admin accounts must be created by an administrator from the admin panel
     so not just anyone can register as a teacher."""
     data = request.get_json(silent=True) or {}
-    full_name = (data.get("full_name") or "").strip()
-    email = (data.get("email") or "").strip().lower()
+    full_name = " ".join((data.get("full_name") or "").split())
+    email = _signup_email(data)
     password = data.get("password") or ""
+    code = str(data.get("code") or "").strip()
 
-    if not full_name or not email or not password:
-        return jsonify({"status": "error", "message": "All fields are required."}), 400
-
+    if not _EMAIL_RE.match(email):
+        return jsonify({"status": "error", "message": _WRONG_DOMAIN}), 400
+    if not full_name:
+        return jsonify({"status": "error", "message": "Enter your full name."}), 400
+    if len(full_name) > _NAME_MAX:
+        return jsonify({"status": "error", "message": f"Your name can be at most {_NAME_MAX} characters."}), 400
+    if len(password) < 8:
+        return jsonify({"status": "error", "message": "Password must be at least 8 characters."}), 400
     if User.query.filter_by(email=email).first():
         return jsonify({"status": "error", "message": "Email is already registered."}), 409
 
+    bad = jsonify({"status": "error", "message": "That code isn't right or has expired. Ask for a new one."}), 400
+    pending = SignupCode.query.filter_by(email=email, used_at=None).order_by(SignupCode.id.desc()).first()
+    if not code or not pending or pending.expires_at < datetime.utcnow() or pending.attempts >= _SIGNUP_CODE_TRIES:
+        return bad
+    if not bcrypt.check_password_hash(pending.code_hash, code):
+        pending.attempts += 1
+        db.session.commit()
+        return bad
+
+    pending.used_at = datetime.utcnow()
     user = User(full_name=full_name, email=email, role="student")
     user.set_password(password)
     db.session.add(user)

@@ -575,8 +575,8 @@ TAXONOMIES = {
     "affective": ("Krathwohl's Affective Taxonomy (1964)", [
         ("Receiving", ["listen attentively to", "show awareness of"]),
         ("Responding", ["participate in", "comply with", "answer", "volunteer"]),
-        ("Valuing", ["value", "show commitment to", "justify"]),
-        ("Organization", ["organize", "integrate", "prioritize"]),
+        ("Valuing", ["value", "show commitment to", "defend", "support"]),
+        ("Organization", ["integrate", "prioritize", "formulate", "balance"]),
         ("Characterization", ["act consistently with", "display", "practice"]),
     ]),
     "psychomotor": ("Dave's Psychomotor Taxonomy (1970)", [

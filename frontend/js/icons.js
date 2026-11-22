@@ -87,6 +87,7 @@ function renderSidebarNav(active) {
     { key: "admin-formats", href: "admin-formats.html", icon: Icons.layoutTemplate, label: "Built-in formats", role: "admin" },
     { key: "admin-archive", href: "admin-users.html?role=student&active=0", icon: Icons.archive, label: "Student Archive", role: "admin" },
     { key: "admin-announcements", href: "admin-announcements.html", icon: Icons.megaphone, label: "Announcements", role: "admin" },
+    { key: "admin-activity", href: "admin-activity.html", icon: Icons.list, label: "User Activity", role: "admin" },
     { key: "dashboard", href: "dashboard.html", icon: Icons.dashboard, label: "Dashboard", role: "!admin" },
     { key: "lesson-plan", href: "generator.html", icon: Icons.filePlus, label: "Create Lesson Plan", role: "!admin" },
     { key: "formats", href: "lesson-plan.html", icon: Icons.files, label: "Formats", role: "teacher" },

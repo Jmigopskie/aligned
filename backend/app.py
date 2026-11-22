@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from datetime import datetime
 from flask import Flask
 
 from config import Config
@@ -338,10 +339,57 @@ def _migrate_section_columns():
     _add_column("sections", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
 
 
+def _register_error_handlers(app):
+    """Bad input never ends in a crash page (the user's request, 2026-11-22):
+    a value the database refuses (too long for its column on MySQL, the wrong
+    kind) is a 400 the page shows, a duplicate a 409, and any other failure
+    on an /api route a JSON 500 the page can show too."""
+    from flask import jsonify, request
+    from sqlalchemy.exc import DataError, IntegrityError
+    from werkzeug.exceptions import HTTPException
+
+    def error(message, status):
+        return jsonify({"status": "error", "message": message}), status
+
+    @app.errorhandler(DataError)
+    def _bad_value(exc):
+        db.session.rollback()
+        app.logger.warning("Refused value: %s", exc.orig)
+        return error("One of the values is too long or not in the right form. Shorten it and try again.", 400)
+
+    @app.errorhandler(IntegrityError)
+    def _conflict(exc):
+        db.session.rollback()
+        app.logger.warning("Conflicting value: %s", exc.orig)
+        return error("That conflicts with something already saved (for example, a name or email already in use).", 409)
+
+    @app.errorhandler(HTTPException)
+    def _http(exc):
+        if not request.path.startswith("/api/"):
+            return exc
+        return error(exc.description or exc.name, exc.code)
+
+    @app.errorhandler(Exception)
+    def _unexpected(exc):
+        if not request.path.startswith("/api/"):
+            raise exc
+        db.session.rollback()
+        app.logger.exception("Unhandled error on %s", request.path)
+        return error("Something went wrong on our side. Please try again.", 500)
+
+
 def _migrate_build_columns():
     """Add completed_at (when a plan's first build finished; writes after it
     are regenerates, 5 points each) to databases from before Regenerate."""
     _add_column("builds", "completed_at", "DATETIME")
+    # Builds made before Regenerate went live (2026-11-22 19:29 +08:00) were
+    # already written, so they count as finished: no extra free write. Safe
+    # to rerun: only NULLs from before that moment are touched.
+    from sqlalchemy import text
+    db.session.execute(text("UPDATE builds SET completed_at = created_at "
+                            "WHERE completed_at IS NULL AND created_at < :cut"),
+                       {"cut": datetime(2026, 11, 22, 11, 29)})
+    db.session.commit()
 
 
 def _migrate_announcement_columns():
@@ -423,7 +471,7 @@ def create_app():
         # including the newer sections / section_memberships / announcements /
         # notifications tables.
         from models import user, format, lesson_plan, course_guide, section, announcement, notification  # noqa: F401
-        from models import supplementary_source, password_reset, points  # noqa: F401
+        from models import supplementary_source, password_reset, points, signup_code, activity_log  # noqa: F401
 
         _create_tables()
         _migrate_lesson_plan_columns()
@@ -445,6 +493,12 @@ def create_app():
 
         from services.builtins import seed_builtins
         seed_builtins()
+
+    _register_error_handlers(app)
+
+    from services import activity
+    app.before_request(activity.remember_user)
+    app.after_request(activity.log_response)
 
     @app.get("/api/health")
     def health():

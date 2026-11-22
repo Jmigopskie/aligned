@@ -145,7 +145,10 @@ def start_build():
         return jsonify({"status": "ok", "charged": False, "cost": 0})
     plan = _own_plan(user, data)
     if plan and _plan_paid(plan):
-        return jsonify({"status": "ok", "charged": False, "points": user.points or 0, "cost": BUILD_COST})
+        # "finished": Alan already wrote it, so another write is a regenerate
+        # (REGENERATE_COST); the page asks the student before spending it.
+        return jsonify({"status": "ok", "charged": False, "points": user.points or 0, "cost": BUILD_COST,
+                        "finished": _plan_build(user, data)[1], "regenerate_cost": REGENERATE_COST})
     key = _run_key(data)
     if not key:
         return jsonify({"status": "error", "message": "This lesson plan has no run to charge."}), 400
@@ -154,7 +157,8 @@ def start_build():
         if plan and plan.build_id is None:
             plan.build_id = existing.id
             db.session.commit()
-        return jsonify({"status": "ok", "charged": False, "points": user.points or 0, "cost": BUILD_COST})
+        return jsonify({"status": "ok", "charged": False, "points": user.points or 0, "cost": BUILD_COST,
+                        "finished": existing.completed_at is not None, "regenerate_cost": REGENERATE_COST})
 
     # One atomic UPDATE, so two tabs (or a double click) can't both spend
     # the same points: the balance never goes below zero.
@@ -180,7 +184,7 @@ def start_build():
     db.session.commit()
     db.session.refresh(user)
     return jsonify({"status": "ok", "charged": True, "points": user.points, "cost": BUILD_COST,
-                    "build": build.to_dict()})
+                    "build": build.to_dict(), "finished": False, "regenerate_cost": REGENERATE_COST})
 
 
 def _owned_section(section_id):

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-11-09a" />
+  <link rel="stylesheet" href="css/style.css?v=2026-11-23a" />
 </head>
 <body class="auth-page">
   <div class="auth-shell">
@@ -20,32 +20,43 @@
     <div class="auth-panel">
       <h1>Create your account</h1>
       <p class="auth-subtitle">Join AlignED to start generating lesson plans</p>
-      <p class="text-sm mt-0" style="margin-bottom:18px;">This creates a <strong>student</strong> account. Teacher and admin accounts are created by your school's AlignED administrator.</p>
+      <p class="text-sm mt-0" style="margin-bottom:18px;">This creates a <strong>student</strong> account with your TUP Cavite school email (<strong>@gsfe.tupcavite.edu.ph</strong>). Teacher and admin accounts are created by your school's AlignED administrator.</p>
 
       <div id="form-error" class="alert alert-error" hidden></div>
+      <div id="form-note" class="alert alert-info" hidden></div>
 
       <form id="signup-form" novalidate>
         <div class="field">
-          <label for="full_name">Full name</label>
-          <input type="text" id="full_name" name="full_name" autocomplete="name" placeholder="Juan Dela Cruz" required />
+          <label for="email">School email</label>
+          <div class="signup-email-row">
+            <input type="email" id="email" name="email" autocomplete="email" placeholder="juan.delacruz@gsfe.tupcavite.edu.ph" required maxlength="120" pattern="[A-Za-z0-9._%+\-]+@gsfe\.tupcavite\.edu\.ph" data-error="Use your school email, ending in @gsfe.tupcavite.edu.ph." />
+            <button type="button" id="send-code-btn" class="btn btn-secondary">Send code</button>
+          </div>
         </div>
 
-        <div class="field">
-          <label for="email">Email Address</label>
-          <input type="email" id="email" name="email" autocomplete="email" placeholder="juan@gsfe.tupcavite.edu.ph" required />
-        </div>
+        <div id="after-code" hidden>
+          <div class="field">
+            <label for="code">6-digit code from your email</label>
+            <input type="text" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" required pattern="\d{6}" maxlength="6" data-error="Enter the 6 digits from the email." />
+          </div>
 
-        <div class="field">
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" autocomplete="new-password" placeholder="At least 8 characters" required minlength="8" />
-        </div>
+          <div class="field">
+            <label for="full_name">Full name</label>
+            <input type="text" id="full_name" name="full_name" autocomplete="name" placeholder="Juan Dela Cruz" required maxlength="120" data-error="Enter your full name." />
+          </div>
 
-        <div class="field">
-          <label for="confirm_password">Confirm password</label>
-          <input type="password" id="confirm_password" name="confirm_password" autocomplete="new-password" placeholder="Re-enter your password" required minlength="8" />
-        </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" autocomplete="new-password" placeholder="At least 8 characters" required minlength="8" maxlength="128" data-error="Use at least 8 characters." />
+          </div>
 
-        <button type="submit" id="submit-btn" class="btn btn-primary btn-block">Create account</button>
+          <div class="field">
+            <label for="confirm_password">Confirm password</label>
+            <input type="password" id="confirm_password" name="confirm_password" autocomplete="new-password" placeholder="Re-enter your password" required minlength="8" maxlength="128" data-error="Re-enter the same password." />
+          </div>
+
+          <button type="submit" id="submit-btn" class="btn btn-primary btn-block">Create account</button>
+        </div>
       </form>
 
       <div class="auth-divider">OR</div>
@@ -56,7 +67,7 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-11-09a"></script>
+  <script src="js/api.js?v=2026-11-23a"></script>
   <script>
     (async () => {
       try {
@@ -69,26 +80,54 @@
 
     const form = document.getElementById("signup-form");
     const errorBox = document.getElementById("form-error");
+    const noteBox = document.getElementById("form-note");
     const submitBtn = document.getElementById("submit-btn");
+    const sendBtn = document.getElementById("send-code-btn");
+    const emailInput = document.getElementById("email");
+
+    // Step 1: a code to the school email. Step 2: the code and the account.
+    sendBtn.addEventListener("click", async () => {
+      errorBox.hidden = true;
+      if (!checkFields([emailInput])) return;
+      setButtonLoading(sendBtn, true, "Sending");
+      try {
+        const data = await Api.signupCode(emailInput.value.trim());
+        noteBox.textContent = data.message || "Code sent. Check your email.";
+        noteBox.hidden = false;
+        document.getElementById("after-code").hidden = false;
+        sendBtn.textContent = "Send again";
+        document.getElementById("code").focus();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.hidden = false;
+      } finally {
+        setButtonLoading(sendBtn, false);
+      }
+    });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       errorBox.hidden = true;
+      if (document.getElementById("after-code").hidden) {
+        sendBtn.click();
+        return;
+      }
+      if (!checkFields(form)) return;
 
       const full_name = document.getElementById("full_name").value.trim();
-      const email = document.getElementById("email").value.trim();
+      const email = emailInput.value.trim();
+      const code = document.getElementById("code").value.trim();
       const password = document.getElementById("password").value;
-      const confirm = document.getElementById("confirm_password").value;
+      const confirm = document.getElementById("confirm_password");
 
-      if (password !== confirm) {
-        errorBox.textContent = "Passwords don't match.";
-        errorBox.hidden = false;
+      if (password !== confirm.value) {
+        showFieldError(confirm, "Passwords don't match.");
         return;
       }
 
       setButtonLoading(submitBtn, true, "Creating account");
       try {
-        const data = await Api.signup({ full_name, email, password });
+        const data = await Api.signup({ full_name, email, code, password });
         cacheUser(data.user);
         window.location.href = "dashboard.html";
       } catch (err) {

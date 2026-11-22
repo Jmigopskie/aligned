@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-11-09a" />
+  <link rel="stylesheet" href="css/style.css?v=2026-11-23a" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -76,7 +76,7 @@
           <form id="join-form" class="filter-bar join-form">
             <div class="field field-wide">
               <label for="join-code">Class code</label>
-              <input type="text" id="join-code" placeholder="e.g. 7K2QXB" maxlength="10" autocapitalize="characters" autocomplete="off" required />
+              <input type="text" id="join-code" pattern="[A-Za-z0-9]{6}" data-error="A class code is the 6 letters and numbers your teacher gave you." placeholder="e.g. 7K2QXB" maxlength="10" autocapitalize="characters" autocomplete="off" required />
             </div>
             <button type="submit" class="btn btn-primary" id="join-submit-btn">Join</button>
           </form>
@@ -95,8 +95,8 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-11-09a"></script>
-  <script src="js/icons.js?v=2026-10-26q"></script>
+  <script src="js/api.js?v=2026-11-23a"></script>
+  <script src="js/icons.js?v=2026-11-23a"></script>
   <script src="js/my-classes.js?v=2026-10-26p"></script>
 </body>
 </html>

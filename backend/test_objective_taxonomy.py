@@ -29,6 +29,9 @@ def main():
     for level in LEVELS:
         assert level in t, level
     assert set(ai_service.TAXONOMIES) == {"cognitive", "affective", "psychomotor"}
+    # A verb names one domain, so the coherence check can tell them apart.
+    verbs = [v for _, levels in ai_service.TAXONOMIES.values() for _, vs in levels for v in vs]
+    assert len(verbs) == len(set(verbs)), sorted(v for v in verbs if verbs.count(v) > 1)
     print("  three taxonomies with their levels OK")
 
     d = ai_service._field_directive(Field("objectives", "Objectives", "list"))

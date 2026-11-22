@@ -311,6 +311,29 @@ button {
   margin-bottom: 6px;
 }
 
+/* User Activity's page controls under the table. */
+.activity-pager { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 12px 16px; }
+.activity-pager .text-sm { margin-right: auto; }
+
+/* A field's own error, under it (checkFields in api.js). */
+.field-error {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--danger);
+}
+input.is-invalid,
+select.is-invalid,
+textarea.is-invalid {
+  border-color: var(--danger) !important;
+}
+
+/* Sign-up: the school email and its "Send code" button on one line. */
+.signup-email-row { display: flex; gap: 8px; }
+.signup-email-row input { flex: 1; min-width: 0; }
+.signup-email-row .btn { flex: none; white-space: nowrap; }
+
 .hint,
 .field .hint {
   font-size: 12px;

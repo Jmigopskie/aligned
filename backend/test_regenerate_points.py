@@ -9,6 +9,7 @@ Run it directly: `python test_regenerate_points.py`.
 import json
 import os
 import sys
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.environ["DATABASE_URL"] = "sqlite://"
@@ -71,7 +72,8 @@ def main():
             return res.status_code, [json.loads(l) for l in body.splitlines() if l.strip()] if res.status_code == 200 else body
 
         login("ana")
-        assert client.post("/api/builds", json={"run_key": "r-1"}).get_json()["charged"] is True
+        first = client.post("/api/builds", json={"run_key": "r-1"}).get_json()
+        assert first["charged"] is True and first["finished"] is False, first
         assert points() == 10  # 40 - 30 for the first build
 
         # first_build_free: a first build that fails is retried free...
@@ -82,6 +84,9 @@ def main():
         status, events = write()
         assert status == 200 and events[-1]["type"] == "complete" and points() == 10, (events, points())
         assert db.session.query(Build).filter_by(run_key="r-1").one().completed_at is not None
+        # The page asks first: the build says it's finished, so another write costs 5.
+        info = client.post("/api/builds", json={"run_key": "r-1"}).get_json()
+        assert info["charged"] is False and info["finished"] is True and info["regenerate_cost"] == 5, info
         print("  first build free, finished once it completes OK")
 
         # regenerate_charged
@@ -112,6 +117,20 @@ def main():
             assert write(run_key="t-1")[0] == 200
         assert PointEvent.query.filter(PointEvent.student_id == ids["tina"]).count() == 0
         print("  teachers never charged OK")
+
+        # Builds from before Regenerate existed were already written: the boot
+        # migration marks them finished, so they get no extra free write.
+        import app as app_module
+        old = Build(student_id=ids["ana"], run_key="before-deploy", points=30,
+                    created_at=datetime(2026, 11, 20, 8, 0))
+        new = Build(student_id=ids["ana"], run_key="after-deploy", points=30)
+        db.session.add_all([old, new])
+        db.session.commit()
+        app_module._migrate_build_columns()
+        db.session.expire_all()
+        assert db.session.get(Build, old.id).completed_at == datetime(2026, 11, 20, 8, 0)
+        assert db.session.get(Build, new.id).completed_at is None
+        print("  builds from before the deploy count as finished OK")
     print("regenerate points OK")
 
 

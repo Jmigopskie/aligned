@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-11-09a" />
+  <link rel="stylesheet" href="css/style.css?v=2026-11-23a" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -104,11 +104,11 @@
           <input type="hidden" id="announcement-id" value="" />
           <div class="field">
             <label for="announcement-title">Title</label>
-            <input type="text" id="announcement-title" placeholder="e.g. Quiz moved to Friday" required />
+            <input type="text" id="announcement-title" maxlength="150" placeholder="e.g. Quiz moved to Friday" required />
           </div>
           <div class="field">
             <label for="announcement-message">Message</label>
-            <textarea id="announcement-message" rows="4" placeholder="What's happening and what should people expect?" required></textarea>
+            <textarea id="announcement-message" maxlength="2000" rows="4" placeholder="What's happening and what should people expect?" required></textarea>
           </div>
           <div class="field">
             <label for="announcement-audience">Audience</label>
@@ -150,8 +150,8 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-11-09a"></script>
-  <script src="js/icons.js?v=2026-10-26q"></script>
+  <script src="js/api.js?v=2026-11-23a"></script>
+  <script src="js/icons.js?v=2026-11-23a"></script>
   <script src="js/announcements.js?v=2026-10-06c"></script>
 </body>
 </html>

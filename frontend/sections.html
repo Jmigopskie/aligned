@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-11-09a" />
+  <link rel="stylesheet" href="css/style.css?v=2026-11-23a" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -94,7 +94,7 @@
         <form id="create-form">
           <div class="field">
             <label for="section-name">Section name</label>
-            <input type="text" id="section-name" placeholder="e.g. TLE-ICT 10 - Mabini" required />
+            <input type="text" id="section-name" maxlength="120" placeholder="e.g. TLE-ICT 10 - Mabini" required />
           </div>
           <button type="submit" class="btn btn-primary btn-block" id="create-submit-btn">Create section</button>
         </form>
@@ -123,7 +123,7 @@
           <label class="points-check"><input type="checkbox" id="points-select-all" /><span>Select all</span></label>
           <div class="points-bulk-actions">
             <label class="sr-only" for="points-bulk-amount">Points for the selected students</label>
-            <input type="number" id="points-bulk-amount" class="points-amount" value="30" min="1" step="1" inputmode="numeric" />
+            <input type="number" id="points-bulk-amount" max="1000" class="points-amount" value="30" min="1" step="1" inputmode="numeric" />
             <button class="btn btn-primary btn-sm" type="button" id="points-give-selected" disabled>Give to selected</button>
             <button class="btn btn-ghost btn-sm" type="button" id="points-remove-selected" disabled>Remove</button>
           </div>
@@ -134,8 +134,8 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-11-09a"></script>
-  <script src="js/icons.js?v=2026-10-26q"></script>
+  <script src="js/api.js?v=2026-11-23a"></script>
+  <script src="js/icons.js?v=2026-11-23a"></script>
   <script src="js/sections.js?v=2026-10-30a"></script>
 </body>
 </html>

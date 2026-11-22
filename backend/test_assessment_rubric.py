@@ -83,6 +83,18 @@ def main():
     assert nested._tc[-1].tag == qn("w:p"), "a cell must end with a paragraph"
     print("  rubric rows become Word tables OK")
 
+    # The format's own " | " lines (in the template before any value) stay as they are.
+    doc = Document()
+    doc.add_paragraph("Name | Section | Date")
+    doc.add_paragraph("Grade | Week | Day")
+    doc.add_paragraph(HEAD)
+    doc.add_paragraph(ROW)
+    keep = docx_service.template_pipe_lines(doc) - {HEAD, ROW}
+    docx_service.pipe_rows_to_tables(doc, keep)
+    assert [p.text for p in doc.paragraphs][:2] == ["Name | Section | Date", "Grade | Week | Day"], [p.text for p in doc.paragraphs]
+    assert len(doc.tables) == 1 and doc.tables[0].rows[1].cells[0].text == "Accuracy"
+    print("  the format's own pipe lines stay text OK")
+
     # A rubric edited on screen arrives as an HTML table in the rich value.
     lines = docx_service.parse_rich_value(
         "<p>Rubric:</p><table><tbody><tr><th>Criteria</th><th>Excellent (4)</th><th>Good (3)</th></tr>"
