@@ -440,7 +440,10 @@ function addOwlMessage(text, choices = [], { error = false, unread = true } = {}
         // Several lines (objectives, say) read as a bulleted list, not one run.
         const text = document.createElement("div");
         text.className = "owl-choice-text";
-        fillLines(text, choice.text, true);
+        // A task's rubric rows read as a table; everything else as a list.
+        const table = rubricHtml(choice.text);
+        if (table) text.innerHTML = table;
+        else fillLines(text, choice.text, true);
         card.append(label, text);
         if (choice.why) {
           const why = document.createElement("span");

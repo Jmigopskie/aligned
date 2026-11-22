@@ -446,7 +446,7 @@ function fillAndLockDocCanvas(plan) {
     const value = plan.field_values[el.dataset.fieldKey];
     const text = Array.isArray(value) ? value.join("\n") : (value || "");
     if (text.trim()) {
-      el.textContent = text;
+      setSlotText(el, text);
       el.classList.add("lp-filled");
     }
     el.setAttribute("contenteditable", "false");

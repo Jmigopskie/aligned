@@ -1360,6 +1360,9 @@ function renderPreviewValue(value) {
       .join("")}</ul>`;
   }
   const text = value == null ? "" : String(value).trim();
+  // A rubric's " | " rows read as a table (js/rubric.js, on the pages that show plans).
+  const table = typeof rubricHtml === "function" ? rubricHtml(text) : null;
+  if (table) return `<div class="preview-field-value">${table}</div>`;
   return `<div class="preview-field-value">${escapeHtml(text) || "\u2013"}</div>`;
 }
 

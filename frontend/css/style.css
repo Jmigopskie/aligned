@@ -2861,8 +2861,10 @@ body.auth-page {
 }
 
 /* A performance task's rubric (" | " rows), drawn as a table (js/rubric.js). */
-.lp-rubric { width: 100%; margin: 6px 0; border-collapse: collapse; white-space: normal; }
-.lp-rubric th, .lp-rubric td { padding: 6px 8px; border: 1px solid var(--border); vertical-align: top; text-align: left; }
+/* Columns sized by their words, slightly smaller text, so a rubric inside a
+   narrow cell of the document fits without running past the cell's edge. */
+.lp-rubric { width: 100%; max-width: 100%; margin: 6px 0; border-collapse: collapse; white-space: normal; }
+.lp-rubric th, .lp-rubric td { padding: 4px 5px; border: 1px solid var(--border); vertical-align: top; text-align: left; font-size: 0.86em; overflow-wrap: break-word; }
 .lp-rubric th { font-weight: 700; background: var(--primary-tint); }
 
 /* A submission's three buttons wrap on a phone instead of running off the card. */

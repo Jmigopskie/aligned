@@ -27,4 +27,8 @@ assert.deepStrictEqual(blocks(""), []);
 
 // The shared cell rule matches the Word export's: 3+ cells, bullets ignored.
 assert.deepStrictEqual(Array.from(ctx.rubricCells("• a | b | c")), ["a", "b", "c"]);
+// The read-only previews build HTML strings: rows become a table, text is escaped.
+assert.strictEqual(ctx.rubricHtml("Rubric:\nA | B | C\nx | <y> | z"),
+  '<div>Rubric:</div><table class="lp-rubric"><tr><th>A</th><th>B</th><th>C</th></tr><tr><td>x</td><td>&lt;y&gt;</td><td>z</td></tr></table>');
+assert.strictEqual(ctx.rubricHtml("plain"), null, "no table: the caller renders it as before");
 console.log("rubric OK");

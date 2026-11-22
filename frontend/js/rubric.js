@@ -44,6 +44,24 @@ function rubricBlocks(text) {
   return out;
 }
 
+// For the read-only previews, which build HTML strings: the text with its
+// rubric rows as a table (each other line a <div>), escaped; null when the
+// text has no rubric, so the caller renders it as it always did.
+function rubricHtml(text) {
+  const blocks = rubricBlocks(text);
+  if (!blocks.some((b) => b.rows)) return null;
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return blocks.map((b) => {
+    if (!b.rows) return `<div>${esc(b.line)}</div>`;
+    const width = Math.max(...b.rows.map((r) => r.length));
+    const rows = b.rows.map((cells, r) => {
+      const tag = r === 0 ? "th" : "td";
+      return `<tr>${Array.from({ length: width }, (_, c) => `<${tag}>${esc(cells[c] || "")}</${tag}>`).join("")}</tr>`;
+    });
+    return `<table class="lp-rubric">${rows.join("")}</table>`;
+  }).join("");
+}
+
 // Writes text into a slot: rubric rows as a table, everything else exactly as
 // el.textContent = text would (the slots are white-space: pre-wrap).
 function setSlotText(el, text) {

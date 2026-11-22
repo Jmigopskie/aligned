@@ -64,18 +64,6 @@ async function getFormatCached(formatId) {
   return formatCache[formatId];
 }
 
-function renderPreviewValue(value) {
-  if (Array.isArray(value)) {
-    const items = value.filter((v) => String(v).trim());
-    if (!items.length) return `<div class="preview-field-value">\u2013</div>`;
-    return `<ul class="preview-field-value">${items
-      .map((v) => `<li>${escapeHtml(String(v))}</li>`)
-      .join("")}</ul>`;
-  }
-  const text = value == null ? "" : String(value).trim();
-  return `<div class="preview-field-value">${escapeHtml(text) || "\u2013"}</div>`;
-}
-
 async function loadSectionOptions() {
   const data = await Api.listSections();
   const sections = data.sections || [];
