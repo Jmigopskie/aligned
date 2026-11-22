@@ -3049,7 +3049,10 @@ async function runGeneration(includeKeys) {
   // shows its cost) is a 5-point regenerate, so the student is asked first.
   if (!regenerating && currentUser && currentUser.role === "student" && flowFlags.paid) {
     try {
-      const info = await Api.startBuild({ run_key: currentRunId, plan_id: planId || null });
+      // Read-only: never charges, never logged.
+      const query = new URLSearchParams({ run_key: currentRunId || "" });
+      if (planId) query.set("plan_id", String(planId));
+      const info = await apiFetch(`/api/builds/status?${query}`);
       if (info.finished && !confirm(`Alan already wrote this plan. Writing it again uses ${info.regenerate_cost || 5} of your ${info.points ?? 0} points. Continue?`)) {
         emitGeneration("error", { message: "Not written again." });
         return;

@@ -67,7 +67,7 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=2026-11-23a"></script>
+  <script src="js/api.js?v=2026-11-23b"></script>
   <script>
     (async () => {
       try {
@@ -86,8 +86,12 @@
     const emailInput = document.getElementById("email");
 
     // Step 1: a code to the school email. Step 2: the code and the account.
+    // School emails are case-insensitive: checked (and sent) in lowercase.
+    emailInput.addEventListener("change", () => { emailInput.value = emailInput.value.trim().toLowerCase(); });
+
     sendBtn.addEventListener("click", async () => {
       errorBox.hidden = true;
+      emailInput.value = emailInput.value.trim().toLowerCase();
       if (!checkFields([emailInput])) return;
       setButtonLoading(sendBtn, true, "Sending");
       try {

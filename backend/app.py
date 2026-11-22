@@ -360,8 +360,14 @@ def _register_error_handlers(app):
     @app.errorhandler(IntegrityError)
     def _conflict(exc):
         db.session.rollback()
-        app.logger.warning("Conflicting value: %s", exc.orig)
-        return error("That conflicts with something already saved (for example, a name or email already in use).", 409)
+        text = str(exc.orig)
+        # Only a real duplicate is "already in use"; any other constraint is a
+        # bug, logged in full and reported like any other failure.
+        if "Duplicate entry" in text or "UNIQUE constraint" in text or "1062" in text:
+            app.logger.warning("Duplicate value: %s", text)
+            return error("That's already in use (for example, a name or email). Use a different one.", 409)
+        app.logger.exception("Constraint failed on %s", request.path)
+        return error("Something went wrong on our side. Please try again.", 500)
 
     @app.errorhandler(HTTPException)
     def _http(exc):

@@ -98,6 +98,27 @@ def main():
                                                    "password": "short", "code": bcode})
             assert res.status_code == 400 and "8" in res.get_json()["message"]
             print("  sign-up inputs checked OK")
+
+            # One address gets at most 10 codes a day; one IP at most 10 an hour.
+            spam = "spam@gsfe.tupcavite.edu.ph"
+            for _ in range(10):
+                db.session.add(SignupCode(email=spam, code_hash="x", expires_at=datetime.utcnow(),
+                                          created_at=datetime.utcnow() - timedelta(hours=2), used_at=datetime.utcnow()))
+            db.session.commit()
+            res = client.post("/api/signup/code", json={"email": spam})
+            assert res.status_code == 429, res.get_json()
+            for n in range(12):
+                res = client.post("/api/signup/code", json={"email": f"ip{n}@gsfe.tupcavite.edu.ph"},
+                                  environ_base={"REMOTE_ADDR": "203.0.113.9"})
+            assert res.status_code == 429, res.get_json()
+            print("  daily and per-IP code limits OK")
+
+            # A student keeps a school address when changing it in Settings.
+            with client.session_transaction() as s:
+                s["user_id"] = User.query.filter_by(email=good).first().id
+            assert client.patch("/api/me", json={"email": "juan@gmail.com"}).status_code == 400
+            assert client.patch("/api/me", json={"email": "juan2@gsfe.tupcavite.edu.ph"}).status_code == 200
+            print("  students keep a school email OK")
     finally:
         mail.configured, mail.send_email = real
     print("signup code OK")

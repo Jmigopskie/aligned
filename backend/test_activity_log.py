@@ -67,6 +67,16 @@ def main():
         found = client.get("/api/admin/activity?q=failed").get_json()["entries"]
         assert [e["action"] for e in found] == ["Failed login"], found
         print("  admin-only list, filters, newest first OK")
+
+        # The IP is the one the proxy saw (the last X-Forwarded-For entry), not
+        # one the client typed in; a failed login's non-email text isn't kept.
+        client.post("/api/logout")
+        client.post("/api/login", json={"email": "MyPassw0rd!", "password": "x"},
+                    headers={"X-Forwarded-For": "1.2.3.4, 198.51.100.7"})
+        row = ActivityLog.query.order_by(ActivityLog.id.desc()).first()
+        assert row.action == "Failed login" and row.ip == "198.51.100.7", (row.action, row.ip)
+        assert "MyPassw0rd" not in (row.detail or ""), row.detail
+        print("  real IP, no typed secrets OK")
     print("activity log OK")
 
 

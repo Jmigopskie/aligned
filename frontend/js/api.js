@@ -1464,8 +1464,14 @@ document.addEventListener("change", (e) => {
   if (e.target.dataset && e.target.dataset.errorFor && !fieldMessage(e.target)) clearFieldError(e.target);
 }, true);
 // Forms check themselves (above), so the browser's own bubbles are turned off.
+// Also forms a page builds later (dialogs, the points form).
 function quietNativeChecks() {
   document.querySelectorAll("form").forEach((f) => { f.noValidate = true; });
+  new MutationObserver((changes) => changes.forEach((c) => c.addedNodes.forEach((n) => {
+    if (n.nodeType !== 1) return;
+    if (n.tagName === "FORM") n.noValidate = true;
+    n.querySelectorAll?.("form").forEach((f) => { f.noValidate = true; });
+  }))).observe(document.body, { childList: true, subtree: true });
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", quietNativeChecks);
 else quietNativeChecks();

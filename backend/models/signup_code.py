@@ -16,4 +16,6 @@ class SignupCode(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     attempts = db.Column(db.Integer, nullable=False, default=0)
     used_at = db.Column(db.DateTime)
+    # Who asked (the address the proxy saw), for the per-IP sending limit.
+    ip = db.Column(db.String(45), index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

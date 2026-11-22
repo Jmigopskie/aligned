@@ -131,6 +131,18 @@ def refund_regenerate(event_id):
     db.session.commit()
 
 
+@points_bp.get("/builds/status")
+@login_required
+def build_status():
+    """Read-only: has Alan already finished this plan (so another write is a
+    regenerate)? Never charges; the page asks the student with it first."""
+    user = current_user()
+    data = {"run_key": request.args.get("run_key"), "plan_id": request.args.get("plan_id", type=int)}
+    finished = user.role == "student" and _plan_build(user, data)[1]
+    return jsonify({"status": "ok", "finished": bool(finished), "regenerate_cost": REGENERATE_COST,
+                    "points": user.points or 0})
+
+
 @points_bp.post("/builds")
 @login_required
 @enrollment_required

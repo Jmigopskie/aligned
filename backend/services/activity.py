@@ -6,6 +6,7 @@ logged without anyone remembering to.
 ponytail: rows are kept forever; add a purge (e.g. older than a year) when the
 table grows large enough to matter.
 """
+import re
 from datetime import datetime, timedelta
 
 from flask import g, request, session
@@ -33,7 +34,7 @@ _LABELS = {
 _REPEATING = {"Edited a lesson plan", "Asked Alan for help (Guided)", "Checked a plan's coherence"}
 _REPEAT_WINDOW = timedelta(minutes=10)
 # Reading and housekeeping that says nothing about what the user did.
-_SKIP = {"mark_onboarded", "mark_read", "mark_all_read", "health"}
+_SKIP = {"mark_onboarded", "mark_read", "mark_all_read", "health", "build_status"}
 _DETAIL_KEYS = (("plan_id", "Lesson plan"), ("section_id", "Section"), ("format_id", "Format"),
                 ("user_id", "User"), ("guide_id", "Guide"), ("announcement_id", "Announcement"))
 
@@ -48,8 +49,12 @@ def _detail(name: str, response) -> str:
              if request.view_args and key in request.view_args]
     if name in ("login", "signup", "signup_code", "forgot_password", "reset_password"):
         email = str((request.get_json(silent=True) or {}).get("email") or "").strip().lower()[:120]
-        if email:
+        # Only something that looks like an email: a password typed into the
+        # email box must never end up in the log.
+        if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
             parts.append(email)
+        elif email:
+            parts.append("(not an email address)")
     if name == "save_lesson_plan":
         # A new plan has no id in the URL; its JSON reply says which (this
         # route never streams, so reading the reply is safe).
@@ -60,8 +65,8 @@ def _detail(name: str, response) -> str:
 
 
 def _ip() -> str:
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    return (forwarded.split(",")[0].strip() or request.remote_addr or "")[:45]
+    from routes.auth_routes import client_ip
+    return client_ip()
 
 
 def remember_user():

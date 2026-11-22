@@ -6,6 +6,7 @@ from functools import wraps
 from html import escape
 
 from flask import Blueprint, request, jsonify, session, current_app, send_file
+from sqlalchemy import text
 from PIL import Image, UnidentifiedImageError
 
 from extensions import db, bcrypt
@@ -92,6 +93,15 @@ _SIGNUP_CODE_TRIES = 5
 _NAME_MAX = 120
 _EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]{1,90}@" + re.escape(SIGNUP_DOMAIN) + r"$")  # users.email is 120 chars
 _WRONG_DOMAIN = f"Sign up with your TUP Cavite school email (ending in @{SIGNUP_DOMAIN})."
+_SIGNUP_CODES_PER_DAY = 10
+_SIGNUP_CODES_PER_IP_HOUR = 10
+
+
+def client_ip():
+    """The address the proxy (Apache) saw: the LAST X-Forwarded-For entry,
+    which the proxy appends; earlier entries are whatever the client sent."""
+    forwarded = [p.strip() for p in request.headers.get("X-Forwarded-For", "").split(",") if p.strip()]
+    return (forwarded[-1] if forwarded else request.remote_addr or "")[:45]
 
 
 def _signup_email(data):
@@ -112,6 +122,16 @@ def signup_code():
     reply = jsonify({"status": "ok", "message": f"We sent a 6-digit code to {email}. It works for "
                                                 f"{_SIGNUP_CODE_MINUTES} minutes."})
     now = datetime.utcnow()
+    # Limits on sending (each is an email, and a guessing budget): per address
+    # per day, per IP per hour.
+    ip = client_ip()
+    if (SignupCode.query.filter(SignupCode.email == email, SignupCode.created_at > now - timedelta(days=1)).count()
+            >= _SIGNUP_CODES_PER_DAY):
+        return jsonify({"status": "error", "message": "Too many codes for this email today. Try again tomorrow, "
+                                                      "or use the last code you got."}), 429
+    if ip and (SignupCode.query.filter(SignupCode.ip == ip, SignupCode.created_at > now - timedelta(hours=1)).count()
+               >= _SIGNUP_CODES_PER_IP_HOUR):
+        return jsonify({"status": "error", "message": "Too many sign-up codes from here. Try again in an hour."}), 429
     pending = SignupCode.query.filter_by(email=email, used_at=None).all()
     if any(p.created_at and now - p.created_at < timedelta(minutes=1) for p in pending):
         return reply  # once a minute; the last code still works
@@ -119,7 +139,7 @@ def signup_code():
         p.used_at = now  # only the newest code works
     code = f"{secrets.randbelow(10**6):06d}"
     db.session.add(SignupCode(email=email, code_hash=bcrypt.generate_password_hash(code).decode("utf-8"),
-                              expires_at=now + timedelta(minutes=_SIGNUP_CODE_MINUTES), created_at=now))
+                              expires_at=now + timedelta(minutes=_SIGNUP_CODE_MINUTES), created_at=now, ip=ip))
     db.session.commit()
     text = (f"Your AlignED sign-up code is {code}\n\nIt works for {_SIGNUP_CODE_MINUTES} minutes. "
             "If you didn't try to sign up for AlignED, ignore this email.")
@@ -159,11 +179,15 @@ def signup():
 
     bad = jsonify({"status": "error", "message": "That code isn't right or has expired. Ask for a new one."}), 400
     pending = SignupCode.query.filter_by(email=email, used_at=None).order_by(SignupCode.id.desc()).first()
-    if not code or not pending or pending.expires_at < datetime.utcnow() or pending.attempts >= _SIGNUP_CODE_TRIES:
+    if not code or not pending or pending.expires_at < datetime.utcnow():
         return bad
-    if not bcrypt.check_password_hash(pending.code_hash, code):
-        pending.attempts += 1
-        db.session.commit()
+    # Each try is claimed in one atomic UPDATE before the code is checked, so
+    # parallel requests can't get more than the allowed tries.
+    claimed = db.session.execute(
+        text("UPDATE signup_codes SET attempts = attempts + 1 WHERE id = :id AND attempts < :tries"),
+        {"id": pending.id, "tries": _SIGNUP_CODE_TRIES}).rowcount
+    db.session.commit()
+    if not claimed or not bcrypt.check_password_hash(pending.code_hash, code):
         return bad
 
     pending.used_at = datetime.utcnow()
@@ -289,6 +313,9 @@ def update_me():
         email = (data.get("email") or "").strip().lower()
         if not email:
             return jsonify({"status": "error", "message": "Email can't be empty."}), 400
+        # Students signed up with their school email and keep one.
+        if user.role == "student" and email != user.email and not _EMAIL_RE.match(email):
+            return jsonify({"status": "error", "message": f"Use your TUP Cavite school email (ending in @{SIGNUP_DOMAIN})."}), 400
         existing = User.query.filter_by(email=email).first()
         if existing and existing.id != user.id:
             return jsonify({"status": "error", "message": "That email is already in use."}), 409

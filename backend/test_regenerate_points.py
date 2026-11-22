@@ -84,9 +84,11 @@ def main():
         status, events = write()
         assert status == 200 and events[-1]["type"] == "complete" and points() == 10, (events, points())
         assert db.session.query(Build).filter_by(run_key="r-1").one().completed_at is not None
-        # The page asks first: the build says it's finished, so another write costs 5.
-        info = client.post("/api/builds", json={"run_key": "r-1"}).get_json()
-        assert info["charged"] is False and info["finished"] is True and info["regenerate_cost"] == 5, info
+        # The page asks first, through a read-only check that never charges.
+        info = client.get("/api/builds/status?run_key=r-1").get_json()
+        assert info["finished"] is True and info["regenerate_cost"] == 5 and info["points"] == 10, info
+        assert client.get("/api/builds/status?run_key=never-paid").get_json()["finished"] is False
+        assert points() == 10
         print("  first build free, finished once it completes OK")
 
         # regenerate_charged
