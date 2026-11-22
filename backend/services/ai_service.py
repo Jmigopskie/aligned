@@ -1397,11 +1397,11 @@ def _search_references(prompt: str) -> tuple:
     return [l for l in lines if l and any(u.rstrip("/") in cited for u in grounding.reference_urls([l]))], cited
 
 
-# References found, by topic. Only a full set is remembered, so a topic that
-# came back thin is searched again next time rather than staying thin.
+# References found, by topic. A set of fewer than three isn't remembered, so a
+# topic that came back thin is searched again next time rather than staying thin.
 _FOUND_REFERENCES = {}
 _MIN_PAGE_TEXT = 800
-_REMEMBER_AT = 5
+_REMEMBER_AT = 3
 
 
 def find_references(context: dict, count: int = _WEB_REFERENCES) -> list:
@@ -1437,7 +1437,8 @@ def find_references(context: dict, count: int = _WEB_REFERENCES) -> list:
     candidates = [(u, l) for u, l in by_url.items() if not grounding.is_unreliable_site(u)]
     # A link that only answers a status check can still fail in a browser, so
     # each page must actually open, with readable text about this topic.
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    # All at once: twenty pages read eight at a time took a minute on slow sites.
+    with ThreadPoolExecutor(max_workers=16) as pool:
         texts = list(pool.map(grounding.page_text, [grounding.reference_urls([l])[0] for _, l in candidates]))
     terms = grounding.topic_terms(topic)
     ranked = []
@@ -1573,7 +1574,8 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
     if searching:
         # References Alan offers are real pages from a web search, not the model's guesses.
         try:
-            found = searching.result(timeout=60)
+            # Two web searches plus reading every page took about 95s live.
+            found = searching.result(timeout=150)
         except Exception:  # noqa: BLE001 - the reply still stands without them
             found = []
         if found:

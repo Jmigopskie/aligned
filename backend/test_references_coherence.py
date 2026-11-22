@@ -66,14 +66,17 @@ def main():
         assert any("DepEd" in c for c in calls)
         print("  every reliable, on-topic, readable reference, one per site OK")
 
-        # Four is a thin set: searched again next time, not remembered.
-        ai_service.find_references({"topic": "Number systems", "subject": "ICT"})
-        assert len(calls) == 4, len(calls)
-        # A full set is remembered for the topic.
+        # Three or more are remembered for the topic...
+        assert ai_service.find_references({"topic": "Number systems", "subject": "ICT"}) == found and len(calls) == 2
+        # ...a thin set is searched again next time.
         ai_service._FOUND_REFERENCES.clear()
-        full = ai_service.find_references({"topic": "Number systems", "subject": "ICT"}, count=3)
-        assert ai_service.find_references({"topic": "Number systems", "subject": "ICT"}) == full and len(calls) == 6
-        print("  only a full set is cached OK")
+        grounding.page_text = lambda url: ON_TOPIC if url == "https://a.edu/numbers" else ""
+        assert len(ai_service.find_references({"topic": "Number systems", "subject": "ICT"})) == 1
+        ai_service.find_references({"topic": "Number systems", "subject": "ICT"})
+        assert len(calls) == 6, len(calls)
+        grounding.page_text = lambda url: PAGES.get(url, "")
+        ai_service._FOUND_REFERENCES.clear()
+        print("  only a set of 3+ is cached OK")
 
         # The rules on their own.
         assert grounding.is_unreliable_site("https://m.facebook.com/x") and grounding.is_unreliable_site("https://youtu.be/x")
