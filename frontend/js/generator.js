@@ -1573,7 +1573,7 @@ function syncActiveStepValue() {
   if (!key) return;
   if (docTemplateData) {
     const canvas = liveDocWrap.querySelector(".lp-doc");
-    slotsFor(key, canvas).forEach((el) => storeSlot(el, el.textContent));
+    slotsFor(key, canvas).forEach((el) => storeSlot(el, slotText(el)));
   } else {
     slotsFor(key, resultsEl).forEach((el) => storeSlot(el, el.value));
   }
@@ -1741,7 +1741,7 @@ async function initLiveDocView() {
 // browser's rich-text commands (execCommand) can produce other wrapper
 // elements (span, div) depending on browser, which this flattens down to
 // their text/line-break content instead of storing arbitrary markup.
-const RICH_VALUE_TAGS = new Set(["B", "STRONG", "I", "EM", "U", "UL", "OL", "LI", "BR"]);
+const RICH_VALUE_TAGS = new Set(["B", "STRONG", "I", "EM", "U", "UL", "OL", "LI", "BR", "TABLE", "TBODY", "TR", "TH", "TD"]);
 const RICH_VALUE_BLOCK_TAGS = new Set(["DIV", "P"]);
 
 // The closed set of classes a <span> may carry through the sanitizer. These are
@@ -1798,7 +1798,7 @@ function sanitizeRichValueHtml(node) {
 }
 
 function syncFieldFromEl(el) {
-  storeSlot(el, el.textContent, sanitizeRichValueHtml(el));
+  storeSlot(el, slotText(el), sanitizeRichValueHtml(el));
   el.classList.toggle("lp-filled", !!el.textContent.trim() || !!el.querySelector(".lp-img"));
 }
 
@@ -2180,7 +2180,7 @@ async function revealFieldsInLiveDoc(keys) {
     if (slots.length) {
       delete fieldRichValues[key]; // fresh AI text replaces any earlier manual styling
       slots.forEach((el) => {
-        el.textContent = valueForSlot(el);
+        setSlotText(el, valueForSlot(el));
         el.classList.toggle("lp-filled", !!el.textContent.trim());
       });
       slots[0].scrollIntoView({ behavior: "smooth", block: "center" });
@@ -2699,7 +2699,7 @@ function paintRestoredValues(blankMissing = false) {
         el.querySelectorAll(".lp-img-cap").forEach((c) => { c.contentEditable = "true"; });
         el.classList.add("lp-filled");
       } else if (text.trim()) {
-        el.textContent = text;
+        setSlotText(el, text);
         el.classList.add("lp-filled");
       } else if (blankMissing) {
         el.textContent = "";
@@ -3451,7 +3451,7 @@ function fillDocCanvas() {
       el.innerHTML = rich;
       hydrateDocImages(el);
     } else if (text.trim()) {
-      el.textContent = text;
+      setSlotText(el, text);
     } else {
       return;
     }
@@ -3468,7 +3468,7 @@ function wireDocCanvasEditing() {
   canvas.querySelectorAll("[data-field-key]").forEach((el) => {
     el.setAttribute("data-placeholder", "Not generated yet");
     el.addEventListener("input", () => {
-      storeSlot(el, el.textContent);
+      storeSlot(el, slotText(el));
       el.classList.toggle("lp-filled", !!el.textContent.trim() || !!el.querySelector(".lp-img"));
       markDirty();
       renderResults();
@@ -3860,7 +3860,7 @@ function setGuidedValue(key, text, part = null) {
   if (canvas) {
     slotsFor(key, canvas).forEach((el) => {
       if (part !== null && slotPart(el) !== part) return;
-      el.textContent = valueForSlot(el);
+      setSlotText(el, valueForSlot(el));
       el.classList.toggle("lp-filled", !!el.textContent.trim());
     });
   } else {

@@ -2860,6 +2860,11 @@ body.auth-page {
   gap: 6px;
 }
 
+/* A performance task's rubric (" | " rows), drawn as a table (js/rubric.js). */
+.lp-rubric { width: 100%; margin: 6px 0; border-collapse: collapse; white-space: normal; }
+.lp-rubric th, .lp-rubric td { padding: 6px 8px; border: 1px solid var(--border); vertical-align: top; text-align: left; }
+.lp-rubric th { font-weight: 700; background: var(--primary-tint); }
+
 /* A submission's three buttons wrap on a phone instead of running off the card. */
 .submission-card .row-actions,
 #review-body .row-actions {
