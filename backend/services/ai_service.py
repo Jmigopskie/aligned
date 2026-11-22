@@ -1341,16 +1341,24 @@ def _web_search_post(system_instruction: str, prompt: str):
         "plugins": [{"id": "web", "max_results": _WEB_RESULTS}],
         "response_format": {"type": "json_object"},
     }
-    # The same setting as the writing calls: Mistral Large 4 refuses a request
-    # that turns reasoning off (400), which silently emptied every search.
     if not Config.OPENROUTER_REASONING:
         payload["reasoning"] = {"enabled": False}
-    response = requests.post(
-        _OPENROUTER_URL,
-        headers={"Authorization": f"Bearer {Config.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
-        json=payload,
-        timeout=90,
-    )
+
+    def post():
+        return requests.post(
+            _OPENROUTER_URL,
+            headers={"Authorization": f"Bearer {Config.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=90,
+        )
+
+    response = post()
+    # Mistral Large 4 refuses a request that turns reasoning off (400
+    # "reasoning_effort none is not supported"), which silently emptied every
+    # search; Qwen needs it off to answer at all. Asked again without it.
+    if response.status_code == 400 and "reasoning" in payload and "reasoning" in response.text.lower():
+        del payload["reasoning"]
+        response = post()
     response.raise_for_status()
     message = response.json()["choices"][0]["message"]
     cited = {}

@@ -111,26 +111,45 @@ def main():
     finally:
         ai_service.PROVIDER, ai_service._web_search_post, grounding.page_text, ai_service._call = real
 
-    # --- The search sends the reasoning setting the writing calls use ---
+    # --- A model that refuses "reasoning off" (Mistral Large 4) still searches ---
     sent = []
     real_post, real_flag = ai_service.requests.post, ai_service.Config.OPENROUTER_REASONING
 
     class Reply:
+        def __init__(self, status, text=""):
+            self.status_code, self.text = status, text
+
         def raise_for_status(self):
-            pass
+            if self.status_code >= 400:
+                raise RuntimeError(self.status_code)
 
         def json(self):
-            return {"choices": [{"message": {"content": "{}", "annotations": []}}]}
+            return {"choices": [{"message": {"content": "{}", "annotations": [
+                {"type": "url_citation", "url_citation": {"url": "https://a.edu/x/", "title": "X"}}]}}]}
+
+    def mistral(url, **kw):
+        sent.append(dict(kw["json"]))
+        if "reasoning" in kw["json"]:
+            return Reply(400, '{"error": "reasoning_effort none is not supported for this model"}')
+        return Reply(200)
 
     try:
-        ai_service.requests.post = lambda url, **kw: sent.append(kw["json"]) or Reply()
-        for flag in (True, False):
-            ai_service.Config.OPENROUTER_REASONING = flag
+        ai_service.requests.post = mistral
+        ai_service.Config.OPENROUTER_REASONING = False
+        _, cited = ai_service._web_search_post("system", "prompt")
+        assert cited == {"https://a.edu/x": "X"} and len(sent) == 2 and "reasoning" not in sent[1], sent
+        # Any other 400 is not retried.
+        sent.clear()
+        ai_service.requests.post = lambda url, **kw: sent.append(1) or Reply(400, "bad model id")
+        try:
             ai_service._web_search_post("system", "prompt")
-        assert "reasoning" not in sent[0] and sent[1]["reasoning"] == {"enabled": False}, sent
+            raise AssertionError("a 400 should raise")
+        except RuntimeError:
+            pass
+        assert len(sent) == 1
     finally:
         ai_service.requests.post, ai_service.Config.OPENROUTER_REASONING = real_post, real_flag
-    print("  search follows OPENROUTER_REASONING OK")
+    print("  search retried without 'reasoning off' when the model refuses it OK")
 
     # --- Objectives, lesson and evaluation line up ---
     ctx = {"topic": "Number systems"}
