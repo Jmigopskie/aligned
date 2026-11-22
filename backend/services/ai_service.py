@@ -426,15 +426,13 @@ def _field_directive(field):
             + f" exactly {_MIN_OBJECTIVES} learning objectives, one per line with no "
             "numbers or bullet characters (the app bullets them; this overrides any 'numbered' "
             "wording above). Each is unpacked from the competency, achievable in the session, and "
-            "starts with a measurable Bloom's taxonomy action verb in lowercase, never 'understand', "
-            "'know', 'learn' or 'appreciate the importance of'. Cover the domains the lesson really "
-            "has: cognitive (e.g. identify, describe, explain, compare, classify, analyze, evaluate, "
-            "create), affective (e.g. value, show willingness to, demonstrate respect for, cooperate "
-            "in, practice), and psychomotor (e.g. perform, construct, operate, assemble, demonstrate "
-            "the procedure for) ONLY when the lesson has a real hands-on skill; never force a "
-            "psychomotor objective. Order them from lower to higher thinking. Each is about today's "
-            "specific topic and something the lesson proper can teach and the evaluation can check in "
-            "this session."
+            "starts in lowercase with a measurable action verb from the taxonomy of its domain, at a "
+            "level fit for the grade:\n" + taxonomy_text() + "\nNever 'understand', 'know', 'learn' or "
+            "'appreciate the importance of'. Use only the domains the lesson really has: an affective "
+            "objective when the lesson builds an attitude or value, a psychomotor one ONLY when it has a "
+            "real hands-on skill; never force a domain. No domain labels in the text. Order them from "
+            "lower to higher level. Each is about today's specific topic and something the lesson proper "
+            "can teach and the evaluation can check in this session."
         )
     if grounding.is_copy_only_field(field):
         return (
@@ -548,6 +546,43 @@ def _grounding_directive(field, context: dict) -> str:
     if _ASSESSMENT_FIELD.search(haystack) and "mastery" not in haystack:
         out += _ALIGNED_ASSESSMENT
     return out + _assessment_directive(haystack, context)
+
+
+# Objective verbs by domain (the user's request, 2026-11-22): domain ->
+# (taxonomy, [(level, verbs)]), lower levels first. The objectives directive,
+# Alan's Guided chat and the coherence check all read it from here.
+TAXONOMIES = {
+    "cognitive": ("Revised Bloom's Taxonomy (Anderson & Krathwohl, 2001)", [
+        ("Remember", ["define", "list", "identify", "name", "recall"]),
+        ("Understand", ["explain", "describe", "classify", "summarize", "compare"]),
+        ("Apply", ["use", "demonstrate", "solve", "carry out", "compute"]),
+        ("Analyze", ["differentiate", "organize", "examine", "distinguish"]),
+        ("Evaluate", ["judge", "critique", "justify", "assess"]),
+        ("Create", ["design", "construct", "produce", "plan", "compose"]),
+    ]),
+    "affective": ("Krathwohl's Affective Taxonomy (1964)", [
+        ("Receiving", ["listen attentively to", "show awareness of"]),
+        ("Responding", ["participate in", "comply with", "answer", "volunteer"]),
+        ("Valuing", ["value", "show commitment to", "justify"]),
+        ("Organization", ["organize", "integrate", "prioritize"]),
+        ("Characterization", ["act consistently with", "display", "practice"]),
+    ]),
+    "psychomotor": ("Dave's Psychomotor Taxonomy (1970)", [
+        ("Imitation", ["copy", "follow", "replicate"]),
+        ("Manipulation", ["perform from instructions", "execute", "assemble"]),
+        ("Precision", ["perform accurately", "calibrate", "demonstrate with precision"]),
+        ("Articulation", ["combine", "adapt", "coordinate"]),
+        ("Naturalization", ["perform automatically", "improvise", "master"]),
+    ]),
+}
+
+
+def taxonomy_text() -> str:
+    """One line per domain: 'Cognitive (Revised Bloom's ...): Remember: define, list · ...'."""
+    return "\n".join(
+        f"{domain.title()} ({name}): " + " · ".join(f"{level}: {', '.join(verbs)}" for level, verbs in levels)
+        for domain, (name, levels) in TAXONOMIES.items()
+    )
 
 
 # Testers wanted the lesson itself, as the teacher puts it on slides, not an
