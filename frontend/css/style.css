@@ -7419,6 +7419,45 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
 .flow-stage.is-guided .flow-alan:hover { transform: translateY(-4px); }
 .flow-stage.is-guided .flow-alan:focus-visible { outline: 3px solid var(--primary); outline-offset: -12px; border-radius: 24px; }
 .flow-stage.is-guided .flow-say { transition: opacity 0.2s var(--flow-ease); }
+/* The label under Alan that says he opens the chat (the user's request,
+   2026-11-22: "make it noticeable that Alan is clickable"). */
+.alan-chat-cue {
+  position: absolute;
+  /* Just under Alan's feet: the camera scales him with the stage height. */
+  bottom: 15%;
+  left: 50%;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px 12px 18px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(22, 35, 30, 0.12), 0 14px 28px -12px rgba(28, 92, 78, 0.55);
+  transform: translateX(-50%);
+  transition: background-color 0.2s var(--flow-ease), box-shadow 0.2s var(--flow-ease);
+}
+.alan-chat-cue svg { display: block; width: 20px; height: 20px; }
+.flow-alan:hover .alan-chat-cue { background: var(--primary-hover); box-shadow: 0 3px 6px rgba(22, 35, 30, 0.16), 0 18px 32px -12px rgba(28, 92, 78, 0.6); }
+/* A reply is waiting: a gold mark beside the words. */
+.alan-chat-cue.is-unread::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: #f2c46d;
+}
+/* One ripple out from the label, twice, when a part appears or the chat closes. */
+.alan-chat-cue.is-nudging { animation: cue-nudge 1.3s var(--flow-ease) 0.4s 2; }
+@keyframes cue-nudge {
+  0% { box-shadow: 0 2px 4px rgba(22, 35, 30, 0.12), 0 14px 28px -12px rgba(28, 92, 78, 0.55), 0 0 0 0 rgba(28, 92, 78, 0.45); }
+  100% { box-shadow: 0 2px 4px rgba(22, 35, 30, 0.12), 0 14px 28px -12px rgba(28, 92, 78, 0.55), 0 0 0 16px rgba(28, 92, 78, 0); }
+}
 /* The chat takes his place; he keeps animating underneath, ready to return. */
 .flow-stage.is-chatting .flow-alan,
 .flow-stage.is-chatting .flow-say { opacity: 0; pointer-events: none; }
@@ -7542,12 +7581,14 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
   /* On a phone the chat needs more than Alan's band: it opens taller. */
   .flow-stage.is-chatting { height: 72svh; }
   .flow-stage .owl-chat.is-staged { inset: 8px; }
+  .alan-chat-cue { bottom: 12px; padding: 10px 18px 10px 14px; font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .flow-step, .flow-progress > span, .flow-choice, .flow-next, .flow-next-icon, .flow-field { transition: none; }
   .flow-stage.is-guided .flow-alan, .flow-stage.is-guided .flow-say { transition: none; }
   .flow-stage.is-guided .flow-alan:hover { transform: none; }
   .flow-stage .owl-chat.is-staged { animation: none; }
+  .alan-chat-cue.is-nudging { animation: none; }
 }
 
 /* Larger type and fields for the flow (the user's request, 2026-10-24):

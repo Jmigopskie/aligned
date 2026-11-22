@@ -20,6 +20,22 @@ export function createGuided(ui) {
   const ASK = touch ? "Tap me" : "Click me";
 
   // ---- Alan and the chat share the stage ----
+  // A label on Alan himself says he opens the chat. It's part of his button
+  // (clicks land on alanHost), so the minimized state stays Alan only.
+  const cueText = el("span", {}, "Chat with Alan");
+  const chatCue = el("span", { class: "alan-chat-cue", "aria-hidden": "true" }, icon("chat"), cueText);
+  function setCue(unread) {
+    cueText.textContent = unread ? "Read Alan's reply" : "Chat with Alan";
+    chatCue.classList.toggle("is-unread", !!unread);
+  }
+  // One ripple when a part appears or the chat closes, then still.
+  function nudge() {
+    chatCue.classList.remove("is-nudging");
+    void chatCue.offsetWidth;
+    chatCue.classList.add("is-nudging");
+  }
+  chatCue.addEventListener("animationend", () => chatCue.classList.remove("is-nudging"));
+
   function openChat() {
     if (active) G.openChat();
   }
@@ -35,6 +51,8 @@ export function createGuided(ui) {
     if (!active) return;
     const { open, unread } = e.detail;
     stageEl.classList.toggle("is-chatting", open);
+    setCue(!open && unread);
+    if (!open) nudge();
     if (!open && unread) say(`I answered in the chat. ${ASK} to read it.`, "point");
     else if (!open && showing) say(`${ASK} any time you want ideas.`, "write");
   });
@@ -48,7 +66,9 @@ export function createGuided(ui) {
     if (top) top.append(previewBtn);
     alanHost.setAttribute("role", "button");
     alanHost.setAttribute("tabindex", "0");
-    alanHost.setAttribute("aria-label", "Ask Alan for help with this part");
+    alanHost.setAttribute("aria-label", "Chat with Alan for help with this part");
+    setCue(false);
+    alanHost.append(chatCue);
   }
 
   function leave() {
@@ -57,6 +77,7 @@ export function createGuided(ui) {
     showing = null;
     G.unmountChat();
     previewBtn.remove();
+    chatCue.remove();
     stageEl.classList.remove("is-guided", "is-chatting");
     ["role", "tabindex", "aria-label"].forEach((a) => alanHost.removeAttribute(a));
   }
@@ -424,6 +445,7 @@ export function createGuided(ui) {
         : `Your turn: ${p.label}. ${ASK} if you'd like ideas.`,
       pose: p.locked ? "think" : "write",
     });
+    nudge();
   }
 
   function quick() {
