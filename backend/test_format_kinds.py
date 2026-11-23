@@ -99,8 +99,67 @@ def main():
     long_text = "A sentence that a student wrote. " * 80
     assert ai_limits.tidy_layout(long_text) == long_text.strip(), "words were cut"
     assert ai_limits.tidy_layout(["- a", "b  c"]) == ["• a", "b c"]
+    assert ai_limits.tidy_layout("Hello , world !!  It works .") == "Hello, world! It works.", \
+        ai_limits.tidy_layout("Hello , world !!  It works .")
+    link = "See https://k.org/page?id=1 ,ok"
+    assert ai_limits.tidy_layout(link) == link, "a line with a link keeps its punctuation"
     print("  a Guided plan tidied without changing its words OK")
+
+    # Spelling and grammar only: a rewrite or a lost line is refused.
+    real = ai_service._call
+    ai_service._call = lambda system, parts, label: {
+        "a": "The learners identify the tools.",           # spelling fixed: kept
+        "b": "Students will explore many new ideas today.",  # rewritten: refused
+        "c": "one line only"}                               # a line lost: refused
+    try:
+        fixed = ai_service.proofread({"a": "The lerners identfy the tools.",
+                                      "b": "Learners name three tools.", "c": "first line\nsecond line"})
+    finally:
+        ai_service._call = real
+    assert fixed == {"a": "The learners identify the tools."}, fixed
+    print("  proofread keeps fixes, refuses rewrites OK")
+    check_tidy_route()
     print("format kinds OK")
+
+
+def check_tidy_route():
+    """POST /api/lesson-plans/tidy: arranged, proofread except locked parts,
+    a weekly part day by day; only what changed comes back."""
+    from app import create_app
+    from extensions import db
+    from models.user import User
+
+    app = create_app()
+    app.config.update(TESTING=True)
+    sent = []
+    real = ai_service._call
+
+    def fake(system, parts, label):
+        import json
+        data = json.loads(parts[0])
+        sent.append(set(data))
+        return {k: v.replace("teh", "the") for k, v in data.items()}
+
+    with app.app_context():
+        user = User(full_name="Tidy T", email="tidy@kinds.test", role="teacher")
+        user.set_password("password123")
+        db.session.add(user)
+        db.session.commit()
+        client = app.test_client()
+        client.post("/api/login", json={"email": "tidy@kinds.test", "password": "password123"})
+        ai_service._call = fake
+        try:
+            res = client.post("/api/lesson-plans/tidy", json={"proofread": True, "locked": ["mine"], "values": {
+                "motivation": "- Show teh picture", "mine": "- teh own words", "flow": ["teh start", "fine"],
+                "same": "Already fine."}})
+        finally:
+            ai_service._call = real
+    body = res.get_json()
+    assert res.status_code == 200, body
+    assert body["values"] == {"motivation": "• Show the picture", "mine": "• teh own words",
+                              "flow": ["the start", "fine"]}, body
+    assert "mine" not in sent[0] and "flow#0" in sent[0], sent
+    print("  tidy route: locked parts arranged only, weekly days proofread OK")
 
 
 if __name__ == "__main__":

@@ -15,7 +15,17 @@ export function createGuided(ui) {
   // Preview: the plan so far, in its real document, from any Guided screen.
   const previewBtn = el("button", { type: "button", class: "flow-preview-btn", title: "Preview your plan", "aria-label": "Preview your plan" },
     icon("eye"), el("span", {}, "Preview"));
-  previewBtn.addEventListener("click", () => G.openPreview(() => redraw && redraw()));
+  // A finished plan is tidied (layout, spelling) before it is previewed.
+  const allWritten = () => G.guidedParts().every((p) => G.isFieldComplete(p.key));
+  async function tidyIfDone() {
+    if (!allWritten()) return 0;
+    say("Tidying your plan: bullets, spacing and spelling…", "write");
+    return G.tidyGuidedPlan();
+  }
+  previewBtn.addEventListener("click", async () => {
+    await tidyIfDone();
+    G.openPreview(() => redraw && redraw());
+  });
   const touch = matchMedia("(hover: none)").matches;
   const ASK = touch ? "Tap me" : "Click me";
 
@@ -105,7 +115,60 @@ export function createGuided(ui) {
     { cmd: "insertOrderedList", label: "Numbered list", mark: () => el("span", { class: "flow-format-num" }, "1.") },
     { cmd: "highlight", label: "Highlight", mark: () => icon("highlight") },
     { cmd: "clear", label: "Clear formatting", mark: () => icon("clearFormat") },
+    { cmd: "table", label: "Insert a rubric table", mark: () => icon("table") },
+    { cmd: "addRow", label: "Add a row to the table", mark: () => icon("tableRow") },
   ];
+
+  // ---- tables (a rubric) in an answer ----
+  // A rubric can't be typed as a table in a text box, and one copied from Word,
+  // Google Docs or Alan's chat pasted as loose text (user report 2026-11-24).
+  // Rows copied from a table come as tab-separated lines, Alan's as "a | b | c";
+  // both become a real table here, stored as the answer's HTML, which the
+  // document, the preview and the Word export already draw as a table.
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const RUBRIC_HEAD = ["Criteria", "Excellent (4)", "Good (3)", "Fair (2)", "Needs Improvement (1)"];
+
+  // A line's cells (three or more), "rule" for a markdown |---| line, else null.
+  function cellsOf(line) {
+    const tabs = line.split("\t");
+    if (tabs.length >= 3) return tabs.map((c) => c.trim());
+    let l = line.trim().replace(/^[•\-*]\s+/, "");
+    if (/^\|?\s*:?-{2,}/.test(l) && !/[A-Za-z0-9]/.test(l)) return "rule";
+    if (l.startsWith("|")) l = l.slice(1);
+    if (l.endsWith("|")) l = l.slice(0, -1);
+    const cells = l.split("|").map((c) => c.trim());
+    return cells.length >= 3 ? cells : null;
+  }
+
+  function tableHtml(rows) {
+    const width = Math.max(...rows.map((r) => r.length));
+    const cell = (tag, text) => `<${tag}>${text ? esc(text) : "<br>"}</${tag}>`;
+    return `<table><tbody>${rows.map((r, i) => `<tr>${Array.from({ length: width }, (_, c) =>
+      cell(i ? "td" : "th", r[c] || "")).join("")}</tr>`).join("")}</tbody></table>`;
+  }
+
+  // Text with table rows in it as HTML (rows as tables, other lines as lines); null when it has none.
+  function withTables(text) {
+    const lines = text.split("\n");
+    if (!lines.some((l) => Array.isArray(cellsOf(l)))) return null;
+    const out = [];
+    let rows = [];
+    const flush = () => {
+      if (rows.length) out.push(tableHtml(rows));
+      rows = [];
+    };
+    lines.forEach((line) => {
+      const cells = cellsOf(line);
+      if (cells === "rule") return;
+      if (cells) rows.push(cells);
+      else {
+        flush();
+        out.push(`${esc(line)}<br>`);
+      }
+    });
+    flush();
+    return out.join("");
+  }
 
   // A contenteditable answer with its toolbar (editor.toolbar). `partOf` says
   // which day it shows (null for a plain part); `onChange` stores it.
@@ -123,7 +186,8 @@ export function createGuided(ui) {
     };
     const states = () => buttons.forEach((b) => {
       const cmd = b.dataset.cmd;
-      const on = cmd === "highlight" ? highlighted() : cmd === "clear" ? false : document.queryCommandState(cmd);
+      const on = cmd === "highlight" ? highlighted()
+        : ["clear", "table", "addRow"].includes(cmd) ? false : document.queryCommandState(cmd);
       b.setAttribute("aria-pressed", String(!!on));
     });
     const changed = () => { onChange(editor); states(); ui.refresh(); };
@@ -162,7 +226,20 @@ export function createGuided(ui) {
       editor.focus();
       const sel = window.getSelection();
       if (cmd === "highlight") G.applySpanClass(["hl-"], highlighted() ? "hl-none" : "hl-yellow");
-      else if (cmd === "clear") {
+      else if (cmd === "table") {
+        // A rubric to fill in: its levels as the header, three criteria rows.
+        document.execCommand("insertHTML", false, `${tableHtml([RUBRIC_HEAD, [], [], []])}<br>`);
+      } else if (cmd === "addRow") {
+        const node = sel && sel.anchorNode;
+        const row = node && (node.nodeType === 1 ? node : node.parentElement).closest("tr");
+        if (row && editor.contains(row)) {
+          const copy = document.createElement("tr");
+          [...row.children].forEach(() => copy.append(Object.assign(document.createElement("td"), { innerHTML: "<br>" })));
+          row.after(copy);
+        } else {
+          say("Click inside the table first, then add a row.", "point");
+        }
+      } else if (cmd === "clear") {
         if (sel && !sel.isCollapsed) G.applySpanClass(["hl-", "fc-", "fs-"], "");
         document.execCommand("removeFormat", false, null);
       } else {
@@ -239,6 +316,13 @@ export function createGuided(ui) {
     editor.addEventListener("paste", (e) => {
       e.preventDefault();
       const text = (e.clipboardData || window.clipboardData).getData("text/plain").replace(/\r\n?/g, "\n");
+      // A table (rows copied from Word, Docs or Alan) comes in as a table.
+      const table = withTables(text.replace(/\n+$/, ""));
+      if (table) {
+        document.execCommand("insertHTML", false, table);
+        pasted = null;
+        return;
+      }
       const from = caretOffset();
       document.execCommand("insertText", false, text);
       const to = caretOffset();
@@ -254,6 +338,12 @@ export function createGuided(ui) {
         return;
       }
       const text = part === null ? asText(G.fieldValue(p.key)) : dayText(G.fieldValue(p.key), part);
+      // A rubric written as " | " rows (Alan's) opens as a table.
+      const table = withTables(text);
+      if (table) {
+        editor.innerHTML = table;
+        return;
+      }
       editor.textContent = "";
       text.split("\n").forEach((line, i) => editor.append(...(i ? [el("br"), line] : [line])));
     };
@@ -431,7 +521,18 @@ export function createGuided(ui) {
           ed.sync();
           ui.refresh();
         });
-        tools.append(clear);
+        // Some parts have nothing for this lesson (user, 2026-11-24): "None"
+        // goes in the plan, so it reads as left empty on purpose, and on to the next.
+        const none = el("button", { type: "button", class: "flow-back flow-more flow-none" }, icon("x"), "None for this part");
+        none.addEventListener("click", () => {
+          if (p.days) p.days.forEach((_, d) => G.setGuidedValue(p.key, "None", d));
+          else G.setGuidedValue(p.key, "None");
+          ed.sync();
+          ui.refresh();
+          if (last) quick();
+          else part(i + 1);
+        });
+        tools.append(clear, none);
         answer.append(...[].concat(ed.node), tools);
         const refs = G.lessonReferences(p.key);
         if (refs) answer.append(referencesBox(refs));
@@ -519,13 +620,23 @@ export function createGuided(ui) {
       next: "Open the document",
       onNext: async () => {
         leave();
-        await G.tidyGuidedPlan(); // laid out like Alan's: bullets, numbering, spacing
+        await G.tidyGuidedPlan(); // laid out like Alan's, spelling fixed
         G.showDocument();
       },
       onBack: () => (G.quickParts().length ? quick() : part(parts.length - 1)),
       sayText: done ? "Great work! Have a look before you save it." : "So close. One part still needs you.",
       pose: done ? "celebrate" : "point",
     });
+    // The plan is complete (user, 2026-11-24): every part is arranged and its
+    // spelling fixed now, before any preview. Unchanged since the last tidy: nothing to do.
+    if (done) {
+      G.tidyGuidedPlan().then((changed) => {
+        if (changed && redraw === review) {
+          review();
+          say("I tidied your plan: bullets, spacing, spelling and punctuation. Have a look.", "celebrate");
+        }
+      });
+    }
   }
 
   function backToSetup() {

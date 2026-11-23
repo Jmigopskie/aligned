@@ -7634,6 +7634,11 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
 .flow-rich { height: auto; cursor: text; overflow-wrap: anywhere; }
 .flow-rich ul, .flow-rich ol { margin: 0; padding-left: 1.4em; }
 .flow-rich li + li { margin-top: 2px; }
+/* A rubric in a Guided answer (guided-flow.js tableHtml): a real table to type in. */
+.flow-rich table { width: 100%; border-collapse: collapse; margin: 6px 0; table-layout: fixed; }
+.flow-rich th, .flow-rich td { border: 1px solid var(--border); padding: 6px 8px; vertical-align: top; text-align: left; min-width: 3em;
+  font-size: 0.9em; overflow-wrap: break-word; word-break: normal; hyphens: auto; }
+.flow-rich th { background: var(--primary-tint); font-weight: 700; }
 .flow-rich .hl-yellow { background: #FDE68A; }
 .flow-rich .hl-green { background: #BBF7D0; }
 .flow-rich .hl-cyan { background: #A5F3FC; }

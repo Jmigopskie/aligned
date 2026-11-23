@@ -325,15 +325,31 @@ def tidy_plan():
     the parts that changed. No AI, free."""
     data = request.get_json(silent=True) or {}
     values = data.get("values") if isinstance(data.get("values"), dict) else {}
-    changed = {}
+    # Locked parts are the student's own words: laid out, never proofread.
+    locked = {str(k) for k in data.get("locked") or [] if isinstance(k, str)}
+    tidy = {}
     for key, value in list(values.items())[:200]:
         if not isinstance(value, (str, list)) or len(str(value)) > _TIDY_VALUE_LIMIT:
             continue
         if isinstance(value, list) and not all(isinstance(v, str) for v in value):
             continue
-        tidy = ai_limits.tidy_layout(value)
-        if tidy != value:
-            changed[str(key)[:120]] = tidy
+        tidy[str(key)[:120]] = ai_limits.tidy_layout(value)
+    if data.get("proofread"):
+        # A weekly part's days are proofread one by one ("key#day").
+        flat = {}
+        for key, value in tidy.items():
+            if key in locked:
+                continue
+            for i, v in enumerate(value if isinstance(value, list) else [value]):
+                flat[f"{key}#{i}" if isinstance(value, list) else key] = v
+        for flat_key, text in ai_service.proofread(flat).items():
+            key, _, day = flat_key.partition("#")
+            text = ai_limits.tidy_layout(text)
+            if day and isinstance(tidy.get(key), list):
+                tidy[key][int(day)] = text
+            elif not day:
+                tidy[key] = text
+    changed = {k: v for k, v in tidy.items() if v != values.get(k)}
     return jsonify({"status": "ok", "values": changed})
 
 @generate_bp.post("/lesson-plans/coherence")

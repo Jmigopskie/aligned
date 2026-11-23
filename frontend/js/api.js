@@ -231,8 +231,9 @@ const Api = {
     }),
 
   // The parts laid out tidily (bullets, numbering, spacing; never the words): { values } -> { values } changed.
-  tidyPlan: (values) =>
-    apiFetch("/api/lesson-plans/tidy", { method: "POST", body: JSON.stringify({ values }) }),
+  // locked: parts that are only arranged, never proofread.
+  tidyPlan: (values, locked = []) =>
+    apiFetch("/api/lesson-plans/tidy", { method: "POST", body: JSON.stringify({ values, locked, proofread: true }) }),
 
   // Whether the plan's parts line up; payload = generation payload + field_values + mode.
   checkCoherence: (payload) =>

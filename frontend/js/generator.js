@@ -2687,8 +2687,11 @@ document.addEventListener("click", (e) => {
   if (!planOpen() || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   const link = e.target.closest("a[href]");
   if (!link || link.target === "_blank" || link === exportBtn) return;
+  // A download (the Word export clicks a blob link) never leaves the page
+  // (user report 2026-11-24: "Leave this lesson plan?" stopped the export).
+  if (link.hasAttribute("download")) return;
   const href = link.getAttribute("href");
-  if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+  if (!href || /^(#|javascript:|blob:|data:)/.test(href)) return;
   e.preventDefault();
   leaveHref = link.href;
   openLeaveDialog();
@@ -4156,26 +4159,55 @@ function guidedRich(key, part = null) {
   return richForSlot({ dataset: part === null ? { fieldKey: key } : { fieldKey: key, part: String(part) } });
 }
 
-// Guided done (user, 2026-11-24): every part the student wrote is laid out
-// like Alan's before the document opens: bullets, numbering, quiz items and
-// spacing, never the words. Parts with formatting from the toolbox keep it
-// as they are. Nothing changes if the tidy can't run.
+// A Guided answer's formatted HTML as plain lines ("• " and "1. " for its
+// lists), or null when it has formatting a plain line would lose (bold,
+// italics, a highlight, a table, a picture), which then stays as it is.
+function plainFromRich(html) {
+  const div = document.createElement("div");
+  div.innerHTML = html || "";
+  if (div.querySelector("b, strong, i, em, u, table, img, [class]")) return null;
+  div.querySelectorAll("ol").forEach((ol) => [...ol.children].forEach((li, n) => li.prepend(`${n + 1}. `)));
+  div.querySelectorAll("ul > li").forEach((li) => li.prepend("• "));
+  div.querySelectorAll("br").forEach((br) => br.replaceWith("\n"));
+  div.querySelectorAll("li, div, p").forEach((block) => block.append("\n"));
+  return div.textContent.replace(/\n{2,}/g, "\n").trim();
+}
+
+// Guided done (user, 2026-11-24): before any preview, every part the student
+// wrote is arranged like Alan's (bullets, numbering, quiz items, spacing)
+// and its spelling, grammar and punctuation fixed, never its content. A
+// locked part is only arranged. Parts with bold, tables and the like keep
+// their formatting. Returns how many parts changed; nothing changes if the
+// tidy can't run, and a plan unchanged since the last tidy isn't sent again.
+let lastTidied = "";
 async function tidyGuidedPlan() {
-  const hasRich = (key) => [].concat(fieldRichValues[key] || []).some((h) => String(h || "").trim());
   const values = {};
   Object.entries(fieldValues).forEach(([key, value]) => {
-    if (!hasRich(key) && hasValue(value)) values[key] = value;
+    if (!hasValue(value)) return;
+    const rich = fieldRichValues[key];
+    if (![].concat(rich || []).some((h) => String(h || "").trim())) {
+      values[key] = value;
+      return;
+    }
+    const plain = Array.isArray(value)
+      ? weeklyArray(rich, value.length).map((h, i) => (String(h || "").trim() ? plainFromRich(h) : String(value[i] || "")))
+      : plainFromRich(rich);
+    if (plain !== null && !(Array.isArray(plain) && plain.includes(null))) values[key] = plain;
   });
-  if (!Object.keys(values).length) return;
+  const stamp = JSON.stringify(values);
+  if (!Object.keys(values).length || stamp === lastTidied) return 0;
+  const locked = Object.keys(values).filter((key) => (fieldByKey(key) || {}).locked);
   try {
-    const { values: tidy } = await Api.tidyPlan(values);
-    Object.entries(tidy || {}).forEach(([key, value]) => {
-      if (!(key in values)) return;
+    const { values: tidy } = await Api.tidyPlan(values, locked);
+    const changed = Object.entries(tidy || {}).filter(([key]) => key in values);
+    changed.forEach(([key, value]) => {
       if (Array.isArray(value)) value.forEach((day, i) => setGuidedValue(key, day, i));
       else setGuidedValue(key, value);
     });
+    lastTidied = JSON.stringify({ ...values, ...Object.fromEntries(changed) });
+    return changed.length;
   } catch (err) {
-    // The plan stands as written.
+    return 0; // the plan stands as written
   }
 }
 

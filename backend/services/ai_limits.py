@@ -215,13 +215,27 @@ def tidy_layout(value):
     if isinstance(value, (list, tuple)):
         return [tidy_layout(v) for v in value]
     text = str(value or "")
-    lines = [re.sub(r"[ \t]+", " ", _strip_markdown(line)).strip() for line in text.split("\n")]
+    # Any run of spaces, tabs or non-breaking spaces (typed into the editor) is one space.
+    lines = [re.sub(r"[^\S\n]+", " ", _strip_markdown(line)).strip() for line in text.split("\n")]
     lines = _split_runs([line for line in lines if line])
     if not lines:
         return ""
+    lines = [_tidy_punctuation(line) for line in lines]
     if _looks_like_quiz(lines):
         return _quiz_layout(lines, _NO_LIMIT)
     return "\n".join(_BULLET.sub("• ", line) for line in lines)
+
+
+def _tidy_punctuation(line: str) -> str:
+    """No space before , . ; : ! ?, one after; "!!" / ",," once ("..." stays).
+    A line with a link is left alone: "page?id=1" isn't a sentence."""
+    if re.search(r"https?://|www\.", line, re.I):
+        return line
+    line = re.sub(r"\s+([,;:!?])", r"\1", line)
+    line = re.sub(r"(?<=\w)\s+\.(?=\s|$)", ".", line)
+    line = re.sub(r"([,;!?])\1+", r"\1", line)
+    line = re.sub(r"([,;!?])(?=[A-Za-z])", r"\1 ", line)
+    return line
 
 
 def clean_value(value, field_type: str = "text", *, max_items: int, max_item_words: int,

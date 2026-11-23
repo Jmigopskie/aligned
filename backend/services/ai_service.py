@@ -1869,6 +1869,53 @@ def _with_web_references(values: dict, fields, context: dict, found=None, citati
 
 _MAX_CHOICES = 4
 
+# Guided finished (user, 2026-11-24: "the system should arrange and fix the
+# inputted texts and words"): spelling, grammar, capitals and punctuation only.
+_PROOFREAD_SYSTEM = (
+    "You proofread parts of a lesson plan that a student teacher wrote. Fix ONLY spelling, grammar, "
+    "capitalization and punctuation. Never add, remove, reorder or reword content; never change a "
+    "name, number, link, reference, code or technical term that is spelled right; keep every line "
+    "and its bullet, number or ' | ' separators exactly where it is. Return strict JSON with the same "
+    "keys and the corrected text as values."
+)
+# A correction is kept only when it stays this close to what was written:
+# a proofread, not a rewrite.
+_PROOFREAD_SIMILARITY = 0.85
+_PROOFREAD_BUDGET = 30000
+_PROOFREAD_WAIT = 20
+
+
+def proofread(values: dict) -> dict:
+    """{key: corrected text} for the changed ones among {key: text}. A
+    correction that changes the line count or more than a proofread would is
+    dropped, and so is everything when the call fails: the words stand."""
+    from difflib import SequenceMatcher
+
+    texts = {k: v for k, v in values.items() if isinstance(v, str) and re.search(r"[A-Za-z]{3}", v)}
+    if not texts or sum(len(v) for v in texts.values()) > _PROOFREAD_BUDGET:
+        return {}
+    # At most _PROOFREAD_WAIT seconds: a busy provider's retries (up to a
+    # minute) would keep the student waiting at "Open the document".
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        data = pool.submit(_call, _PROOFREAD_SYSTEM, [json.dumps(texts)], "Proofread").result(timeout=_PROOFREAD_WAIT)
+    except Exception as exc:  # noqa: BLE001 - the plan stands as written (laid out, not proofread)
+        _log.warning("Proofread skipped: %s", exc)
+        return {}
+    finally:
+        pool.shutdown(wait=False)
+    fixed = {}
+    for key, before in texts.items():
+        after = data.get(key) if isinstance(data, dict) else None
+        if not isinstance(after, str) or after == before:
+            continue
+        if len(after.splitlines()) != len(before.splitlines()):
+            continue
+        if SequenceMatcher(None, before, after).ratio() < _PROOFREAD_SIMILARITY:
+            continue
+        fixed[key] = after
+    return fixed
+
 
 def _written_by_label(prior_values, fields, current):
     """The other parts already written, as {label: value} in the plan's
