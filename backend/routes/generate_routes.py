@@ -55,8 +55,32 @@ def _resolve_guides(data):
     guides.sort(key=lambda g: g.doc_type != "budget_of_work")  # stable: picked order kept within each kind
     return guides, None
 
+_CONTEXT_TEXT_LIMIT = 300
+
+
+def _clean_context(raw):
+    """The setup answers as the prompts may read them: text trimmed and
+    capped, the session's minutes a whole number from 5 to 240 (else left out,
+    and the 45-minute default applies), anything else dropped."""
+    context = {}
+    for key, value in (raw if isinstance(raw, dict) else {}).items():
+        key = str(key)[:60]
+        if key == "duration_minutes":
+            try:
+                minutes = int(str(value).strip())
+            except (TypeError, ValueError):
+                continue
+            if 5 <= minutes <= 240:
+                context[key] = minutes
+        elif isinstance(value, str):
+            context[key] = re.sub(r"\s+", " ", value).strip()[:_CONTEXT_TEXT_LIMIT]
+        elif isinstance(value, (int, float, bool)) or value is None:
+            context[key] = value
+    return context
+
+
 def _build_context(data, guides):
-    context = dict(data.get("context") or {})
+    context = _clean_context(data.get("context"))
     if data.get("teacher_name"):
         context["teacher_name"] = data["teacher_name"]
     if data.get("subject"):

@@ -98,4 +98,20 @@ assert.deepStrictEqual([t.builtin.length, t.teacher.length, t.mine.length], [1, 
 
 assert.strictEqual(ctx.runDraftKey("abc"), "alignedDraft:v2:run:abc");
 assert.strictEqual(ctx.rememberKey(12), "alignedFlowMemory:v1:12");
+
+// What Next says when a step isn't right (user report 2026-11-24): which field, and why.
+const problem = (step, a) => ctx.stepProblem(step, a);
+assert.strictEqual(problem("topics", { mainTopic: "Spreadsheets", topic: "Cell formulas" }), null);
+assert.strictEqual(problem("topics", { mainTopic: "Spreadsheets" }).field, "flow-topic");
+assert.match(problem("topics", { mainTopic: "!!!", topic: "Cell formulas" }).message, /words/);
+assert.strictEqual(problem("topics", { mainTopic: "Spreadsheets", topic: "Formulas", previousTopic: "123" }).field,
+  "flow-previousTopic", "an optional box, when typed in, must read as words");
+assert.strictEqual(problem("subject", { subject: "ICT", durationMinutes: 300 }).field, "flow-minutes");
+assert.match(problem("subject", { subject: "ICT", durationMinutes: 300 }).message, /5 to 240/);
+assert.strictEqual(problem("subject", { subject: "ICT" }).field, "flow-minutes");
+assert.strictEqual(problem("people", { studentTeacher: "12345", coop: "Juan" }).field, "flow-studentTeacher");
+assert.strictEqual(problem("people", { studentTeacher: "Ána Cruz", coop: "Juan Dela Cruz" }), null, "accented names are letters");
+assert.strictEqual(problem("format", { formatId: 3, school: "@@@" }).field, "flow-school");
+assert.strictEqual(problem("class", { levelType: "college", year: "1st Year", program: "" }).field, "flow-program");
+assert.match(problem("sources", {}).message, /Budget of Work/);
 console.log("flow steps OK");

@@ -49,25 +49,71 @@ function filled(value) {
 const QUIZ_SIZES = [5, 10, 15, 20];
 
 function isStepAnswered(stepId, answers) {
+  return stepProblem(stepId, answers) === null;
+}
+
+// Text that says something: at least two letters, not only symbols or digits.
+function wordy(value) {
+  return (String(value || "").match(/\p{L}/gu) || []).length >= 2;
+}
+
+// What is wrong with a step's answers, as { field, message } (field: the
+// input's id, to mark and focus), or null when the step is answered. Next
+// shows the message instead of greying out with no reason (user report
+// 2026-11-24: the create-plan inputs gave no error when something was off).
+function stepProblem(stepId, answers) {
   const a = answers || {};
+  const problem = (field, message) => ({ field, message });
+  // An optional box may stay empty, but what is typed in it must read as words.
+  const optional = (key, field, what) =>
+    (filled(a[key]) && !wordy(a[key]) ? problem(field, `${what} should be words, not just symbols or numbers.`) : null);
   switch (stepId) {
-    case "format": return filled(a.formatId); // the school is encouraged, not required
+    case "format":
+      if (!filled(a.formatId)) return problem(null, "Choose a lesson plan format.");
+      return optional("school", "flow-school", "The school's name"); // the school is encouraged, not required
     // Whatever the objectives call for, a quiz, a performance task, or both;
     // any choice that may hold a quiz has its 5, 10, 15 or 20 items.
     case "assessment":
-      return a.assessment === "task"
-        || (["objectives", "quiz", "both"].includes(a.assessment) && QUIZ_SIZES.includes(a.quizItems));
-    case "people": return filled(a.studentTeacher) && filled(a.coop);
+      if (!["objectives", "quiz", "task", "both"].includes(a.assessment)) return problem(null, "Choose how you'll assess this lesson.");
+      if (a.assessment !== "task" && !QUIZ_SIZES.includes(a.quizItems)) return problem("flow-quiz-items", "Choose how many quiz items.");
+      return null;
+    case "people":
+      if (!filled(a.studentTeacher)) return problem("flow-studentTeacher", "Type your name.");
+      if (!wordy(a.studentTeacher)) return problem("flow-studentTeacher", "Your name should be letters, as it appears on the plan.");
+      if (!filled(a.coop)) return problem("flow-coop", "Type the cooperating or subject teacher's name.");
+      if (!wordy(a.coop)) return problem("flow-coop", "The teacher's name should be letters, as it appears on the plan.");
+      return null;
     case "class":
-      return a.levelType === "college" ? filled(a.program) && filled(a.year) : filled(a.grade);
+      if (a.levelType === "college") {
+        if (!filled(a.year)) return problem("flow-grade", "Choose the year level.");
+        if (!filled(a.program)) return problem("flow-program", "Type the program, e.g. BS Information Technology.");
+        if (!wordy(a.program)) return problem("flow-program", "The program should be words, e.g. BS Information Technology.");
+      } else if (!filled(a.grade)) {
+        return problem("flow-grade", "Choose the grade level.");
+      }
+      return null;
     case "subject":
-      return filled(a.subject) && Number.isInteger(a.durationMinutes) && a.durationMinutes >= 5 && a.durationMinutes <= 240;
-    case "topics": return filled(a.mainTopic) && filled(a.topic); // previous and next are encouraged
+      if (!filled(a.subject)) return problem("flow-subject", "Choose the subject.");
+      if (!Number.isInteger(a.durationMinutes)) return problem("flow-minutes", "Choose how long the discussion is, or type the minutes.");
+      if (a.durationMinutes < 5 || a.durationMinutes > 240) {
+        return problem("flow-minutes", "The discussion should be from 5 to 240 minutes long.");
+      }
+      return null;
+    case "topics":
+      if (!filled(a.mainTopic)) return problem("flow-mainTopic", "Type the main topic.");
+      if (!wordy(a.mainTopic)) return problem("flow-mainTopic", "The main topic should be words, e.g. Spreadsheets.");
+      if (!filled(a.topic)) return problem("flow-topic", "Type today's specific topic.");
+      if (!wordy(a.topic)) return problem("flow-topic", "Today's topic should be words, e.g. Cell formulas.");
+      // previous and next are encouraged, not required
+      return optional("previousTopic", "flow-previousTopic", "The last topic")
+        || optional("nextTopic", "flow-nextTopic", "The next topic");
     case "sources": // at least one source of any kind
-      return (a.guides || []).length + (a.sources || []).length > 0;
-    case "sample": return true; // optional: a finished plan to learn the layout from
-    case "mode": return a.mode === "full" || a.mode === "step";
-    default: return true;
+      return (a.guides || []).length + (a.sources || []).length > 0
+        ? null : problem(null, "Pick at least one Budget of Work, Curriculum Guide or file for me to read.");
+    case "sample": return null; // optional: a finished plan to learn the layout from
+    case "mode":
+      return a.mode === "full" || a.mode === "step" ? null : problem(null, "Choose Building Proficiency or Guided.");
+    default: return null;
   }
 }
 

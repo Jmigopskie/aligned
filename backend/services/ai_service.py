@@ -226,15 +226,22 @@ _LOOK_AHEAD = 2500
 _MAX_HITS = 3
 
 
-def _topic_sections(text: str, terms: set, budget: int) -> str:
+_GRADE_HEADING = re.compile(r"\bgrade\s*(\d{1,2})\b", re.I)
+
+
+def _topic_sections(text: str, terms: set, budget: int, needed: int = None, grade: str = "") -> str:
     """The guide searched for the topic: the passages that mention it most,
     each widened back to the standards heading it sits under and a little past
-    it, merged and kept in document order. "" when the topic isn't in the guide."""
+    it, merged and kept in document order. "" when the topic isn't in the guide.
+    `needed`: how many of the topic's words a passage must hold (default: all
+    of a short topic, most of a longer one). `grade` ("7"): a passage under
+    that grade's heading wins over the same topic in another grade."""
     low = text.lower()
     patterns = {t: re.compile(r"\b" + re.escape(t)) for t in terms}
     # A passage that holds one stray word of the topic isn't the topic: a short
     # topic needs every word, a longer one most of them.
-    needed = len(terms) if len(terms) <= 2 else -(-len(terms) * 3 // 5)
+    if needed is None:
+        needed = len(terms) if len(terms) <= 2 else -(-len(terms) * 3 // 5)
     hits = []
     for start in range(0, len(text), _BLOCK_CHARS // 2):
         block = low[start:start + _BLOCK_CHARS]
@@ -247,21 +254,30 @@ def _topic_sections(text: str, terms: set, budget: int) -> str:
             score = len(present) ** 2 * 10 + sum(counts.values())
             if _STANDARDS_HEADING.search(text, max(0, start - 1500), start + _BLOCK_CHARS):
                 score *= 2
-            hits.append((score, start))
+            # Where the topic is first mentioned in this passage: the headings
+            # it sits under are the ones before THAT, not before the passage's
+            # start, which may lie in the previous section (a Grade 7 table
+            # came back for a Grade 8 topic).
+            at = start + min(patterns[t].search(block).start() for t in present)
+            if grade:
+                under = [m.group(1) for m in _GRADE_HEADING.finditer(text, max(0, at - 20000), at)]
+                if under:
+                    score *= 1.5 if under[-1] == grade else 0.6
+            hits.append((score, start, at))
     if not hits:
         return ""
     hits.sort(reverse=True)
 
     windows = []
-    for score, start in hits:
+    for score, start, at in hits:
         # Further passages only when they are nearly as good a match as the
         # best one, so a passing mention doesn't pull in an unrelated section.
         if len(windows) == _MAX_HITS or score < hits[0][0] / 2:
             break
-        if any(a <= start < b for a, b in windows):
+        if any(a <= at < b for a, b in windows):
             continue
-        heads = [m.start() for m in _STANDARDS_HEADING.finditer(text, max(0, start - _LOOK_BACK), start)]
-        begin = max(0, start - 1500)
+        heads = [m.start() for m in _STANDARDS_HEADING.finditer(text, max(0, at - _LOOK_BACK), at)]
+        begin = max(0, at - 1500)
         if heads:
             # Walk back through the run of headings nearest the hit (Term,
             # Performance Standard, Content Standard sit close together), not
@@ -308,8 +324,24 @@ def _guide_inputs(course_guide_text, context: dict):
     if not sources:
         return "", ""
     share = GUIDE_BUDGET // len(sources)
-    parts = [(f"[From: {title}]\n" if title else "") + guide_excerpt(text, context, share) for title, text in sources]
+    parts = []
+    for title, text in sources:
+        excerpt, how = _guide_match(text, context, share)
+        parts.append((f"[From: {title}]\n" if title else "") + _MATCH_NOTES[how].format(
+            topic=context.get("topic") or "the topic", main=context.get("main_topic") or "its main topic") + excerpt)
     return "\n\n".join(parts), "\n\n".join(text for _, text in sources)
+
+
+# Said above each document's excerpt, so the lesson is aligned to the right part.
+_MATCH_NOTES = {
+    "exact": "",
+    "main": "[This document doesn't name \"{topic}\" itself; this is the section for its main topic, "
+            "{main}. Align the lesson to it.]\n",
+    "closest": "[This document doesn't name \"{topic}\"; this is its closest matching section. Align the "
+               "lesson to it: teach the topic as this section's competency frames it, at the depth it sets.]\n",
+    "none": "[\"{topic}\" wasn't found in this document; these are its opening and the passages nearest "
+            "the topic. Align the lesson to whatever here is closest to the topic.]\n",
+}
 
 
 def guide_excerpt(text: str, context: dict, budget: int = GUIDE_BUDGET) -> str:
@@ -319,7 +351,23 @@ def guide_excerpt(text: str, context: dict, budget: int = GUIDE_BUDGET) -> str:
     teach it are sent (with the standards they sit under), rather than reading
     the document from its first page. When the topic can't be found, the old
     fallback applies: the whole guide if it fits, otherwise its opening plus the
-    passages that mention the topic and subject most."""
+    passages that mention the topic and subject most. (Also used on reference
+    pages, so no AI is asked here; see _guide_match.)"""
+    return _guide_match(text, context, budget, ask_ai=False)[0]
+
+
+def _grade_number(context) -> str:
+    found = re.search(r"\d{1,2}", str((context or {}).get("grade_level") or ""))
+    return found.group(0) if found else ""
+
+
+def _guide_match(text: str, context: dict, budget: int = GUIDE_BUDGET, ask_ai: bool = True):
+    """(excerpt, how) for one document. how: "exact" (the topic's section),
+    "main" (the main topic's section), "closest" (the nearest section when the
+    document doesn't name the topic: most of its words, else, with ask_ai, the
+    competency an AI picked as the closest match), "none" (the old fallback).
+    User, 2026-11-24: the plan is aligned to the selected curriculum, and a
+    topic it doesn't name goes under its closest match."""
     text = (text or "").strip()
     # PDF extraction of the DepEd Budget of Work files puts every word on its
     # own line, which wastes most of the budget on line breaks and leaves the
@@ -327,11 +375,74 @@ def guide_excerpt(text: str, context: dict, budget: int = GUIDE_BUDGET) -> str:
     lines = [l for l in text.split("\n") if l.strip()]
     if lines and sum(len(l) for l in lines) / len(lines) < 20:
         text = grounding.tidy_guide(text)
+    grade = _grade_number(context)
     topic_terms = _focus_terms(context.get("topic"))
-    if topic_terms:
-        found = _topic_sections(text, topic_terms, budget)
+    main_terms = _focus_terms(context.get("main_topic"))
+    tries = [(topic_terms, "exact", None), (main_terms, "main", None),
+             (topic_terms, "closest", max(1, (len(topic_terms) + 1) // 2))]
+    for terms, how, needed in tries:
+        if terms:
+            found = _topic_sections(text, terms, budget, needed, grade)
+            if found:
+                return found, how
+    picked = _closest_line(text, context) if ask_ai else ""
+    if picked:
+        found = _topic_sections(text, _focus_terms(picked), budget, None, grade)
         if found:
-            return found
+            return found, "closest"
+    return _guide_fallback(text, context, budget), "none"
+
+
+# The closest competency for a topic a document doesn't name, by document and
+# lesson, so the AI is asked once per worker, not on every chat turn.
+_CLOSEST = {}
+_CANDIDATE_LINES = 160
+
+
+def _closest_line(text: str, context: dict) -> str:
+    """The line of the curriculum document (a competency, content or
+    standard) closest in meaning to the lesson's topic, as an AI picks it from
+    the document's own lines; "" when none is close or the call fails."""
+    topic = str(context.get("topic") or "").strip()
+    if not topic:
+        return ""
+    key = (hash(text), topic.lower(), str(context.get("main_topic") or "").lower(), _grade_number(context))
+    if key in _CLOSEST:
+        return _CLOSEST[key]
+    seen, lines = set(), []
+    for line in text.split("\n"):
+        line = re.sub(r"\s+", " ", line).strip()
+        if 20 <= len(line) <= 240 and re.search(r"[a-z]{3}", line) and line.lower() not in seen:
+            seen.add(line.lower())
+            lines.append(line)
+    if len(lines) > _CANDIDATE_LINES:  # spread over the whole document
+        step = len(lines) / _CANDIDATE_LINES
+        lines = [lines[int(i * step)] for i in range(_CANDIDATE_LINES)]
+    if not lines:
+        return ""
+    about = ", ".join(f"{k.replace('_', ' ')}: {context[k]}" for k in ("main_topic", "subject", "grade_level", "program")
+                      if context.get(k))
+    task = (f"Lesson topic: {topic}" + (f" ({about})" if about else "") + "\n\nLines of the curriculum document:\n"
+            + "\n".join(f"{i}. {l[:200]}" for i, l in enumerate(lines))
+            + '\n\nWhich line is the closest match in meaning to the lesson topic (the competency or content it '
+              'belongs under)? Return strict JSON {"index": n}, or {"index": null} when none is related.')
+    picked = ""
+    try:
+        index = _call("You match a lesson topic to a Philippine curriculum document. Return strict JSON only.",
+                      [task], "Closest competency").get("index")
+        if isinstance(index, int) and 0 <= index < len(lines):
+            picked = lines[index]
+    except Exception as exc:  # noqa: BLE001 - the plan still has the document's fallback excerpt
+        _log.warning("Closest competency failed: %s", exc)
+        return ""
+    if len(_CLOSEST) < 500:
+        _CLOSEST[key] = picked
+    return picked
+
+
+def _guide_fallback(text: str, context: dict, budget: int) -> str:
+    """The whole guide if it fits, otherwise its opening plus the passages that
+    mention the topic and subject most."""
     if len(text) <= budget:
         return text
     focus = " ".join(str(context.get(k) or "") for k in ("topic", "subject", "grade_level", "program"))
@@ -776,6 +887,25 @@ def _context_block(context: dict):
     return ", ".join(f"{k}: {v}" for k, v in context.items() if v and k != "sample_plan")
 
 
+def _learners_directive(context: dict) -> str:
+    """The class and the session, as setup gave them, for every part."""
+    if str(context.get("level_type") or "").lower() == "college" or context.get("program"):
+        who = " ".join(str(context.get(k) or "").strip() for k in ("year", "program")).strip()
+        who = f"{who} college students".strip() if who else ""
+    else:
+        who = f"{str(context.get('grade_level') or '').strip()} learners".strip() if context.get("grade_level") else ""
+    out = ""
+    if who:
+        out += (f"\nThe class: {who}. Pitch every part at their level, as the curriculum sets it for them: "
+                "the vocabulary, the depth of the content, the examples (from their daily life in the Philippines), "
+                "the reading load, the tasks they can really do, and the difficulty of the questions and quiz.\n")
+    minutes = _session_minutes(context)
+    if context.get("duration_minutes"):
+        out += (f"\nThe session lasts {minutes} minutes: plan only what fits in it, with every timed part "
+                f"together adding up to {minutes} minutes, and activities and the assessment sized for that time.\n")
+    return out
+
+
 def _lesson_block(context: dict, guide_text: str, citation: str = "") -> str:
     """The part of every generation and chat request that stays the same for a
     lesson, sent first so it can be served from the provider's prompt cache."""
@@ -788,6 +918,9 @@ def _lesson_block(context: dict, guide_text: str, citation: str = "") -> str:
         block += (f"\nThis lesson teaches ONE specific topic: {topic}{within}. Every field (content, examples, "
                   f"activities, questions, assessment, assignment) is about {topic} itself; the main topic and "
                   f"the guide's section are only its frame. Do not drift into the main topic's other subtopics.\n")
+    # Every setup answer shapes the plan (user, 2026-11-24): who it is for and
+    # how long it runs, not only what it is about.
+    block += _learners_directive(context)
     # College only: the syllabus week, typed by hand ("5" reads as "Week 5").
     week = str(context.get("week") or "").strip()
     if week and guide_text:
@@ -797,7 +930,9 @@ def _lesson_block(context: dict, guide_text: str, citation: str = "") -> str:
                   f"that covers the topic.\n")
     if guide_text:
         block += f"""
-This is the section of the course guide that covers the lesson's topic. EVERY field must be
+This is the section of the selected curriculum (the course guide, Budget of Work and any other
+documents chosen) that covers the lesson's topic, or its closest match where a note says so. The
+whole plan is ALIGNED to it: this is the system's core. EVERY field must be
 grounded in it or in a source listed under References: the lesson content, examples,
 activities, questions, assessment and materials all come from this section's competencies,
 suggested activities and performance tasks (or from a listed reference), using its terms.

@@ -7464,6 +7464,8 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
 .flow-back:hover { background: rgba(28, 92, 78, 0.07); }
 .flow-hint { font-size: var(--text-sm); color: var(--text-body); }
 .flow-error { margin: 0; font-size: var(--text-sm); color: var(--danger); }
+/* The field Next's message is about (setup-flow.js showProblem). */
+.flow-field [aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 18%, transparent); }
 
 /* A student not in a class yet: Alan points them to My Classes. */
 .enroll-gate {

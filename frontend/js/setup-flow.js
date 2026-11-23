@@ -444,7 +444,7 @@ const STEPS = {
     const a = G.getAnswers();
     const custom = a.durationMinutes && !DURATION_CHOICES.includes(a.durationMinutes);
     const other = el("div", { class: "flow-field", hidden: !custom });
-    const input = el("input", { type: "number", min: "5", max: "240", step: "1", inputmode: "numeric",
+    const input = el("input", { id: "flow-minutes", type: "number", min: "5", max: "240", step: "1", inputmode: "numeric",
       placeholder: "Minutes, e.g. 50", "aria-label": "Minutes" });
     if (custom) input.value = a.durationMinutes;
     input.addEventListener("input", () => {
@@ -714,7 +714,7 @@ const nextIcon = icon("arrowRight");
 nextIcon.className = "flow-next-icon";
 const nextLabel = el("span", {}, "Next");
 const nextBtn = el("button", { type: "submit", class: "flow-next" }, nextLabel, nextIcon);
-const errorEl = el("p", { class: "flow-error", role: "alert", hidden: true });
+const errorEl = el("p", { class: "flow-error", id: "flow-error", role: "alert", hidden: true });
 const form = el("form", { class: "flow-step", novalidate: true });
 const actions = el("div", { class: "flow-actions" }, backBtn, nextBtn, el("span", { class: "flow-hint" }, "or press Enter"));
 askEl.append(el("div", { class: "flow-top" }, progress, countEl),
@@ -809,16 +809,46 @@ refresh = () => {
     nextBtn.disabled = screenCanNext ? !screenCanNext() : false;
     return;
   }
-  const id = steps[index];
-  nextBtn.disabled = id === "format" ? !pendingFormatId : !isStepAnswered(id, G.getAnswers());
+  // Next stays clickable: a step that isn't answered says why (stepProblem)
+  // instead of a grey button with no reason. A field fixed since is unmarked.
+  nextBtn.disabled = false;
+  form.querySelectorAll("[aria-invalid=true]").forEach((input) => {
+    const p = stepProblem(steps[index], G.getAnswers());
+    if (!p || p.field !== input.id) input.removeAttribute("aria-invalid");
+  });
+  // The message goes once the problem it names is fixed (the next one shows on Next).
+  const now = stepProblem(steps[index], G.getAnswers());
+  if (!errorEl.hidden && errorEl.dataset.step === steps[index] && (!now || now.message !== errorEl.textContent)) {
+    errorEl.hidden = true;
+  }
 };
+
+// Says what is missing or wrong on this step, marks that field and moves to it.
+function showProblem(p) {
+  showError(p.message);
+  errorEl.dataset.step = steps[index];
+  const shown = (id) => {
+    const node = id && document.getElementById(id);
+    return node && !node.disabled && node.offsetParent !== null ? node : null;
+  };
+  // No length chosen yet: the minutes box is hidden, so the length dropdown.
+  const input = shown(p.field) || (p.field === "flow-minutes" ? shown("flow-duration") : null);
+  if (input) {
+    input.setAttribute("aria-invalid", "true");
+    input.setAttribute("aria-describedby", "flow-error");
+    input.focus();
+  }
+  say(p.message, "point");
+}
 
 async function go(delta) {
   if (delta > 0 && screenNext) return nextBtn.disabled ? undefined : screenNext();
   if (delta < 0 && screenBack) return screenBack();
   const id = steps[index];
   if (delta > 0 && id === "format") {
-    if (!pendingFormatId) return;
+    if (!pendingFormatId) return showProblem({ field: null, message: "Choose a lesson plan format." });
+    const schoolProblem = stepProblem("format", { ...G.getAnswers(), formatId: pendingFormatId });
+    if (schoolProblem) return showProblem(schoolProblem);
     if (pendingFormatId !== G.getAnswers().formatId) {
       // A different format reloads the page on this run, so say where to land.
       G.setAnswers({ flowStep: steps[index + 1] });
@@ -833,8 +863,8 @@ async function go(delta) {
         return;
       }
     }
-  } else if (delta > 0 && !isStepAnswered(id, G.getAnswers())) {
-    return;
+  } else if (delta > 0 && stepProblem(id, G.getAnswers())) {
+    return showProblem(stepProblem(id, G.getAnswers()));
   }
   if (delta > 0 && ["format", "people"].includes(id)) remember();
   if (detailsMode) return showDetails();
