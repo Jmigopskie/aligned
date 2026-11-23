@@ -35,32 +35,92 @@ def _haystack(field):
     return getattr(field, "kind_text", None) or f"{field.field_key or ''} {field.label or ''}"
 
 
-class _AsCompetency:
-    """A "Learning Competencies/ Objectives" field read as the competency
-    alone: everything else about the field (its key, type, place) is its own."""
+class _AsKind:
+    """A field read as another kind of part (kind_text), and optionally under
+    another label: everything else about it (its key, type, place) is its own."""
 
-    def __init__(self, field):
+    def __init__(self, field, kind_text, label=None):
         self._field = field
-        self.kind_text = "learning competency"
-        self.label = re.sub(r"\s*/\s*objectives?\b", "", field.label or "", flags=re.I).strip() or "Learning Competency"
+        self.kind_text = kind_text
+        self.label = label or field.label
 
     def __getattr__(self, name):
         return getattr(self._field, name)
 
 
+def _as_competency(field):
+    """A "Learning Competencies/ Objectives" field read as the competency alone."""
+    label = re.sub(r"\s*/\s*objectives?\b", "", field.label or "", flags=re.I).strip() or "Learning Competency"
+    return _AsKind(field, "learning competency", label)
+
+
+# Every school words its format its own way (user, 2026-11-24): the part that
+# teaches the topic is "Lesson Proper" (TUP, DLP), "Discussion" (SNHS),
+# "Abstraction" in the 4A's, "Flow" in ILAW, "Procedure" in an older TUP form,
+# "Learning Experience" (PAL3); the references are "References" or, in the
+# SNHS DLP, "Other Learning Resources". When a format has no part by the
+# usual name, the first of these, in order, is taken for it.
+_TEACHING_STAND_INS = (
+    (re.compile(r"abstraction", re.I), "lesson proper"),
+    (re.compile(r"presenting examples|presentation", re.I), "lesson proper"),
+    (re.compile(r"\bflow\b", re.I), "lesson proper flow"),
+    (re.compile(r"procedure", re.I), "lesson proper flow"),
+    (re.compile(r"learning experience|teaching.learning", re.I), "lesson proper flow"),
+)
+# Matched against the whole label: "List of Learning Resources for Development
+# and Engagement Activities" (the 4A's) lists materials, not references.
+_REFERENCE_STAND_INS = (
+    re.compile(r"^\W*other learning resources?\W*$", re.I),
+    re.compile(r"^\W*learning resources?\W*$", re.I),
+)
+
+
 def competency_view(fields):
-    """The format's fields as they are written. A combined "Learning
-    Competencies/ Objectives" field holds only the competency, copied from the
-    guide, when the format has its own objectives field: writing objectives in
-    both put them twice, the first time under the competency."""
+    """The format's fields as they are to be written, whatever the school
+    calls them. A combined "Learning Competencies/ Objectives" field holds
+    only the competency, copied from the guide, when the format has its own
+    objectives field: writing objectives in both put them twice, the first
+    time under the competency. A format with no lesson proper or references
+    part by that name has its stand-ins read as them (_TEACHING_STAND_INS)."""
     fields = list(fields)
 
     def says(f, word):
         return re.search(word, _haystack(f), re.I)
 
-    if not any(says(f, "objective") and not says(f, "competenc") for f in fields):
-        return fields
-    return [_AsCompetency(f) if says(f, "objective") and says(f, "competenc") else f for f in fields]
+    if any(says(f, "objective") and not says(f, "competenc") for f in fields):
+        fields = [_as_competency(f) if says(f, "objective") and says(f, "competenc") else f for f in fields]
+    usable = [f for f in fields if not re.search(r"reflection|remarks", _haystack(f), re.I)]
+    if not any(is_lesson_proper_field(f) for f in usable):
+        for pattern, kind in _TEACHING_STAND_INS:
+            found = next((f for f in usable if pattern.search(_haystack(f))), None)
+            if found is not None:
+                fields = [_AsKind(f, kind) if f is found else f for f in fields]
+                break
+    if not any(is_reference_field(f) for f in usable):
+        for pattern in _REFERENCE_STAND_INS:
+            found = next((f for f in usable if pattern.search(f.label or "")), None)
+            if found is not None:
+                fields = [_AsKind(f, "references") if f is found else f for f in fields]
+                break
+    return fields
+
+
+def field_kinds(fields) -> dict:
+    """{field_key: "lesson_proper" | "references"} for a format, as
+    competency_view reads it, for the page (Guided shows the references at
+    the lesson proper; a regenerate ticks them together)."""
+    kinds = {}
+    for f in competency_view(fields):
+        if is_lesson_proper_field(f):
+            kinds[f.field_key] = "lesson_proper"
+        elif is_reference_field(f):
+            kinds[f.field_key] = "references"
+    return kinds
+
+
+def is_lesson_flow(field) -> bool:
+    """A part that carries the whole session (ILAW's Flow) taken for the lesson proper."""
+    return "lesson proper flow" in _haystack(field)
 
 
 def is_verbatim_field(field) -> bool:
@@ -78,8 +138,13 @@ def is_reference_field(field) -> bool:
     return bool(_REFERENCE_FIELD.search(_haystack(field)))
 
 
-# The part that teaches the topic itself (TUP's "Lesson Proper").
-_LESSON_PROPER_FIELD = re.compile(r"lesson.proper|discussion", re.I)
+# The part that teaches the topic itself, by its usual names (TUP's "Lesson
+# Proper", SNHS's "Discussion", the DLP's "Discussing new concepts", 5E's
+# "Explain"); see competency_view for formats that use none of them.
+_LESSON_PROPER_FIELD = re.compile(
+    r"lesson.proper|discussion|discussing new|lesson development|development of the lesson|"
+    r"concept development|explicitation|lesson presentation|presentation of (?:the )?(?:new )?lesson|\bexplain\b",
+    re.I)
 
 
 def is_lesson_proper_field(field) -> bool:

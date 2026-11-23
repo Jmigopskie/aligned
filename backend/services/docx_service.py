@@ -179,6 +179,7 @@ def apply_content_edits(template_path, edits):
                 # Word requires at least one paragraph per cell — clear it
                 # rather than removing the only paragraph the cell has.
                 _set_paragraph_text(doc, el, "")
+                _unmark_value(doc, el)
             else:
                 parent = el.getparent()
                 if parent is not None:
@@ -262,6 +263,7 @@ def _apply_paragraph_edit(doc, el, edit):
 
     if "text" in edit:
         _set_paragraph_text(doc, el, edit["text"])
+        _unmark_value(doc, el)  # the teacher's own document text, not an answer
 
     para = Paragraph(el, doc)
 
@@ -549,7 +551,9 @@ def _render_doc_body_html(doc, items, slots, cell_value_targets):
     index_by_el_id = {id(item["el"]): idx for idx, item in enumerate(items)}
     body_html = _render_block_children(doc, doc.element.body, slots, cell_value_targets, index_by_el_id, layout)
     page_css, page_width = layout.page()
-    return f'<div class="lp-doc"{_style_attr(page_css)} data-page-width="{page_width:g}">' + body_html + "</div>"
+    page_height = getattr(layout, "page_height", 792.0)
+    return (f'<div class="lp-doc"{_style_attr(page_css)} data-page-width="{page_width:g}" '
+            f'data-page-height="{page_height:g}">' + body_html + "</div>")
 
 def _plan_html_slots(doc, items, anchors, weekly_keys=frozenset()):
     """Decide, for each matched field, where its editable value slot goes in the
@@ -1528,6 +1532,7 @@ def _set_paragraph_rich(doc, para_el, line, template_run=None):
     own bold/italic/underline) into the paragraph instead of one plain
     string, and applies a bullet/numbered list style when the line came from
     an <li>."""
+    _mark_value(doc, para_el, plain=False)
     if line.get("image"):
         from services import image_store  # local: docx_service must import without an app
         para = Paragraph(para_el, doc)
@@ -1544,6 +1549,7 @@ def _set_paragraph_rich(doc, para_el, line, template_run=None):
     existing = [r for r in para.runs if not _run_has_drawing(r)]
     runs = line["runs"] or [{"text": "", "bold": False, "italic": False, "underline": False,
                              "size": None, "color": None, "highlight": None}]
+    runs = [{**runs[0], "text": _ONE_MARKER.sub(r"\1", runs[0]["text"])}] + runs[1:]
     style_name = _LIST_STYLE_BY_TYPE.get(line["list"]) if line["list"] else None
     if line["list"] and not (style_name and _has_style(doc, style_name)):
         # Lesson-plan templates rarely carry Word's list styles, and without
@@ -1648,8 +1654,8 @@ def _replace_block_region_rich(doc, anchor_el, boundary_el, lines):
         (el for el in region_els if el.tag == qn("w:p") and _element_text(doc, el)),
         None,
     )
-    if template_el is not None:
-        template_el = _without_drawings(copy.deepcopy(template_el))
+    template_el = _without_drawings(copy.deepcopy(template_el)) if template_el is not None \
+        else _label_as_template(anchor_el)
     template_run = None
     if template_el is not None:
         p = Paragraph(template_el, doc)
@@ -1957,7 +1963,11 @@ def _value_lines(value):
     if not text:
         return ["-"]
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    return lines or ["-"]
+    return [_ONE_MARKER.sub(r"\1", ln) for ln in lines] or ["-"]
+
+
+# "• • item" (a bullet added to a line that had one) prints with one.
+_ONE_MARKER = re.compile(r"^([•·▪\-*]\s+)(?:[•·▪\-*]\s+)+")
 
 def _text_outside_drawings(p_el):
     return "".join(t.text or "" for t in p_el.iter(qn("w:t")))
@@ -2023,6 +2033,7 @@ def _add_blank_run(para, para_el, text):
 
 
 def _set_paragraph_text(doc, para_el, text):
+    _mark_value(doc, para_el, plain=True)
     para = Paragraph(para_el, doc)
     _strip_text_from_drawing_runs(para)
     # run.text = ... clears the whole run, drawing included, so a run carrying
@@ -2065,14 +2076,11 @@ def _replace_block_region(doc, anchor_el, boundary_el, value):
         (el for el in region_els if el.tag == qn("w:p") and _element_text(doc, el)),
         None,
     )
-    if template_el is not None:
-        template_el = _without_drawings(copy.deepcopy(template_el))
+    template_el = _without_drawings(copy.deepcopy(template_el)) if template_el is not None \
+        else _label_as_template(anchor_el)
 
     lines = _value_lines(value)
-    if template_el is not None:
-        new_els = _build_lines_from_template(doc, template_el, lines)
-    else:
-        new_els = _build_lines_from_style(doc, _sample_style(doc, heading=False), lines)
+    new_els = _build_lines_from_template(doc, template_el, lines)
 
     insert_after = anchor_el
     for new_el in new_els:
@@ -2081,6 +2089,23 @@ def _replace_block_region(doc, anchor_el, boundary_el, value):
 
     for el in region_els:
         el.getparent().remove(el)
+
+def _label_as_template(anchor_el):
+    """The label's paragraph, for an answer under it when nothing below it
+    shows how: the font, size and indent the preview gives that answer
+    (docx_layout.slot_css reads the label), without its bold, italics,
+    pictures or list numbering. A guessed "body" style printed answers in
+    another font at the page's edge, under labels indented an inch."""
+    el = _without_drawings(copy.deepcopy(anchor_el))
+    for rpr in el.iter(qn("w:rPr")):
+        for tag in _EMPHASIS:
+            for old in rpr.findall(qn(tag)):
+                rpr.remove(old)
+    ppr = el.find(qn("w:pPr"))
+    for old in ppr.findall(qn("w:numPr")) if ppr is not None else ():
+        ppr.remove(old)
+    return el
+
 
 def _sample_style(doc, heading):
     for para in doc.paragraphs:
@@ -2228,6 +2253,75 @@ PAPER_SIZES = {
 }
 
 
+def ensure_page_margins(doc):
+    """At least docx_layout.MIN_PAGE_MARGIN at the top and bottom of every
+    page. The built-in formats (converted from PDFs) have none, so tables and
+    text ran to the paper's edge on every page (user report 2026-11-24). Left
+    and right stay: the tables are laid out for that width. The preview's
+    page uses the same minimum (docx_layout.page)."""
+    least = Emu(int(docx_layout.MIN_PAGE_MARGIN * 12700))
+    for section in doc.sections:
+        for side in ("top_margin", "bottom_margin"):
+            if (getattr(section, side) or 0) < least:
+                setattr(section, side, least)
+
+
+# Every answer written into the format, one look in Word and on the page
+# (user report 2026-11-24: answers pressed against the cell's top, gaps of
+# 10pt between some lines and overlapping lines in others, "• •"). The
+# setters below mark each paragraph they write; _save then gives every run
+# of them the preview's spacing: docx_layout.VALUE_GAP above the first line
+# and below the last, nothing between, VALUE_LINE line height, the slot's left
+# indent but no list numbering or first-line indent of its own (a value
+# cloned from a numbered or bold label took both).
+_PPR_AFTER_SPACING = {qn(f"w:{t}") for t in (
+    "ind contextualSpacing mirrorIndents suppressOverlap jc textDirection textAlignment "
+    "textboxTightWrap outlineLvl divId cnfStyle rPr sectPr pPrChange").split()}
+
+
+def _mark_value(doc, para_el, plain):
+    doc.__dict__.setdefault("_value_paras", {})[id(para_el)] = (para_el, plain)
+
+
+def _unmark_value(doc, para_el):
+    getattr(doc, "_value_paras", {}).pop(id(para_el), None)
+
+
+def tidy_value_paragraphs(doc):
+    marked = [(el, plain) for el, plain in getattr(doc, "_value_paras", {}).values()
+              if el.getparent() is not None]
+    ids = {id(el) for el, _ in marked}
+    gap, line = str(int(docx_layout.VALUE_GAP * 20)), str(int(docx_layout.VALUE_LINE * 240))
+    for el, plain in marked:
+        ppr = el.get_or_add_pPr()
+        for tag in ("w:numPr", "w:spacing", "w:contextualSpacing"):
+            for old in ppr.findall(qn(tag)):
+                ppr.remove(old)
+        ind = ppr.find(qn("w:ind"))
+        if ind is not None and el.getparent().tag == qn("w:tc"):
+            ppr.remove(ind)  # in a table cell the cell is the box: flush left, as in the preview
+        elif ind is not None:
+            for attr in ("firstLine", "hanging", "firstLineChars", "hangingChars"):
+                ind.attrib.pop(qn(f"w:{attr}"), None)
+        prev, nxt = el.getprevious(), el.getnext()
+        spacing = OxmlElement("w:spacing")
+        spacing.set(qn("w:before"), "0" if prev is not None and id(prev) in ids else gap)
+        spacing.set(qn("w:after"), "0" if nxt is not None and id(nxt) in ids else gap)
+        spacing.set(qn("w:line"), line)
+        spacing.set(qn("w:lineRule"), "auto")
+        later = next((c for c in ppr if c.tag in _PPR_AFTER_SPACING), None)
+        if later is not None:
+            later.addprevious(spacing)
+        else:
+            ppr.append(spacing)
+        if plain:  # a label's bold or italics, carried over by a clone
+            for r in el.iter(qn("w:r")):
+                rpr = r.find(qn("w:rPr"))
+                for tag in _EMPHASIS if rpr is not None else ():
+                    for old in rpr.findall(qn(tag)):
+                        rpr.remove(old)
+
+
 def apply_paper_size(doc, key):
     """Resize every section to the chosen paper, keeping each section's
     orientation and margins. An unknown or empty key leaves the format's own
@@ -2337,8 +2431,10 @@ def _insert_table(doc, before_el, rows):
 
 
 def _save(doc, plan, keep=frozenset()) -> str:
+    tidy_value_paragraphs(doc)
     pipe_rows_to_tables(doc, keep)
     apply_paper_size(doc, plan.get_setup_context().get("pageSize"))
+    ensure_page_margins(doc)
     os.makedirs(Config.GENERATED_FOLDER, exist_ok=True)
     filename = f"lesson_plan_{plan.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.docx"
     path = os.path.join(Config.GENERATED_FOLDER, filename)

@@ -190,8 +190,8 @@ def _quiz_layout(lines, max_item_words):
         if re.match(r"(?i)answer key", bare):
             in_key = True
             out.append(bare)
-        elif in_key:
-            out.append(line.strip())
+        elif in_key or line.count("|") >= 2:
+            out.append(line.strip())  # the key, or a rubric row (never a question)
         elif _OPTION.match(bare) or _LEAD_IN.match(bare) or bare.endswith(":"):
             out.append(_clip_words(bare, max_item_words * 2))
             if _LEAD_IN.match(bare) and re.match(r"(?i)(multiple-choice quiz|performance task)", bare):
@@ -200,6 +200,28 @@ def _quiz_layout(lines, max_item_words):
             n += 1
             out.append(f"{n}. {_clip_words(bare, max_item_words * 2)}")
     return "\n".join(out[:_QUIZ_LINES])
+
+
+_BULLET = re.compile(r"^(?:[•·●▪\-*]\s+)+")
+_NO_LIMIT = 10 ** 6
+
+
+def tidy_layout(value):
+    """A part the student wrote (Guided), laid out like Alan's (user,
+    2026-11-24): markdown marks off, a list run into one line split back to one
+    item per line, a quiz's questions numbered with their options under them,
+    one "• " per bulleted line, single spaces, no blank lines. Layout only:
+    no word is cut, added or reworded. A weekly part is tidied day by day."""
+    if isinstance(value, (list, tuple)):
+        return [tidy_layout(v) for v in value]
+    text = str(value or "")
+    lines = [re.sub(r"[ \t]+", " ", _strip_markdown(line)).strip() for line in text.split("\n")]
+    lines = _split_runs([line for line in lines if line])
+    if not lines:
+        return ""
+    if _looks_like_quiz(lines):
+        return _quiz_layout(lines, _NO_LIMIT)
+    return "\n".join(_BULLET.sub("• ", line) for line in lines)
 
 
 def clean_value(value, field_type: str = "text", *, max_items: int, max_item_words: int,

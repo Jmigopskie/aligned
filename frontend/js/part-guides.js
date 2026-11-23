@@ -41,8 +41,17 @@ const PART_GUIDES = [
     "The content is the topic of the lesson in a few words, as your Budget of Work or Curriculum Guide names it."],
 ];
 
+// The part this format teaches the topic in, whatever it is called (the 4A's
+// Abstraction, ILAW's Flow): described as the lesson proper, or for a part
+// that runs the whole session, as the session with the lesson inside it.
+const LESSON_PROPER_GUIDE = PART_GUIDES.find(([pattern]) => pattern.test("lesson proper"))[1];
+const LESSON_FLOW_GUIDE = "This part runs the whole session step by step. In the step where you teach today's topic, write the lesson itself: definitions, key terms, parts or rules, and examples, all taken from your references.";
+
 function partGuide(field) {
   const name = `${field.label || ""} ${String(field.field_key || "").replace(/_/g, " ")}`.toLowerCase();
+  if (field.kind === "lesson_proper") {
+    return /\bflow\b|procedure|learning experience|teaching.learning/.test(name) ? LESSON_FLOW_GUIDE : LESSON_PROPER_GUIDE;
+  }
   const rule = PART_GUIDES.find(([pattern]) => pattern.test(name));
   if (rule) return rule[1];
   // Nothing matched: the format's own hint for the part, else a general line.

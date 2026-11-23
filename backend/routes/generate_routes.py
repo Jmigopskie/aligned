@@ -259,7 +259,8 @@ def owl_chat():
     Free: points are only spent when Alan writes the plan."""
     data = request.get_json(silent=True) or {}
     fmt = LessonPlanFormat.query.get_or_404(data.get("format_id"))
-    field = next((f for f in grounding.competency_view(fmt.fields) if f.field_key == data.get("field_key")), None)
+    fields = grounding.competency_view(fmt.fields)
+    field = next((f for f in fields if f.field_key == data.get("field_key")), None)
     if not field:
         return jsonify({"status": "error", "message": "That field isn't part of this format."}), 400
 
@@ -285,8 +286,31 @@ def owl_chat():
 
     answer = ai_service.owl_chat(context, field, prior_values,
                                  _guide_sources(guides) + _resolve_sources(data, current_user()), history, message,
-                                 course_guide_citation=_guide_citation(guides), direction=direction)
+                                 course_guide_citation=_guide_citation(guides), direction=direction,
+                                 fields=sorted(fields, key=lambda f: f.sort_order))
     return jsonify({"status": "ok", **answer})
+
+_TIDY_VALUE_LIMIT = 40000
+
+
+@generate_bp.post("/lesson-plans/tidy")
+@login_required
+def tidy_plan():
+    """The parts of a Guided plan laid out like Alan's (ai_limits.tidy_layout):
+    bullets, numbering, quiz items and spacing, never the words. Returns only
+    the parts that changed. No AI, free."""
+    data = request.get_json(silent=True) or {}
+    values = data.get("values") if isinstance(data.get("values"), dict) else {}
+    changed = {}
+    for key, value in list(values.items())[:200]:
+        if not isinstance(value, (str, list)) or len(str(value)) > _TIDY_VALUE_LIMIT:
+            continue
+        if isinstance(value, list) and not all(isinstance(v, str) for v in value):
+            continue
+        tidy = ai_limits.tidy_layout(value)
+        if tidy != value:
+            changed[str(key)[:120]] = tidy
+    return jsonify({"status": "ok", "values": changed})
 
 @generate_bp.post("/lesson-plans/coherence")
 @login_required

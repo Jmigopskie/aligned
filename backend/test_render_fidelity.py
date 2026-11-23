@@ -61,7 +61,8 @@ def check_page():
     section.top_margin = section.bottom_margin = Inches(0.5)
     doc.add_paragraph("x")
     html = _render(doc)
-    assert html.startswith('<div class="lp-doc" style="width:936pt;padding:36pt 36pt 36pt 36pt;'), html[:200]
+    # Top and bottom at least 0.75" (54pt), as the Word export makes them (test_export_layout.py).
+    assert html.startswith('<div class="lp-doc" style="width:936pt;padding:54pt 36pt 54pt 36pt;'), html[:200]
     assert 'data-page-width="936"' in html
     print("  page OK")
 

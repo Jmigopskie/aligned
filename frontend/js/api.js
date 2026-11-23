@@ -230,6 +230,10 @@ const Api = {
       body: JSON.stringify(payload),
     }),
 
+  // The parts laid out tidily (bullets, numbering, spacing; never the words): { values } -> { values } changed.
+  tidyPlan: (values) =>
+    apiFetch("/api/lesson-plans/tidy", { method: "POST", body: JSON.stringify({ values }) }),
+
   // Whether the plan's parts line up; payload = generation payload + field_values + mode.
   checkCoherence: (payload) =>
     apiFetch("/api/lesson-plans/coherence", {
@@ -491,7 +495,29 @@ function exportPlan(planId, suggestedName) {
 // clean copy of its page: the server has no Word-to-PDF converter, so the page
 // as drawn here is what prints. The dialog names the file after the title.
 // ponytail: browser print; a server PDF (LibreOffice) if exact Word fidelity is needed.
-function printPlanDocument(source, name) {
+// The paper sizes the setup offers (docx_service.PAPER_SIZES), as CSS.
+const PRINT_PAPER = { letter: "8.5in 11in", legal: "8.5in 14in", folio: "8.5in 13in", a4: "210mm 297mm" };
+
+// The page's top and bottom margins go on every printed sheet (@page), not on
+// the document once: with them on the document, only the first sheet's top
+// and the last one's bottom had any, and every page break in between ran to
+// the paper's edge (user report 2026-11-24). Left and right stay on the page,
+// as in the preview and the Word export.
+function printPageStyle(page, paper) {
+  const style = document.createElement("style");
+  const width = parseFloat(page && page.dataset.pageWidth);
+  const height = parseFloat(page && page.dataset.pageHeight);
+  const size = PRINT_PAPER[paper] || (width > 0 && height > 0 ? `${width}pt ${height}pt` : "auto");
+  const top = (page && page.style.paddingTop) || "54pt";
+  const bottom = (page && page.style.paddingBottom) || "54pt";
+  style.textContent = `@media print {
+  @page { size: ${size}; margin: ${top} 0 ${bottom} 0; }
+  body.print-doc #print-root .lp-doc { padding-top: 0 !important; padding-bottom: 0 !important; }
+}`;
+  return style;
+}
+
+function printPlanDocument(source, name, paper) {
   if (!source) {
     showToast("Open the plan's document first.", true);
     return;
@@ -500,6 +526,8 @@ function printPlanDocument(source, name) {
   root.id = "print-root";
   root.append(source.cloneNode(true));
   root.querySelectorAll("[contenteditable]").forEach((el) => el.removeAttribute("contenteditable"));
+  const pageStyle = printPageStyle(root.querySelector(".lp-doc"), paper);
+  document.head.append(pageStyle);
   document.body.append(root);
   document.body.classList.add("print-doc");
   const title = document.title;
@@ -507,6 +535,7 @@ function printPlanDocument(source, name) {
   const done = () => {
     window.removeEventListener("afterprint", done);
     root.remove();
+    pageStyle.remove();
     document.body.classList.remove("print-doc");
     document.title = title;
   };

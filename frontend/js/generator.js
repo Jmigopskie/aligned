@@ -527,16 +527,24 @@ function drawTurns(turns) {
 
 const startersFor = (field) => (field.locked ? OWL_COACH_STARTERS : OWL_STARTERS);
 
-// The lesson proper (TUP's "Lesson Proper", a "Discussion"): the lesson
-// itself, taught from the plan's references.
+// The lesson proper (TUP's "Lesson Proper", a "Discussion", the 4A's
+// "Abstraction", ILAW's "Flow"): the lesson itself, taught from the plan's
+// references. The server says which part it is for each format (field.kind,
+// grounding.field_kinds); the name is the fallback for an older payload.
 function isLessonProper(field) {
+  if ("kind" in field) return field.kind === "lesson_proper";
   return /lesson.proper|discussion/i.test(`${field.label || ""} ${String(field.field_key || "").replace(/_/g, " ")}`);
+}
+
+function isReferencePart(field) {
+  if ("kind" in field) return field.kind === "references";
+  return /reference/i.test(`${field.field_key} ${field.label}`);
 }
 
 // The references the student listed in the plan, one per line.
 function planReferences() {
   return (fmt.fields || [])
-    .filter((f) => /reference/i.test(`${f.field_key} ${f.label}`))
+    .filter(isReferencePart)
     .flatMap((f) => [].concat(fieldValues[f.field_key] || []))
     .flatMap((v) => String(v || "").split("\n"))
     .map((line) => line.replace(/^[•\-*]\s+/, "").trim())
@@ -1630,7 +1638,8 @@ function syncActiveStepValue() {
 // Strips any bullet/dash/number the model (or a prior pass) may already have
 // put on a line, so we can re-apply a single consistent marker.
 function stripExistingBullet(line) {
-  return line.replace(/^[•\-*]\s+/, "").replace(/^\d+[.)]\s+/, "").trim();
+  // Every marker, not just the first: "• • item" came out with two.
+  return line.replace(/^(?:[•\-*]\s+|\d+[.)]\s+)+/, "").trim();
 }
 
 // AI responses for list-style fields (objectives, references, materials, etc.)
@@ -1669,8 +1678,11 @@ function formatGeneratedValue(raw) {
   }
 
   // A lead-in line ("At the end of the lesson, the learners are expected to:")
-  // introduces the list, so it stays a plain line above the bullets.
-  return items.map((item) => (/:\s*$/.test(item) ? stripExistingBullet(item) : `• ${stripExistingBullet(item)}`)).join("\n");
+  // introduces the list, so it stays a plain line above the bullets, and
+  // anything before it (a combined part's competency) is not one of its items.
+  const leadIn = items.findIndex((item) => /:\s*$/.test(item));
+  return items.map((item, i) => (i <= leadIn || /:\s*$/.test(item)
+    ? stripExistingBullet(item) : `• ${stripExistingBullet(item)}`)).join("\n");
 }
 
 // Runs formatGeneratedValue over a whole field_key -> value map returned by
@@ -2498,7 +2510,8 @@ function exportName() {
 
 // The page as it is on screen, so it needs no save first.
 document.getElementById("pdf-btn").addEventListener("click", () => {
-  printPlanDocument(liveDocWrap.querySelector(".lp-doc") || (resultsEl.children.length ? resultsEl : null), exportName());
+  printPlanDocument(liveDocWrap.querySelector(".lp-doc") || (resultsEl.children.length ? resultsEl : null), exportName(),
+    pageSizeSelect.value);
 });
 
 // ---- Same plan on two devices ----------------------------------------------
@@ -2603,23 +2616,75 @@ function hasUnsavedWork() {
   return (dirty && worthSaving()) || (!!fmt && !planId);
 }
 
+// A lesson plan being made (a format picked), saved or not: leaving it, by a
+// link, the browser's Back button or closing the tab, asks first (user,
+// 2026-11-24: an accidental Back threw them out of the plan).
+function planOpen() {
+  return !leavingConfirmed && !!fmt;
+}
+
 function openLeaveDialog() {
-  // "Save and leave" only when there is a plan worth saving yet.
-  document.getElementById("leave-save").hidden = !worthSaving();
+  const unsaved = hasUnsavedWork();
+  document.getElementById("leave-title").textContent = unsaved
+    ? "Are you sure you want to leave?" : "Leave this lesson plan?";
+  document.getElementById("leave-body").textContent = unsaved
+    ? "Your lesson plan won't be saved. What you've done so far isn't in your account yet, so it may be lost and won't show up on another device."
+    : "Your plan is saved. You can open it again from My Lesson Plans.";
+  // "Save and leave" only when there is unsaved work worth saving.
+  document.getElementById("leave-save").hidden = !(unsaved && worthSaving());
+  document.getElementById("leave-discard").textContent = unsaved ? "Leave anyway" : "Leave";
   openDialog(leaveOverlay);
 }
+
+const LEAVE_BACK = "back";
 
 function leaveTo(href) {
   leavingConfirmed = true;
   closeDialog(leaveOverlay);
   showPageTransition();
+  if (href === LEAVE_BACK) {
+    // Past the guard entry and the page itself, to wherever Back was going.
+    history.go(-2);
+    return;
+  }
   window.location.href = href;
 }
+
+// The browser's (or phone's) Back button: an extra history entry on top of
+// the page, pushed after the first click or key press (Chrome skips entries
+// pushed without one). Back lands on the page's own entry; the guard steps
+// forward again and asks. forward(), not a new push, so a URL the page set
+// since (?plan_id=) is kept.
+let backGuarded = false;
+let ignoreNextPop = false;
+function armBackGuard() {
+  if (backGuarded) return;
+  backGuarded = true;
+  history.pushState({ alignedGuard: true }, "", location.href);
+}
+document.addEventListener("pointerdown", armBackGuard, { once: true, capture: true });
+document.addEventListener("keydown", armBackGuard, { once: true, capture: true });
+window.addEventListener("popstate", () => {
+  if (ignoreNextPop) {
+    ignoreNextPop = false;
+    return;
+  }
+  if (!backGuarded) return;
+  if (!planOpen()) {
+    backGuarded = false;
+    history.back();
+    return;
+  }
+  ignoreNextPop = true;
+  history.forward();
+  leaveHref = LEAVE_BACK;
+  openLeaveDialog();
+});
 
 // Capture phase, so this runs before api.js's page-transition handler, which
 // skips any click already default-prevented.
 document.addEventListener("click", (e) => {
-  if (!hasUnsavedWork() || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  if (!planOpen() || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   const link = e.target.closest("a[href]");
   if (!link || link.target === "_blank" || link === exportBtn) return;
   const href = link.getAttribute("href");
@@ -2630,7 +2695,7 @@ document.addEventListener("click", (e) => {
 }, true);
 
 window.addEventListener("beforeunload", (e) => {
-  if (!hasUnsavedWork()) return;
+  if (!planOpen()) return;
   e.preventDefault();
   e.returnValue = "";
 });
@@ -3647,7 +3712,6 @@ const regenAll = document.getElementById("regen-all");
 const regenConfirm = document.getElementById("regen-confirm");
 const regenPoints = document.getElementById("regen-points");
 const REGENERATE_COST = 5;
-const isReferencePart = (f) => /reference/i.test(`${f.field_key} ${f.label}`);
 
 function syncRegenerateBtn() {
   regenBtn.hidden = !(fmt && flowFlags.mode !== "step" && hasAnyValue());
@@ -4092,6 +4156,29 @@ function guidedRich(key, part = null) {
   return richForSlot({ dataset: part === null ? { fieldKey: key } : { fieldKey: key, part: String(part) } });
 }
 
+// Guided done (user, 2026-11-24): every part the student wrote is laid out
+// like Alan's before the document opens: bullets, numbering, quiz items and
+// spacing, never the words. Parts with formatting from the toolbox keep it
+// as they are. Nothing changes if the tidy can't run.
+async function tidyGuidedPlan() {
+  const hasRich = (key) => [].concat(fieldRichValues[key] || []).some((h) => String(h || "").trim());
+  const values = {};
+  Object.entries(fieldValues).forEach(([key, value]) => {
+    if (!hasRich(key) && hasValue(value)) values[key] = value;
+  });
+  if (!Object.keys(values).length) return;
+  try {
+    const { values: tidy } = await Api.tidyPlan(values);
+    Object.entries(tidy || {}).forEach(([key, value]) => {
+      if (!(key in values)) return;
+      if (Array.isArray(value)) value.forEach((day, i) => setGuidedValue(key, day, i));
+      else setGuidedValue(key, value);
+    });
+  } catch (err) {
+    // The plan stands as written.
+  }
+}
+
 // Writes one part's answer (or one day of a weekly part) and shows it in the
 // hidden document too, so saving and exporting see exactly what was typed.
 function setGuidedValue(key, text, part = null) {
@@ -4230,6 +4317,7 @@ window.Generator = {
   checkCoherence,
   isFieldComplete,
   setGuidedValue,
+  tidyGuidedPlan,
   // The part screens' formatting toolbox: the formatted answer, read and
   // written through the document's own rich-value machinery.
   setGuidedRich,

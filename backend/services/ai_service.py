@@ -555,7 +555,7 @@ def _grounding_directive(field, context: dict) -> str:
         out += f" The whole discussion lasts {span}. Where the procedure gives times, they must add up to that."
     out += _objectives_for_assessment(field, context)
     if grounding.is_lesson_proper_field(field):
-        out += _LESSON_PROPER_DIRECTIVE
+        out += _LESSON_FLOW_DIRECTIVE if grounding.is_lesson_flow(field) else _LESSON_PROPER_DIRECTIVE
     if _ASSESSMENT_FIELD.search(haystack) and "mastery" not in haystack:
         out += _ALIGNED_ASSESSMENT
     return out + _assessment_directive(haystack, context)
@@ -617,6 +617,17 @@ _LESSON_PROPER_DIRECTIVE = (
     "that reference lists them, e.g. (Department of Education, n.d.). It teaches "
     "every learning objective already written for this plan, in order, so learners can do each one by "
     "the end. The length limits do not apply to this field."
+)
+
+# A format whose lesson is taught inside the session's flow (ILAW's "Flow", an
+# older form's "Procedure"): the steps stay, the teaching step is the lesson.
+_LESSON_FLOW_DIRECTIVE = (
+    " This part runs the whole session: keep its steps in order, each with its minutes and what the "
+    "teacher and learners do. In the step where today's topic is taught, write the actual lesson, "
+    "taken from the online references' content given above (definitions, key terms, parts or rules, "
+    "examples, on today's specific topic, close to their wording, each fact ending with its APA 7 "
+    "in-text citation), one point per line with '• ' or '1. ', never invented. It teaches every "
+    "learning objective already written for this plan."
 )
 
 # Testers found objectives, content and assessment drifting apart: the check
@@ -722,8 +733,8 @@ _PART_MEANINGS = [
      "that gets learners curious; say what learners do."),
     (r"\banalysis\b", "Two to four questions the teacher asks so learners process the activity they just did "
      "and draw out the concept. Questions only, addressed to learners."),
-    (r"\babstraction\b|\blesson proper\b|\bdiscussion\b", "The lesson itself, as the teacher teaches it and "
-     "shows it on slides: definitions, terms and examples."),
+    (r"\babstraction\b", "With the teacher's questions, learners draw out and state the key concepts the "
+     "lesson proper taught (its definitions and rules), briefly; not the whole lesson again."),
     (r"\bapplication\b", "One task where learners use the new concept themselves (individually, in pairs or "
      "groups), with what they produce."),
     (r"\bgeneralization\b", "The key idea of the lesson in one to three sentences, as learners should be able to "
@@ -736,9 +747,14 @@ _PART_MEANINGS = [
 ]
 
 
+_LESSON_MEANING = "The lesson itself, as the teacher teaches it and shows it on slides: definitions, terms and examples."
+
+
 def _part_meaning(field):
     if field.ai_hint:
         return ""
+    if grounding.is_lesson_proper_field(field) and not grounding.is_lesson_flow(field):
+        return f" ({_LESSON_MEANING})"  # whatever the format calls it (the 4A's Abstraction)
     label = (field.label or "").lower()
     for pattern, meaning in _PART_MEANINGS:
         if re.search(pattern, label):
@@ -1719,14 +1735,31 @@ def _with_web_references(values: dict, fields, context: dict, found=None, citati
 _MAX_CHOICES = 4
 
 
+def _written_by_label(prior_values, fields, current):
+    """The other parts already written, as {label: value} in the plan's
+    order, the lesson proper and references marked as such whatever the
+    format calls them, so Alan can tell which part is which (keys alone said
+    "abstraction" for a 4A's lesson proper). By key without `fields`."""
+    values = {k: v for k, v in (prior_values or {}).items() if v and k != current.field_key}
+    if not fields:
+        return values
+    out = {}
+    for f in fields:
+        if f.field_key in values:
+            tag = (" (the lesson proper)" if grounding.is_lesson_proper_field(f)
+                   else " (the references)" if grounding.is_reference_field(f) else "")
+            out[f"{f.label}{tag}"] = values.pop(f.field_key)
+    return {**out, **values}
+
+
 def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
-             history: list, message: str, course_guide_citation: str = "", direction=None) -> dict:
+             history: list, message: str, course_guide_citation: str = "", direction=None, fields=None) -> dict:
     """One turn of the Guided mode chat about `field`. `direction` is the
     {label, text} the student picked from Alan's two directions, if any. Returns
     {"reply": str, "choices": [{"type": "direction"|"use"|"ask", "label", "text", "why" (not "ask")}]}."""
     excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
     lesson = _lesson_block(context, excerpt, course_guide_citation)
-    written = {k: v for k, v in (prior_values or {}).items() if v and k != field.field_key}
+    written = _written_by_label(prior_values, fields, field)
     current = (prior_values or {}).get(field.field_key) or ""
     names = getattr(field, "parts_list", None) or []
     weekly_note = ""
@@ -1740,7 +1773,7 @@ def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
     turns = "\n".join(f"{'Teacher' if t.get('role') == 'teacher' else 'Owl'}: {t.get('text', '')}" for t in history)
     typed = f'What the teacher has typed in it so far: "{current}"' if str(current).strip() else "The field is still empty."
     if grounding.is_lesson_proper_field(field):
-        lesson += _lesson_references(prior_values, context)
+        lesson += _lesson_references(prior_values, context, fields)
     locked = bool(getattr(field, "locked", False))
     if locked:
         weekly_note += ("\nThe supervising teacher locked this field: the student must write it in their own words. "
@@ -1754,8 +1787,14 @@ def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
                      "questions, but do not write it; offer only \"ask\" choices." if locked else
                      "Write the complete part in that direction as one \"use\" choice."))
     task = f"""
-Fields already written (do not repeat them):
+The parts of this plan the student has already written, in the plan's order (do not repeat them):
 {json.dumps(written)}
+
+Build on them (user, 2026-11-24: Guided plans must be as coherent as Building Proficiency): what you
+suggest works toward exactly the learning objectives written there; the lesson proper is taught from
+the references listed there and what their pages say; any part that assesses or practises checks only
+what the lesson proper written there teaches, in its terms, facts and examples; and it never
+contradicts another part. Where a part it depends on is still empty, say so in the reply.
 
 The teacher is writing the field "{field.label}" ({field.field_type}).
 {f"What belongs in it: {field.ai_hint}" if field.ai_hint else ""}{_field_directive(field)}{_grounding_directive(field, context)}{weekly_note}{chosen}
@@ -1881,7 +1920,9 @@ def check_coherence(context: dict, fields, values: dict) -> dict:
                       ("topic", "main_topic", "subject", "grade_level", "previous_topic", "next_topic",
                        "assessment_type") if context.get(k))
     chosen = _chosen_assessment(context)
+    teaching = [f.label for f in fields if grounding.is_lesson_proper_field(f)]
     task = (f"Lesson:\n{about}\n\nObjective verb taxonomies:\n{taxonomy_text()}\n\n"
+            + (f"In this school's format the lesson proper is the part \"{teaching[0]}\".\n" if teaching else "")
             + (f"{chosen} Never change the assessment's kind or its number of items; when an objective "
                "can't be checked by it, the fix goes on the objectives.\n" if chosen else "")
             + f"{_FIX}\n"
@@ -1909,12 +1950,14 @@ def check_coherence(context: dict, fields, values: dict) -> dict:
             "issues": issues}
 
 
-def _lesson_references(prior_values: dict, context: dict) -> str:
+def _lesson_references(prior_values: dict, context: dict, fields=None) -> str:
     """For the lesson proper in Guided: the references the student listed in
-    the plan and what their pages say, so Alan teaches from them."""
+    the plan (in its references part, whatever the format calls it) and what
+    their pages say, so Alan teaches from them."""
+    ref_keys = {f.field_key for f in fields or [] if grounding.is_reference_field(f)}
     lines = []
     for key, value in (prior_values or {}).items():
-        if "reference" in str(key).lower():
+        if key in ref_keys or (not ref_keys and "reference" in str(key).lower()):
             for v in value if isinstance(value, list) else [value]:
                 lines += [l.strip() for l in str(v or "").split("\n") if l.strip()]
     if not grounding.reference_urls(lines):

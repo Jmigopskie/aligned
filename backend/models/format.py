@@ -63,7 +63,10 @@ class LessonPlanFormat(db.Model):
             "builtin_key": self.builtin_key,
         }
         if include_fields:
-            data["fields"] = [f.to_dict() for f in self.fields]
+            from services.grounding import field_kinds  # local: models import before services
+            kinds = field_kinds(self.fields)
+            # kind: what the part is for, whatever this school calls it ("lesson_proper", "references").
+            data["fields"] = [{**f.to_dict(), "kind": kinds.get(f.field_key)} for f in self.fields]
         return data
 
 class FormatField(db.Model):

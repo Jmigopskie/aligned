@@ -203,7 +203,8 @@ async function runRowAction(action, plan) {
     // The preview draws the plan's page; that page is what prints.
     await openPreview(planId);
     if (!previewBody.querySelector(".preview-error")) {
-      printPlanDocument(previewBody.querySelector(".lp-doc") || previewBody, plan.title || "Lesson plan");
+      printPlanDocument(previewBody.querySelector(".lp-doc") || previewBody, plan.title || "Lesson plan",
+        (plan.setup_context || {}).pageSize);
     }
   } else if (action === "submit") {
     openSubmitModal(planId);

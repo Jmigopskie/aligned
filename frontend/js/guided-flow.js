@@ -517,8 +517,9 @@ export function createGuided(ui) {
         answer.append(list);
       },
       next: "Open the document",
-      onNext: () => {
+      onNext: async () => {
         leave();
+        await G.tidyGuidedPlan(); // laid out like Alan's: bullets, numbering, spacing
         G.showDocument();
       },
       onBack: () => (G.quickParts().length ? quick() : part(parts.length - 1)),

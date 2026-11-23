@@ -21,6 +21,11 @@ from lxml import etree
 _log = logging.getLogger(__name__)
 
 _EMU_PER_PT = 12700
+# Shared with the Word export (docx_service) so the preview, the PDF printed
+# from it and the .docx look the same (user report 2026-11-24). In points:
+MIN_PAGE_MARGIN = 54   # 0.75" at the top and bottom of a page, at least
+VALUE_GAP = 3          # above an answer's first line and below its last
+VALUE_LINE = 1.15      # an answer's line height, in lines
 _A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 _WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
 _R_EMBED = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed"
@@ -367,12 +372,24 @@ class Layout:
 
     def slot_css(self, p_el):
         """What Word gives text typed into this (empty) paragraph: its mark's
-        font and size, and its alignment."""
+        font and size, its alignment and left indent, and the spacing every
+        answer gets in the Word export (docx_service.tidy_value_paragraphs):
+        VALUE_GAP above and below, VALUE_LINE line height."""
         try:
-            css = self._text_css(self._rpr_chain(p_el), marks=False)
-            align = _ALIGN.get(_val(_last(self._ppr_chain(p_el), "jc")) or "")
+            chain = self._rpr_chain(p_el)
+            css = self._text_css(chain, marks=False)
+            pchain = self._ppr_chain(p_el)
+            align = _ALIGN.get(_val(_last(pchain, "jc")) or "")
             if align:
                 css.append("text-align:" + align)
+            ind = _merged(pchain, "ind")
+            left = _num(ind.get("left", ind.get("start")), 0) / 20
+            # In a table cell the cell is the box: flush left (the export does the same).
+            if left > 0 and p_el.getparent().tag != qn("w:tc"):
+                css.append("margin-left:" + _pt(left))
+            single = _LINE_FACTOR.get((self._font_name(chain) or "").lower(), 1.15)
+            css += ["padding-top:" + _pt(VALUE_GAP), "padding-bottom:" + _pt(VALUE_GAP),
+                    "line-height:%g" % round(VALUE_LINE * single, 3)]
             return ";".join(css)
         except Exception:
             _log.debug("Slot layout unreadable; drawn plain.", exc_info=True)
@@ -517,6 +534,9 @@ class Layout:
             margins = sect.find(qn("w:pgMar")) if sect is not None else None
             width = _num(_val(size, "w"), 12240) / 20
             sides = [abs(_num(_val(margins, side), 1440)) / 20 for side in ("top", "right", "bottom", "left")]
+            # The export's minimum (docx_service.ensure_page_margins).
+            sides[0], sides[2] = max(sides[0], MIN_PAGE_MARGIN), max(sides[2], MIN_PAGE_MARGIN)
+            self.page_height = _num(_val(size, "h"), 15840) / 20
             css += ["width:" + _pt(width), "padding:" + " ".join(_pt(v) for v in sides)]
             chain = [el for el in [self._default_rpr] + [s.find(qn("w:rPr")) for s in self._chain(None, "paragraph")]
                      if el is not None]
