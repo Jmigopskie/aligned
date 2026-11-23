@@ -17,7 +17,7 @@ import json
 import logging
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
 import requests
@@ -553,6 +553,7 @@ def _grounding_directive(field, context: dict) -> str:
     if minutes and any(w in haystack for w in _TIMING_WORDS):
         span = f"{minutes} minutes per session" if weekly else f"{minutes} minutes"
         out += f" The whole discussion lasts {span}. Where the procedure gives times, they must add up to that."
+    out += _objectives_for_assessment(field, context)
     if grounding.is_lesson_proper_field(field):
         out += _LESSON_PROPER_DIRECTIVE
     if _ASSESSMENT_FIELD.search(haystack) and "mastery" not in haystack:
@@ -606,8 +607,11 @@ _LESSON_PROPER_DIRECTIVE = (
     "key terms each with its meaning, its parts, rules or types as a numbered list ('1. Digits: the "
     "symbols it uses'), and concrete examples ('Binary has 2 digits (0 and 1), so its base is 2.'). "
     "One point per line: '• ' before a bullet point, '1. ' before a numbered one, nothing before a "
-    "heading. Every fact, term, definition and example comes from the online references' content or "
-    "the course guide given above; never invent one, and leave out what they don't cover. Draw on every "
+    "heading. The content is taken from the online references' content given above (what those pages "
+    "say about today's specific topic): their definitions, facts, lists, steps and examples, kept close "
+    "to their own wording and put simply for these learners, and only what is about today's specific "
+    "topic, never the wider subject. Where no reference covers a point, use the course guide; never "
+    "invent a fact, term, definition or example, and leave out what they don't cover. Draw on every "
     "reference whose content covers part of the topic, and end each definition, fact or example taken "
     "from one with its APA 7 in-text citation: the author's surname or organization and the year as "
     "that reference lists them, e.g. (Department of Education, n.d.). It teaches "
@@ -677,6 +681,29 @@ def _assessment_directive(haystack: str, context: dict) -> str:
     if task:
         return f" Assess with {_TASK_HOW}, on the lesson's specific topic.{_NO_LIMITS}"
     return ""
+
+
+def _chosen_assessment(context) -> str:
+    """What the setup's assessment choice lets the objectives be: "" when the
+    objectives choose it themselves or setup didn't ask."""
+    kind = str((context or {}).get("assessment_type") or "")
+    if not kind or "objectives" in kind:
+        return ""
+    if "performance task" not in kind:
+        return (f"The teacher chose {kind} as the assessment, so every objective is one a quiz can check "
+                "(knowing, understanding, applying or analyzing), never a hands-on or attitude objective.")
+    if not _QUIZ_ITEMS.search(kind):
+        return (f"The teacher chose {kind} as the assessment, so the objectives are ones a performance task "
+                "and its rubric can check.")
+    return f"The teacher chose {kind} as the assessment; the quiz and the task between them check every objective."
+
+
+def _objectives_for_assessment(field, context) -> str:
+    """Objectives written for the assessment the teacher chose: a quiz can't
+    check "assemble a diagram", and the coherence check then flagged it."""
+    if not _is_objective_field(field) or not _chosen_assessment(context):
+        return ""
+    return " " + _chosen_assessment(context)
 
 
 def _sets_assessment(field, context) -> bool:
@@ -810,6 +837,8 @@ def _post_openrouter(system_instruction: str, parts: list) -> str:
         # Lesson content and chat replies don't need a thinking pass: it only
         # adds seconds and output tokens.
         payload["reasoning"] = {"enabled": False}
+    if system_instruction == _COHERENCE_SYSTEM:
+        payload["temperature"] = 0  # the same plan gets the same verdict each time it is checked
     response = requests.post(
         _OPENROUTER_URL,
         headers={"Authorization": f"Bearer {Config.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
@@ -1295,8 +1324,6 @@ Fill ONLY the following fields and return strict JSON with field_key as keys:
 
 
 _STREAM_CHUNK_SIZE = 4
-# Batches written at the same time after the first (and the reference search).
-_STREAM_WORKERS = 6
 
 
 def _not_references(fields):
@@ -1311,7 +1338,7 @@ def _apply_coherence(context, fields, values, written, guide_text, citation, pla
     written. {} when it all lines up or the check can't run."""
     by_key = {f.field_key: f for f in fields}
     try:
-        result = check_coherence(context, list(plan_fields or fields), {**(written or {}), **values}, "full")
+        result = check_coherence(context, list(plan_fields or fields), {**(written or {}), **values})
     except Exception as exc:  # noqa: BLE001 - the plan stands without the extra pass
         _log.warning("Coherence pass failed: %s", exc)
         return {}
@@ -1322,10 +1349,20 @@ def _apply_coherence(context, fields, values, written, guide_text, citation, pla
             continue
         if f.field_type == "weekly":
             continue  # a day-by-day part isn't replaced by one block of text
+        if _INSTRUCTION.match(issue["fix"]):
+            continue  # "Add a performance task ..." pasted over the quiz (server run 2026-11-24)
         cleaned = _trim({f.field_key: issue["fix"]}, [f], guide_text, citation, context).get(f.field_key)
+        quiz = _QUIZ_ITEMS.search(str(context.get("assessment_type") or ""))
+        if quiz and _sets_assessment(f, context) and "answer key" not in str(cleaned).lower():
+            continue  # the teacher's quiz stays a quiz
         if cleaned and ai_limits.is_answered(cleaned):
             fixes[f.field_key] = cleaned
     return fixes
+
+
+# A coherence "fix" that tells the student what to do rather than being the part itself.
+_INSTRUCTION = re.compile(r"\s*['\"]?(?:add|change|replace|include|revise|rewrite|ensure|make|remove|update|modify|"
+                          r"insert|create|align|adjust|consider)\b", re.I)
 
 
 def _chunk_label(chunk):
@@ -1348,17 +1385,25 @@ def generate_full_streaming(context: dict, fields, course_guide_text: str = "", 
     if not fields:
         yield {"type": "complete", "values": {}, "missing": [], "missing_labels": [], **needs_guide}
         return
-    chunks = [fields[i:i + _STREAM_CHUNK_SIZE] for i in range(0, len(fields), _STREAM_CHUNK_SIZE)]
+    # Top to bottom (user, 2026-11-24): one batch after another in document
+    # order, each told everything written above it. The lesson proper ends its
+    # batch, so the assessment and everything after it are written from it.
+    chunks, current = [], []
+    for f in fields:
+        current.append(f)
+        if len(current) == _STREAM_CHUNK_SIZE or grounding.is_lesson_proper_field(f):
+            chunks.append(current)
+            current = []
+    if current:
+        chunks.append(current)
     cite = course_guide_citation
     excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
     base = _lesson_block(context, excerpt, cite) + _written_block(written)
 
-    # Speed (user report 2026-11-23: about 5 minutes a plan). The reference
-    # search (two web searches + reading pages) runs beside the writing; only
-    # a batch with the lesson proper or the references waits for it. The first
-    # batch (the objectives come early) is written alone, then every other
-    # batch at the same time, each told what the first one wrote.
-    pool = ThreadPoolExecutor(max_workers=_STREAM_WORKERS)
+    # The reference search (web search + reading the pages, about 10 seconds)
+    # runs beside the batches before the lesson proper; the references are
+    # in the plan before the lesson proper is written from them.
+    pool = ThreadPoolExecutor(max_workers=1)
     refs = pool.submit(_plan_references, fields, context)
 
     def needs_refs(chunk):
@@ -1370,8 +1415,12 @@ def generate_full_streaming(context: dict, fields, course_guide_text: str = "", 
     def write(i, chunk, already):
         lesson = lesson_for(chunk)
         task = f"""
-Already written fields (for consistency, do not repeat):
+The parts of this plan already written above the ones you write now (build on them, do not repeat them):
 {json.dumps(already)}
+
+The parts you write continue those: they work toward exactly the learning objectives written above,
+and any part that assesses or practises checks only what the lesson proper above teaches, in its
+terms, facts and examples.
 
 Now fill ONLY the following fields. Return strict JSON with field_key as keys:
 {_schema_block(chunk, context)}
@@ -1387,20 +1436,21 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
             values = _complete_batch(lesson, chunk, values, label, course_guide_text, cite, context)
         return values
 
-    all_values = {}
+    all_values, referenced = {}, {}
     try:
-        yield {"type": "section_start", "section": _chunk_label(chunks[0]), "index": 1, "total": len(chunks)}
-        first = write(1, chunks[0], {})
-        all_values.update(first)
-        yield {"type": "section_done", "section": _chunk_label(chunks[0]), "index": 1, "total": len(chunks),
-               "values": first}
-        pending = {}
-        for i, chunk in enumerate(chunks[1:], start=2):
+        for i, chunk in enumerate(chunks, start=1):
             yield {"type": "section_start", "section": _chunk_label(chunk), "index": i, "total": len(chunks)}
-            pending[pool.submit(write, i, chunk, dict(first))] = (i, chunk)
-        for done in as_completed(pending):
-            i, chunk = pending[done]
-            values = done.result()
+            if needs_refs(chunk) and not referenced:
+                # The verified references go in first; the model's own list
+                # for that part is never used once they exist.
+                found, _ = refs.result()
+                referenced = _with_web_references(all_values, fields, context, found, cite)
+                if referenced:
+                    all_values.update(referenced)
+                    yield {"type": "section_done", "section": "Online references", "index": i,
+                           "total": len(chunks), "values": referenced}
+            todo = [f for f in chunk if f.field_key not in referenced]
+            values = {k: v for k, v in write(i, todo, dict(all_values)).items() if k not in referenced} if todo else {}
             all_values.update(values)
             yield {"type": "section_done", "section": _chunk_label(chunk), "index": i, "total": len(chunks),
                    "values": values}
@@ -1433,12 +1483,6 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
             all_values.update(changed)
             yield {"type": "section_done", "section": "Session timing",
                    "index": len(chunks), "total": len(chunks), "values": changed}
-
-    referenced = _with_web_references(all_values, fields, context, found, cite)
-    if referenced:
-        all_values.update(referenced)
-        yield {"type": "section_done", "section": "Online references",
-               "index": len(chunks), "total": len(chunks), "values": referenced}
 
     # Coherent as written (user report 2026-11-23): one review of the whole
     # plan, and its fixes go straight into the parts just written.
@@ -1480,50 +1524,32 @@ _WEB_REFERENCES = 10
 _WEB_RESULTS = 10
 _REFERENCE_SEARCHES = (
     "Find {n} accessible online pages, each on a different website, that explain this lesson's topic "
-    "itself (definitions, key terms, explanations, examples), and list them as APA 7 references.",
+    "itself (definitions, key terms, explanations, examples).",
     "Find {n} accessible online pages from government (DepEd), university, school or other educational "
-    "organizations, each on a different website, that teach this lesson's topic, and list them as APA 7 "
-    "references.",
-)
-_REFERENCES_SYSTEM = (
-    "You list online references for a Philippine K-12 lesson plan, using ONLY the web search "
-    "results you are given. Return strict JSON: {\"references\": [\"...\", ...]}. Each is one "
-    "APA 7 reference: Author or organization. (Year, or n.d.). Title. Site Name. URL, with the "
-    "author's name as the page gives it, the site name left out when it is the author, and the "
-    "URL copied exactly from a search result with nothing after it. Prefer educational, "
-    "government (DepEd), university and reputable reference pages that teach the topic itself "
-    "(definitions, explanations, examples), each from a different website; never social media, "
-    "Wikipedia, blogs, shops, forums, videos, homework or document-sharing sites, or pages behind "
-    "a login. Never invent a source or a URL."
+    "organizations, each on a different website, that teach this lesson's topic.",
 )
 
 
-def _web_search_post(system_instruction: str, prompt: str):
-    """(answer text, set of URLs the search returned) from one web-search call."""
+def _web_search_post(prompt: str) -> dict:
+    """{url: title} of the pages one web search returned. The model is told
+    to say nothing: asked to write the references itself, Mistral Large 4
+    reasoned for about 12,000 tokens, over 5 minutes a search (timed on the
+    server 2026-11-24), while the results alone come back in about 3 seconds.
+    The reply is capped so it can't think at length; the APA lines are
+    written from the pages themselves (_apa_from_result)."""
     payload = {
         "model": Config.OPENROUTER_MODEL,
-        "messages": [{"role": "system", "content": system_instruction}, {"role": "user", "content": prompt}],
+        "messages": [{"role": "system", "content": "Search the web for the request. Reply with {} only."},
+                     {"role": "user", "content": prompt}],
         "plugins": [{"id": "web", "max_results": _WEB_RESULTS}],
-        "response_format": {"type": "json_object"},
+        "max_tokens": 16,
     }
-    if not Config.OPENROUTER_REASONING:
-        payload["reasoning"] = {"enabled": False}
-
-    def post():
-        return requests.post(
-            _OPENROUTER_URL,
-            headers={"Authorization": f"Bearer {Config.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
-            json=payload,
-            timeout=90,
-        )
-
-    response = post()
-    # Mistral Large 4 refuses a request that turns reasoning off (400
-    # "reasoning_effort none is not supported"), which silently emptied every
-    # search; Qwen needs it off to answer at all. Asked again without it.
-    if response.status_code == 400 and "reasoning" in payload and "reasoning" in response.text.lower():
-        del payload["reasoning"]
-        response = post()
+    response = requests.post(
+        _OPENROUTER_URL,
+        headers={"Authorization": f"Bearer {Config.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
+        json=payload,
+        timeout=60,
+    )
     response.raise_for_status()
     message = response.json()["choices"][0]["message"]
     cited = {}
@@ -1532,34 +1558,50 @@ def _web_search_post(system_instruction: str, prompt: str):
             c = a.get("url_citation") or {}
             if c.get("url"):
                 cited.setdefault(c["url"].rstrip("/"), str(c.get("title") or "").strip())
-    return message.get("content") or "", cited
+    return cited
+
+
+_TITLE_SITE = re.compile(r"^(.{3,}?)\s+[-–—|•/:]{1,2}\s+([^-–—|•/]{2,40})$")
+
+
+def _split_site(title: str, host: str = "") -> tuple:
+    """("Parts of a Flower", "Gardening Solutions") from a page title like
+    "Parts of a Flower – Gardening Solutions" on gardeningsolutions.ifas.ufl.edu;
+    (title, "") when the end of the title isn't the site's name ("TLE 7 - Module 5").
+    With no host (a site name), any trailing part splits off."""
+    found = _TITLE_SITE.match(title or "")
+    if not found:
+        return title, ""
+    site = found.group(2).strip()
+    compact = re.sub(r"[^a-z0-9]", "", host.lower())
+    if host and not any(len(w) >= 3 and w in compact for w in re.findall(r"[a-z0-9]+", site.lower())):
+        return title, ""
+    return found.group(1).strip(), site
 
 
 def _apa_from_result(url: str, title: str) -> str:
-    """An APA 7 line for a search result the model didn't list: the site's
-    own name (from its title, "Topic - Site", or its address), n.d., title."""
+    """An APA 7 line for a search result, from what the page says about
+    itself once page_text has read it: its author (a person as "Last, F."),
+    its date (n.d. when it has none), the title, and the site, left out when
+    the site is the author."""
+    meta = grounding.page_meta(url)
     host = (urlparse(url).hostname or "").removeprefix("www.")
-    title = re.sub(r"\s+", " ", title or "").strip()
-    head, sep, site = title.rpartition(" - ") if " - " in title else title.rpartition(" | ")
-    if sep and 2 <= len(site) <= 40:
-        title = head.strip()
-    else:
-        site = host
+    title, site = _split_site(re.sub(r"\s+", " ", title or "").strip(), host)
+    site = (_split_site(meta.get("site", ""))[1] or meta.get("site") or site or host).strip(" .")
+    author = grounding.apa_author(meta.get("author", "")) or site
     title = title.rstrip(" .?!:;") or host
-    return grounding.to_apa(f"{site}. (n.d.). {title}. {url}")
+    date = grounding.apa_date(meta.get("date", ""), time.gmtime().tm_year)
+    where = "" if site.lower() == author.lower() else f" {site}."
+    return grounding.to_apa(f"{author.rstrip('.')}. ({date}). {title}.{where} {url}")
 
 
-def _search_references(prompt: str) -> tuple:
-    """(APA lines the model listed from this search's results, {url: title}
-    of every result). Nothing when this one search fails."""
+def _search_references(prompt: str) -> dict:
+    """{url: title} of one search's results; {} when the search fails."""
     try:
-        text, cited = _web_search_post(_REFERENCES_SYSTEM, prompt)
-        lines = _parse_json(text).get("references") or []
+        return _web_search_post(prompt)
     except Exception as exc:  # noqa: BLE001 - the other search may still find some
         _log.warning("Reference search failed: %s", exc)
-        return [], {}
-    lines = [grounding.to_apa(str(l)) for l in lines if isinstance(l, str)]
-    return [l for l in lines if l and any(u.rstrip("/") in cited for u in grounding.reference_urls([l]))], cited
+        return {}
 
 
 # References found, by topic. A set of fewer than three isn't remembered, so a
@@ -1584,31 +1626,21 @@ def find_references(context: dict, count: int = _WEB_REFERENCES) -> list:
     ask = f"\nLesson topic: {topic}" + (f"\nFor: {about}" if about else "")
     with ThreadPoolExecutor(max_workers=len(_REFERENCE_SEARCHES)) as pool:
         results = list(pool.map(_search_references, [q.format(n=count) + ask for q in _REFERENCE_SEARCHES]))
-    lines, cited = [], {}
-    for listed, found in results:
-        lines += listed
+    cited = {}
+    for found in results:
         for u, t in found.items():
             cited.setdefault(u, t)
-    # Every result is a candidate, not only the ones the model wrote up; the
-    # model's own APA line wins for a page it listed (it read the author).
-    by_url = {}
-    for line in lines:
-        by_url.setdefault(grounding.reference_urls([line])[0].rstrip("/"), line)
-    for u, t in cited.items():
-        if u not in by_url:
-            line = _apa_from_result(u, t)
-            if line:
-                by_url[u] = line
-    candidates = [(u, l) for u, l in by_url.items() if not grounding.is_unreliable_site(u)]
+    candidates = [u for u in cited if not grounding.is_unreliable_site(u)]
     # A link that only answers a status check can still fail in a browser, so
     # each page must actually open, with readable text about this topic.
     # All at once: twenty pages read eight at a time took a minute on slow sites.
     with ThreadPoolExecutor(max_workers=16) as pool:
-        texts = list(pool.map(grounding.page_text, [grounding.reference_urls([l])[0] for _, l in candidates]))
+        texts = list(pool.map(grounding.page_text, candidates))
     terms = grounding.topic_terms(topic)
     ranked = []
-    for (u, line), page in zip(candidates, texts):
-        if len(page) >= _MIN_PAGE_TEXT and grounding.covers_topic(page, terms):
+    for u, page in zip(candidates, texts):
+        line = _apa_from_result(u, cited[u]) if len(page) >= _MIN_PAGE_TEXT else ""
+        if line and grounding.covers_topic(page, terms):
             share, mentions = grounding.topic_coverage(page, terms)
             ranked.append((grounding.source_rank(u), -share, -mentions, u, line))
     ranked.sort(key=lambda r: r[:3])
@@ -1666,12 +1698,14 @@ def _with_web_references(values: dict, fields, context: dict, found=None, citati
     refs = [f for f in fields if grounding.is_reference_field(f)]
     if found is None:
         found = find_references(context) if refs else []
-    guide = {l.strip() for l in str(citation or "").split("\n") if l.strip()}
+    guide_lines = [l.strip() for l in str(citation or "").split("\n") if l.strip()]
+    guide = set(guide_lines)
     changed = {}
     for f in refs if found else []:
         value = values.get(f.field_key)
         first = value[0] if isinstance(value, list) and value else value
-        lines = [l for l in str(first or "").split("\n") if l.strip() in guide] if guide else []
+        # Not written yet (it is filled before the lesson proper): the guide's own citation.
+        lines = [l for l in str(first or "").split("\n") if l.strip() in guide] if first else guide_lines
         merged = "\n".join(lines + [l for l in found if l not in lines])
         # A weekly field cites its references once, on its first day.
         changed[f.field_key] = [merged] + list(value[1:]) if isinstance(value, list) and value else merged
@@ -1787,16 +1821,29 @@ _COHERENCE_SYSTEM = (
     "- the objectives are unpacked from the learning competency;\n"
     "- the motivation and activities lead into today's topic;\n"
     "- the assignment fits the next lesson's topic, when one is given.\n"
-    "Report only real mismatches, each on the part that must change, with what is wrong and why it "
-    "matters in one or two sentences.\n"
-    "Return strict JSON: {\"coherent\": true or false, \"summary\": \"one sentence\", \"issues\": "
+    "Only the learning objectives must be assessed: the motivation, activity, analysis, application and "
+    "other practice parts are how learners get there, never something the assessment must also check.\n"
+    "Report an issue only when one of these checks clearly fails and you can name the exact objective, "
+    "term or item that doesn't match. Never report wording, style, formatting, length, grammar, "
+    "optional extras or ideas to make a part better; never report an empty part or the school, date, "
+    "time, section or teacher details. Put each issue on the one part that must change, with what is "
+    "wrong in one or two sentences. A plan that passes every check is coherent: return "
+    "{\"coherent\": true, \"summary\": \"one sentence\", \"issues\": []}.\n"
+    "First map the plan: for each objective, quote the lesson proper line that teaches it and name the "
+    "assessment item or criterion that checks it (an objective's verb is judged by its taxonomy level, "
+    "not by whether it sounds hands-on: 'select', 'identify' and 'analyze' are cognitive). An objective "
+    "with both is fine. Then report issues only for real gaps the map shows, or a check above that "
+    "clearly fails.\n"
+    "Return strict JSON: {\"map\": [{\"objective\": \"...\", \"taught_by\": \"...\", \"checked_by\": \"...\"}], "
+    "\"coherent\": true or false, \"summary\": \"one sentence\", \"issues\": "
     "[{\"part_key\": \"...\", \"problem\": \"...\", \"fix\": \"...\"}]} with part_key exactly as given."
 )
-_FIX_FULL = ("Each fix is the complete corrected content for that part, ready to use (rubric rows with "
-             "cells separated by ' | ').")
-_FIX_STEP = ("The student writes every part themselves: each fix is a specific instruction of what to change "
-             "or add (e.g. 'Add a performance task where learners design a flyer on kitchen safety, with a "
-             "rubric on layout, accuracy and creativity'); never write the content for them.")
+# The user (2026-11-24): the check gives the exact input the part needs, in
+# both modes; the student copies it in. A locked part still gets an instruction.
+_FIX = ("Each fix is the exact text to put in that part in place of what is there now: the whole part, "
+        "complete and ready to paste, in the plan's own style (rubric rows with cells separated by ' | '), "
+        "fixing the mismatch and keeping everything else in the part that is right. Never an instruction "
+        "('Add ...', 'Change ...'): write the part itself.")
 
 
 # A plan read by the coherence check: each part and the whole are capped, so
@@ -1823,37 +1870,40 @@ def _plan_text(fields, values: dict) -> str:
     return "\n\n".join(blocks)
 
 
-def check_coherence(context: dict, fields, values: dict, mode: str) -> dict:
-    """{"coherent", "summary", "issues": [{"part_key", "part_label", "problem", "fix"}]} for a plan.
-    mode "full" (Building Proficiency) gets complete fixes, "step" (Guided)
-    and locked parts get instructions. Nothing in the plan is changed."""
+def check_coherence(context: dict, fields, values: dict) -> dict:
+    """{"coherent", "summary", "issues": [{"part_key", "part_label", "locked", "problem", "fix"}]}
+    for a plan. Each fix is the exact text the part needs, in both modes; a
+    locked part gets an instruction. Nothing in the plan is changed."""
     labels = {f.field_key: f.label for f in fields}
-    locked = [f.label for f in fields if getattr(f, "locked", False)]
+    locked_keys = {f.field_key for f in fields if getattr(f, "locked", False)}
+    locked = [f.label for f in fields if f.field_key in locked_keys]
     about = "\n".join(f"{k.replace('_', ' ').title()}: {context[k]}" for k in
                       ("topic", "main_topic", "subject", "grade_level", "previous_topic", "next_topic",
                        "assessment_type") if context.get(k))
+    chosen = _chosen_assessment(context)
     task = (f"Lesson:\n{about}\n\nObjective verb taxonomies:\n{taxonomy_text()}\n\n"
-            f"{_FIX_FULL if mode == 'full' else _FIX_STEP}\n"
+            + (f"{chosen} Never change the assessment's kind or its number of items; when an objective "
+               "can't be checked by it, the fix goes on the objectives.\n" if chosen else "")
+            + f"{_FIX}\n"
             + (f"Locked parts (their fix is an instruction only): {', '.join(locked)}\n" if locked else "")
             + f"\nThe lesson plan:\n{_plan_text(fields, values)}")
     data = _call(_COHERENCE_SYSTEM, [task], "Coherence check")
     data = data if isinstance(data, dict) else {}
     # A model often names a part by its label; matched either way.
     by_label = {str(label).strip().lower(): key for key, label in labels.items()}
-    issues = []
-    for i in data.get("issues") or []:
-        if not isinstance(i, dict):
-            continue
+    issues, raised = [], [i for i in data.get("issues") or [] if isinstance(i, dict)]
+    for i in raised:
         named = str(i.get("part_key") or "").strip()
         key = named if named in labels else by_label.get(named.lower())
         problem, fix = str(i.get("problem") or "").strip(), str(i.get("fix") or "").strip()
         if key and problem:
-            issues.append({"part_key": key, "part_label": labels[key],
+            issues.append({"part_key": key, "part_label": labels[key], "locked": key in locked_keys,
                            "problem": problem[:600], "fix": fix[:_MAX_USE_TEXT]})
-    # Coherent only when the model says so and lists nothing; an issue we
-    # couldn't place still means the plan doesn't line up.
-    coherent = data.get("coherent") is True and not issues
-    summary = str(data.get("summary") or "").strip()[:300]
+    # The issues decide, not the model's yes/no: a "false" with nothing listed
+    # showed "doesn't line up" over an empty list. An issue we couldn't place
+    # still means the plan doesn't line up.
+    coherent = not raised
+    summary = str(data.get("summary") or "").strip()[:300] if (data.get("coherent") is True) == coherent else ""
     return {"coherent": coherent,
             "summary": summary or ("Everything lines up." if coherent else "Some parts don't line up yet."),
             "issues": issues}

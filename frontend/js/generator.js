@@ -3755,13 +3755,14 @@ async function checkCoherence() {
     });
     const head = `<p class="coherence-summary${data.coherent ? " is-ok" : ""}">${escapeHtml(
       data.summary || (data.coherent ? "Everything lines up." : "Some parts don't line up yet."))}</p>`;
+    // Each fix is the exact text the part needs (an instruction for a locked part).
     const items = (data.issues || []).map((issue, i) => `
       <section class="coherence-issue">
         <h3>${escapeHtml(issue.part_label)}</h3>
         <p>${escapeHtml(issue.problem)}</p>
-        <div class="coherence-fix-label">${guided ? "What to change" : "Fix"}</div>
+        <div class="coherence-fix-label">${issue.locked ? "What to change" : `Put this in ${escapeHtml(issue.part_label)}`}</div>
         <div class="coherence-fix">${rubricHtml(issue.fix) || escapeHtml(issue.fix)}</div>
-        ${guided ? "" : `<button type="button" class="owl-choice-copy" data-fix="${i}">${Icons.copy || ""}<span>Copy</span></button>`}
+        ${issue.locked || !issue.fix ? "" : `<button type="button" class="owl-choice-copy" data-fix="${i}">${Icons.copy || ""}<span>Copy</span></button>`}
       </section>`).join("");
     coherenceBody.innerHTML = head + items;
     coherenceBody.querySelectorAll("[data-fix]").forEach((btn) => {

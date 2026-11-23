@@ -229,22 +229,17 @@ def check_web_references():
     no references, never a failed plan."""
     from services import grounding
     real = "https://www.w3schools.com/html/html_images.asp"
-    answer = json.dumps({"references": [
-        f"W3Schools. (n.d.). HTML images. W3Schools. {real}",
-        "Made Up. (2024). A page. Nowhere. https://invented.example/page",  # not a search result
-        "no apa here https://www.w3schools.com/html/",                      # not APA
-    ]})
     calls = []
     real_post, real_provider, real_works = ai_service._web_search_post, ai_service.PROVIDER, grounding.page_text
     # Search results by URL and title; the second is the same site, so only one is kept.
     cited = {real: "HTML Images - W3Schools", "https://www.w3schools.com/html": "HTML Tutorial - W3Schools"}
-    ai_service._web_search_post = lambda system, prompt: (calls.append(prompt), (answer, cited))[1]
+    ai_service._web_search_post = lambda prompt: (calls.append(prompt), cited)[1]
     ai_service.PROVIDER = "openrouter"
     grounding.page_text = lambda url: "HTML images: the img tag shows an image on a page. " * 40 if url in cited else ""
     ai_service._FOUND_REFERENCES.clear()
     try:
         found = ai_service.find_references({"topic": "HTML images", "subject": "ICT"})
-        assert found == [f"W3Schools. (n.d.). HTML images. {real}"], found
+        assert found == [f"W3Schools. (n.d.). HTML Images. {real}"], found
         assert "HTML images" in calls[0]
         refs = Field("references", "References")
         guide = "DepEd. (2023). CG. https://deped.gov.ph/cg.pdf"
@@ -255,7 +250,7 @@ def check_web_references():
         assert merged["references"].split("\n") == [guide, found[0]], merged
         assert ai_service._with_web_references({}, [Field("flow", "Flow")], {"topic": "x"}) == {}
 
-        def boom(system, prompt):
+        def boom(prompt):
             raise RuntimeError("search down")
         ai_service._web_search_post = boom
         assert ai_service.find_references({"topic": "HTML tables"}) == []

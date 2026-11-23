@@ -46,14 +46,17 @@ def main():
             {"part_key": "evaluation", "problem": "Nothing checks objective 2.", "fix": "Add a task ..."},
             {"part_key": "lesson_proper", "problem": "Flyers aren't taught.", "fix": "Teach flyer layout ..."},
             {"part_key": "made_up", "problem": "x", "fix": "y"}]})
-        out = ai_service.check_coherence(CTX, FIELDS, VALUES, "full")
+        out = ai_service.check_coherence(CTX, FIELDS, VALUES)
         # issues_cleaned
         assert [i["part_key"] for i in out["issues"]] == ["evaluation", "lesson_proper"], out
         assert out["issues"][0]["part_label"] == "Evaluation" and out["coherent"] is False, out
         prompt = prompts[-1]
-        # full_mode_complete_fix + locked_fix_is_instruction
-        assert "complete corrected content" in prompt, prompt[:400]
+        # exact text for the part + locked_fix_is_instruction (user, 2026-11-24)
+        assert "exact text" in prompt, prompt[:400]
         assert "Locked parts (their fix is an instruction only): Evaluation" in prompt, prompt
+        assert [i["locked"] for i in out["issues"]] == [True, False], out
+        # Only real mismatches: a plan that lines up comes back coherent.
+        assert "Never report wording, style" in prompt and '"issues": []' in prompt, prompt[:1500]
         # weekly_values_flattened
         assert "Monday: Recall the tools" in prompt and "Tuesday: Measure the table" in prompt, prompt
         assert "['Recall" not in prompt and '["Recall' not in prompt
@@ -61,13 +64,14 @@ def main():
         assert ai_service.taxonomy_text() in prompt and "taught" in prompt and "next lesson" in prompt
         print("  issues cleaned, plan flattened, Building Proficiency gets complete fixes OK")
 
-        ai_service.check_coherence(CTX, FIELDS, VALUES, "step")
-        assert "instruction" in prompts[-1] and "never write the content" in prompts[-1], prompts[-1][:600]
-        assert "complete corrected content" not in prompts[-1]
-        print("  Guided gets instructions OK")
+        # The model says "not coherent" but lists nothing: it lines up.
+        ai_service._call = stub({"coherent": False, "summary": "Some things could be better.", "issues": []})
+        assert ai_service.check_coherence(CTX, FIELDS, VALUES) == {
+            "coherent": True, "summary": "Everything lines up.", "issues": []}
+        print("  the listed issues decide, not the model's yes/no OK")
 
         ai_service._call = stub({"coherent": True, "summary": "Everything lines up.", "issues": []})
-        out = ai_service.check_coherence(CTX, FIELDS, VALUES, "full")
+        out = ai_service.check_coherence(CTX, FIELDS, VALUES)
         assert out == {"coherent": True, "summary": "Everything lines up.", "issues": []}, out
         print("  a coherent plan OK")
     finally:
@@ -112,7 +116,7 @@ def check_route():
             ai_service._call = real
         body = res.get_json()
         assert res.status_code == 200 and body["status"] == "ok" and body["coherent"] is True, body
-        assert "identify the parts" in prompts[-1] and "never write the content" in prompts[-1]
+        assert "identify the parts" in prompts[-1] and "exact text" in prompts[-1]   # Guided too
     print("  coherence route OK")
 
 

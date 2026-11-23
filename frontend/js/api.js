@@ -316,8 +316,6 @@ const Api = {
     apiFetch("/api/admin/users", { method: "POST", body: JSON.stringify(payload) }),
   adminUpdateUser: (userId, payload) =>
     apiFetch(`/api/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(payload) }),
-  adminDeleteUser: (userId) =>
-    apiFetch(`/api/admin/users/${userId}`, { method: "DELETE" }),
   adminListSections: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return apiFetch(`/api/admin/sections${qs ? `?${qs}` : ""}`);

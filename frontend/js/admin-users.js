@@ -62,9 +62,7 @@ function renderUsers(users) {
         <td>
           <div class="row-actions">
             <button class="row-action-btn" type="button" data-action="edit" data-id="${u.id}" title="Edit" aria-label="Edit ${escapeHtml(u.full_name)}">${Icons.edit}</button>
-            <button class="row-action-btn" type="button" data-action="toggle" data-id="${u.id}" data-active="${u.is_active}" title="${u.is_active ? "Archive" : "Restore"}" aria-label="${u.is_active ? "Archive" : "Restore"} ${escapeHtml(u.full_name)}">${u.is_active ? Icons.archive : Icons.upload}</button>
-            <button class="row-action-btn danger" type="button" data-action="delete" data-id="${u.id}" title="Delete" aria-label="Delete ${escapeHtml(u.full_name)}">${Icons.trash}</button>
-          </div>
+            <button class="row-action-btn" type="button" data-action="toggle" data-id="${u.id}" data-active="${u.is_active}" title="${u.is_active ? "Archive" : "Restore"}" aria-label="${u.is_active ? "Archive" : "Restore"} ${escapeHtml(u.full_name)}">${u.is_active ? Icons.archive : Icons.upload}</button>          </div>
         </td>
       </tr>`
     )
@@ -143,17 +141,6 @@ async function handleAction(btn) {
       showToast(err.message, true);
     }
     return;
-  }
-
-  if (action === "delete") {
-    if (!confirm("Delete this account permanently? This can't be undone.")) return;
-    try {
-      await Api.adminDeleteUser(id);
-      showToast("Account deleted.");
-      loadUsers();
-    } catch (err) {
-      showToast(err.message, true);
-    }
   }
 }
 

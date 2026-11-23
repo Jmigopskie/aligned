@@ -47,20 +47,35 @@ def main():
         ai_service.PROVIDER = "openrouter"
         ai_service._FOUND_REFERENCES.clear()
 
-        def search(system, prompt):
+        def search(prompt):
             calls.append(prompt)
-            listed = '{"references": ["Kids Learn. (2025). Number systems. Kids Learn. https://a.edu/numbers"]}'
-            return listed, {u: f"{u.rsplit('/', 1)[1].title()} explained - Site {i}" for i, u in enumerate(PAGES)}
+            return {u: f"{u.rsplit('/', 1)[1].title()} explained" for u in PAGES}
+
+        def read(url):
+            # What a page says about itself, as page_text records it while reading.
+            grounding._META[url] = {"https://a.edu/numbers": {"author": "Juan Dela Cruz", "date": "2025-03-04T08:00",
+                                                              "site": "Kids Learn"},
+                                    "https://www.b.org/binary": {"author": "", "date": "", "site": "B Org"}
+                                    }.get(url, {})
+            return PAGES.get(url, "")
 
         ai_service._web_search_post = search
-        grounding.page_text = lambda url: PAGES.get(url, "")
+        grounding.page_text = read
         found = ai_service.find_references({"topic": "Number systems", "subject": "ICT"})
         urls = [grounding.reference_urls([l])[0] for l in found]
         # Every page that passes, not two: school/government first, then .org, then the rest.
         assert urls == ["https://a.edu/numbers", "https://www.f.gov.ph/number-systems",
                         "https://www.b.org/binary", "https://g.com/numbers"], found
-        # APA 7: the model's line, with the site dropped where it repeats the author.
-        assert found[0] == "Kids Learn. (2025). Number systems. https://a.edu/numbers", found
+        # APA 7 from the page itself: author (surname first), date, title, site.
+        assert found[0] == "Dela Cruz, J. (2025, March 4). Numbers explained. Kids Learn. https://a.edu/numbers", found
+        # No author: the site is the author and isn't repeated; no date: n.d.
+        assert found[2] == "B Org. (n.d.). Binary explained. https://www.b.org/binary", found
+        assert found[1] == "f.gov.ph. (n.d.). Number-Systems explained. https://www.f.gov.ph/number-systems", found
+        # A page title's trailing site name, only when it is the site's.
+        assert ai_service._split_site("Parts of a Flower – Gardening Solutions", "gardeningsolutions.ifas.ufl.edu") \
+            == ("Parts of a Flower", "Gardening Solutions")
+        assert ai_service._split_site("TLE 7 - 8 - Carpentry - Module 5", "pdfcoffee.com")[1] == ""
+        assert ai_service._split_site("Biology 2e | OpenStax") == ("Biology 2e", "OpenStax")
         assert all(grounding.to_apa(l) == l for l in found), found
         assert len(calls) == 2 and all("Find 10" in c and "different website" in c for c in calls), calls
         assert any("DepEd" in c for c in calls)
@@ -94,10 +109,10 @@ def main():
         ai_service._FOUND_REFERENCES.clear()
         overlap = {}
 
-        def slow_search(system, prompt):
+        def slow_search(prompt):
             overlap["search"] = threading.current_thread().name
             time.sleep(0.6)
-            return search(system, prompt)
+            return search(prompt)
 
         def slow_call(system, parts, label):
             time.sleep(0.6)
@@ -114,45 +129,38 @@ def main():
     finally:
         ai_service.PROVIDER, ai_service._web_search_post, grounding.page_text, ai_service._call = real
 
-    # --- A model that refuses "reasoning off" (Mistral Large 4) still searches ---
+    # --- The search asks for results only (a written reply took 5+ minutes) ---
     sent = []
-    real_post, real_flag = ai_service.requests.post, ai_service.Config.OPENROUTER_REASONING
+    real_post = ai_service.requests.post
 
     class Reply:
-        def __init__(self, status, text=""):
-            self.status_code, self.text = status, text
-
         def raise_for_status(self):
-            if self.status_code >= 400:
-                raise RuntimeError(self.status_code)
+            pass
 
         def json(self):
             return {"choices": [{"message": {"content": "{}", "annotations": [
                 {"type": "url_citation", "url_citation": {"url": "https://a.edu/x/", "title": "X"}}]}}]}
 
-    def mistral(url, **kw):
-        sent.append(dict(kw["json"]))
-        if "reasoning" in kw["json"]:
-            return Reply(400, '{"error": "reasoning_effort none is not supported for this model"}')
-        return Reply(200)
-
     try:
-        ai_service.requests.post = mistral
-        ai_service.Config.OPENROUTER_REASONING = False
-        _, cited = ai_service._web_search_post("system", "prompt")
-        assert cited == {"https://a.edu/x": "X"} and len(sent) == 2 and "reasoning" not in sent[1], sent
-        # Any other 400 is not retried.
-        sent.clear()
-        ai_service.requests.post = lambda url, **kw: sent.append(1) or Reply(400, "bad model id")
-        try:
-            ai_service._web_search_post("system", "prompt")
-            raise AssertionError("a 400 should raise")
-        except RuntimeError:
-            pass
-        assert len(sent) == 1
+        ai_service.requests.post = lambda url, **kw: sent.append(kw["json"]) or Reply()
+        assert ai_service._web_search_post("prompt") == {"https://a.edu/x": "X"}
+        assert sent[0]["max_tokens"] <= 32 and "reasoning" not in sent[0], sent
+        assert sent[0]["plugins"][0]["id"] == "web"
     finally:
-        ai_service.requests.post, ai_service.Config.OPENROUTER_REASONING = real_post, real_flag
-    print("  search retried without 'reasoning off' when the model refuses it OK")
+        ai_service.requests.post = real_post
+    print("  search asks for results only, with a capped reply OK")
+
+    # --- A page's own author and date, read from its HTML ---
+    meta = grounding._meta_of('<html><meta name="author" content="Maria  Santos"><meta property="og:site_name" '
+                              'content="Science Hub"><script type="application/ld+json">{"datePublished": '
+                              '"2023-11-02"}</script></html>')
+    assert meta == {"author": "Maria Santos", "date": "2023-11-02", "site": "Science Hub"}, meta
+    assert grounding.apa_author("Maria Santos") == "Santos, M."
+    assert grounding.apa_author("Department of Education") == "Department of Education"
+    assert grounding.apa_author("Mary Ann de los Santos") == "de los Santos, M. A."
+    assert grounding.apa_date("2023-11-02T10:00:00Z") == "2023, November 2"
+    assert grounding.apa_date("Posted 2019") == "2019" and grounding.apa_date("") == "n.d."
+    print("  APA author and date from the page OK")
 
     # --- Objectives, lesson and evaluation line up ---
     ctx = {"topic": "Number systems"}

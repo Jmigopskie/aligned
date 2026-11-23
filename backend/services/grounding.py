@@ -19,6 +19,7 @@ import re
 import socket
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
+from html import unescape
 from urllib.parse import urljoin, urlparse
 
 import certifi
@@ -400,6 +401,73 @@ def page_text(url: str) -> str:
     return text
 
 
+# What a page says about itself (author, date, site name), by URL: the APA
+# line is written from it, so no model has to read the page for a reference.
+_META = {}
+_MONTHS = ("January February March April May June July August September October November December").split()
+_ORG_WORDS = re.compile(
+    r"\b(?:university|department|dept|society|foundation|museum|council|academy|institute|cent(?:er|re)|service|"
+    r"office|ministry|association|school|college|team|staff|editors?|agency|library|organi[sz]ation|inc|ltd|llc|"
+    r"corporation|company|press|network|project|programme|program|government|deped|unesco|unicef|board|"
+    r"commission|bureau|authority|club|group|media|news|learning|education)\b", re.I)
+
+
+_SURNAME_PARTICLES = {"de", "del", "dela", "della", "delos", "di", "da", "dos", "das", "du", "la", "le", "los",
+                      "san", "santa", "sta.", "van", "von", "der", "den"}
+
+
+def _meta_content(html: str, *names) -> str:
+    for name in names:
+        for tag in re.findall(rf"<meta\b[^>]*\b(?:name|property|itemprop)\s*=\s*[\"']{re.escape(name)}[\"'][^>]*>",
+                              html, re.I):
+            content = re.search(r"\bcontent\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", tag, re.I)
+            value = unescape((content.group(1) or content.group(2) or "") if content else "").strip()
+            if value and not value.lower().startswith("http"):
+                return re.sub(r"\s+", " ", value)
+    return ""
+
+
+def _meta_of(html: str) -> dict:
+    date = _meta_content(html, "citation_publication_date", "citation_date", "article:published_time",
+                         "datePublished", "dc.date", "dcterms.created", "date", "pubdate")
+    if not date:
+        found = re.search(r"\"datePublished\"\s*:\s*\"([^\"]+)\"", html)
+        date = found.group(1) if found else ""
+    return {"author": _meta_content(html, "citation_author", "author", "dc.creator", "article:author"),
+            "date": date, "site": _meta_content(html, "og:site_name")}
+
+
+def page_meta(url: str) -> dict:
+    """{author, date, site} from a page page_text has read ({} otherwise)."""
+    return _META.get(url) or {}
+
+
+def apa_author(name: str) -> str:
+    """A person's name as APA's "Last, F. M."; an organization as it is."""
+    name = re.sub(r"\s+", " ", name or "").strip(" .,;|")
+    if len(name) > 80:
+        return ""
+    words = name.split(" ")
+    if _ORG_WORDS.search(name) or not 2 <= len(words) <= 5 or not all(
+            re.fullmatch(r"[A-Z][a-zA-Z'’-]*\.?", w) or w.lower() in _SURNAME_PARTICLES for w in words):
+        return name
+    # "Juan Dela Cruz" -> "Dela Cruz, J.": a surname can start with a particle.
+    start = next((i for i in range(1, len(words) - 1) if words[i].lower() in _SURNAME_PARTICLES), len(words) - 1)
+    return f"{' '.join(words[start:])}, " + " ".join(f"{w[0]}." for w in words[:start])
+
+
+def apa_date(raw: str, this_year: int = 2100) -> str:
+    """"2023, January 25" / "2023" from a page's date, "n.d." when there is none."""
+    iso = re.match(r"\s*((?:19|20)\d{2})(?:-(\d{1,2})(?:-(\d{1,2}))?)?", raw or "")
+    year = iso.group(1) if iso else (re.search(r"\b(?:19|20)\d{2}\b", raw or "") or [None])[0]
+    if not year or not 1990 <= int(year) <= this_year:
+        return "n.d."
+    month, day = (int(iso.group(2) or 0), int(iso.group(3) or 0)) if iso else (0, 0)
+    if 1 <= month <= 12:
+        return f"{year}, {_MONTHS[month - 1]}" + (f" {day}" if 1 <= day <= 31 else "")
+    return year
+
+
 def _read_page(url: str) -> str:
     current = url
     try:
@@ -423,7 +491,9 @@ def _read_page(url: str) -> str:
         html = body.decode(charset.group(1) if charset else "utf-8", errors="ignore")
     except LookupError:
         html = body.decode("utf-8", errors="ignore")
-    main = re.search(r"<(main|article)\b.*?</\1\s*>", html, re.I | re.S)
+    if len(_META) < 200:
+        _META[url] = _meta_of(html)
+    main =re.search(r"<(main|article)\b.*?</\1\s*>", html, re.I | re.S)
     html = _DROP_BLOCKS.sub(" ", main.group(0) if main else html)
     text = re.sub(r"<[^>]+>", " ", _BLOCK_TAG.sub("\n", html))
     for entity, char in (("&nbsp;", " "), ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'), ("&#39;", "'")):
@@ -504,6 +574,7 @@ _UNRELIABLE_SITES = {
     "pinterest", "reddit", "quora", "medium", "substack", "blogspot", "blogger", "wordpress", "tumblr",
     "scribd", "slideshare", "slideplayer", "coursehero", "studocu", "brainly", "quizlet", "chegg",
     "answers", "wikipedia", "wikiwand", "fandom", "amazon", "shopee", "lazada", "ebay", "etsy",
+    "pdfcoffee", "dokumen", "fdocuments", "vdocuments", "pdfslide", "idoc", "documents", "issuu", "yumpu",
 }
 _OFFICIAL = re.compile(r"\.(?:gov|edu|ac|int|mil)(?:\.[a-z]{2})?$")
 _ORG = re.compile(r"\.org(?:\.[a-z]{2})?$")

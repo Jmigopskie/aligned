@@ -293,10 +293,9 @@ def owl_chat():
 @enrollment_required
 def check_coherence():
     """Whether the plan on the page hangs together (objectives, lesson proper,
-    assessment), with a fix per mismatch: complete content in Building
-    Proficiency (mode "full"), an instruction in Guided (mode "step") and for
-    locked parts. Reads the page's current values, so unsaved work is checked.
-    Free; changes nothing."""
+    assessment), with a fix per mismatch: the exact text the part needs (an
+    instruction for a locked part). Reads the page's current values, so
+    unsaved work is checked. Free; changes nothing."""
     data = request.get_json(silent=True) or {}
     fmt = LessonPlanFormat.query.get_or_404(data.get("format_id"))
     values = data.get("field_values") if isinstance(data.get("field_values"), dict) else {}
@@ -312,8 +311,7 @@ def check_coherence():
     guides, err = _resolve_guides(data)
     if err:
         return err
-    result = ai_service.check_coherence(_build_context(data, guides), fields, values,
-                                        "step" if data.get("mode") == "step" else "full")
+    result = ai_service.check_coherence(_build_context(data, guides), fields, values)
     return jsonify({"status": "ok", **result})
 
 @generate_bp.get("/lesson-plans")

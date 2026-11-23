@@ -81,15 +81,15 @@ def check_coherence_verdict():
         # The model names the part by its label instead of its key.
         ai_service._call = stub({"coherent": False, "summary": "Objective 1 isn't assessed.", "issues": [
             {"part_key": "V. Evaluation", "problem": "Nothing checks it.", "fix": "Add an item."}]})
-        out = ai_service.check_coherence({}, fields, values, "full")
+        out = ai_service.check_coherence({}, fields, values)
         assert [i["part_key"] for i in out["issues"]] == ["evaluation"] and out["coherent"] is False, out
         # The model says it doesn't line up but names no part we know: not "coherent".
         ai_service._call = stub({"coherent": False, "summary": "They drift.", "issues": [
             {"part_key": "made_up", "problem": "x", "fix": "y"}]})
-        assert ai_service.check_coherence({}, fields, values, "full")["coherent"] is False
+        assert ai_service.check_coherence({}, fields, values)["coherent"] is False
         # Capped: a huge plan is cut before it reaches the model.
         ai_service._call = stub({"coherent": True, "summary": "ok", "issues": []})
-        ai_service.check_coherence({}, fields, {"objectives": "z" * 200000, "evaluation": "q"}, "full")
+        ai_service.check_coherence({}, fields, {"objectives": "z" * 200000, "evaluation": "q"})
         assert len(prompts[-1]) < 60000, len(prompts[-1])
     finally:
         ai_service._call = real
