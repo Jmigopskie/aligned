@@ -17,7 +17,7 @@ import json
 import logging
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 
 import requests
@@ -1295,6 +1295,37 @@ Fill ONLY the following fields and return strict JSON with field_key as keys:
 
 
 _STREAM_CHUNK_SIZE = 4
+# Batches written at the same time after the first (and the reference search).
+_STREAM_WORKERS = 6
+
+
+def _not_references(fields):
+    return [f for f in fields if not grounding.is_reference_field(f)]
+
+
+def _apply_coherence(context, fields, values, written, guide_text, citation, plan_fields=None):
+    """The coherence check's fixes for the parts just written, cleaned like
+    any written value. The check reads the whole plan (plan_fields, with the
+    parts that stay); only the parts just written change. Never a standard or
+    competency copied from the guide, the references, or a part not being
+    written. {} when it all lines up or the check can't run."""
+    by_key = {f.field_key: f for f in fields}
+    try:
+        result = check_coherence(context, list(plan_fields or fields), {**(written or {}), **values}, "full")
+    except Exception as exc:  # noqa: BLE001 - the plan stands without the extra pass
+        _log.warning("Coherence pass failed: %s", exc)
+        return {}
+    fixes = {}
+    for issue in result.get("issues") or []:
+        f = by_key.get(issue["part_key"])
+        if not f or _is_exact(f) or getattr(f, "locked", False) or not issue.get("fix", "").strip():
+            continue
+        if f.field_type == "weekly":
+            continue  # a day-by-day part isn't replaced by one block of text
+        cleaned = _trim({f.field_key: issue["fix"]}, [f], guide_text, citation, context).get(f.field_key)
+        if cleaned and ai_limits.is_answered(cleaned):
+            fixes[f.field_key] = cleaned
+    return fixes
 
 
 def _chunk_label(chunk):
@@ -1311,52 +1342,81 @@ def generate_full_streaming(context: dict, fields, course_guide_text: str = "", 
     progressively rather than one big call that arrives all at once."""
     # Only the requested fields are generated, and only they are held to account
     # in the completeness report at the end.
+    plan_fields = list(fields)  # the whole format, for the coherence pass
     fields, skipped = _split_uncopyable(select_fields(fields, include_keys), course_guide_text)
     needs_guide = {"needs_guide": [f.field_key for f in skipped], "needs_guide_labels": [f.label for f in skipped]}
     if not fields:
         yield {"type": "complete", "values": {}, "missing": [], "missing_labels": [], **needs_guide}
         return
     chunks = [fields[i:i + _STREAM_CHUNK_SIZE] for i in range(0, len(fields), _STREAM_CHUNK_SIZE)]
-    # Built once per plan: every chunk shares this exact prefix.
     cite = course_guide_citation
     excerpt, course_guide_text = _guide_inputs(course_guide_text, context)
-    found, refs_block = _plan_references(fields, context)
-    lesson = _lesson_block(context, excerpt, cite) + refs_block + _written_block(written)
+    base = _lesson_block(context, excerpt, cite) + _written_block(written)
 
-    all_values = {}
-    for i, chunk in enumerate(chunks, start=1):
-        name = _chunk_label(chunk)
-        yield {"type": "section_start", "section": name, "index": i, "total": len(chunks)}
+    # Speed (user report 2026-11-23: about 5 minutes a plan). The reference
+    # search (two web searches + reading pages) runs beside the writing; only
+    # a batch with the lesson proper or the references waits for it. The first
+    # batch (the objectives come early) is written alone, then every other
+    # batch at the same time, each told what the first one wrote.
+    pool = ThreadPoolExecutor(max_workers=_STREAM_WORKERS)
+    refs = pool.submit(_plan_references, fields, context)
 
+    def needs_refs(chunk):
+        return any(grounding.is_lesson_proper_field(f) or grounding.is_reference_field(f) for f in chunk)
+
+    def lesson_for(chunk):
+        return base + (refs.result()[1] if needs_refs(chunk) else "")
+
+    def write(i, chunk, already):
+        lesson = lesson_for(chunk)
         task = f"""
 Already written fields (for consistency, do not repeat):
-{json.dumps(all_values)}
+{json.dumps(already)}
 
 Now fill ONLY the following fields. Return strict JSON with field_key as keys:
 {_schema_block(chunk, context)}
 """
-        values = _trim(
-            _call(_SYSTEM_INSTRUCTION, [lesson, task], f"Building Proficiency {i}/{len(chunks)}"),
-            chunk, course_guide_text, cite, context,
-        )
-        # Check this batch before moving on: anything blank, a weekly field
-        # with a day missing, or objectives short of the minimum is asked for
-        # again now, while it is still the next batch's context.
-        if _incomplete(values, chunk):
-            yield {"type": "filling_gaps", "count": len(_incomplete(values, chunk))}
-            values = _complete_batch(lesson, chunk, values, f"Building Proficiency {i}/{len(chunks)}",
-                                     course_guide_text, cite, context)
-        all_values.update(values)
-        yield {"type": "section_done", "section": name, "index": i, "total": len(chunks), "values": values}
+        label = f"Building Proficiency {i}/{len(chunks)}"
+        values = _trim(_call(_SYSTEM_INSTRUCTION, [lesson, task], label), chunk, course_guide_text, cite, context)
+        # Anything blank, a weekly field with a day missing, or objectives
+        # short of the minimum is asked for again now, in the same batch. Not
+        # the references: the model's own links are dropped unless they check
+        # out, and the verified ones fill the part at the end, so asking again
+        # only cost time (two extra calls per build, then one more).
+        if _incomplete(values, _not_references(chunk)):
+            values = _complete_batch(lesson, chunk, values, label, course_guide_text, cite, context)
+        return values
+
+    all_values = {}
+    try:
+        yield {"type": "section_start", "section": _chunk_label(chunks[0]), "index": 1, "total": len(chunks)}
+        first = write(1, chunks[0], {})
+        all_values.update(first)
+        yield {"type": "section_done", "section": _chunk_label(chunks[0]), "index": 1, "total": len(chunks),
+               "values": first}
+        pending = {}
+        for i, chunk in enumerate(chunks[1:], start=2):
+            yield {"type": "section_start", "section": _chunk_label(chunk), "index": i, "total": len(chunks)}
+            pending[pool.submit(write, i, chunk, dict(first))] = (i, chunk)
+        for done in as_completed(pending):
+            i, chunk = pending[done]
+            values = done.result()
+            all_values.update(values)
+            yield {"type": "section_done", "section": _chunk_label(chunk), "index": i, "total": len(chunks),
+                   "values": values}
+        found, refs_block = refs.result()
+    finally:
+        pool.shutdown(wait=False)
+    lesson = base + refs_block
 
     # Anything still blank or answered with a placeholder gets one more,
     # targeted attempt before this reports back. Without it the page announced
     # a finished plan over fields the model had quietly skipped.
-    gaps = _incomplete(all_values, fields)
+    gaps = _incomplete(all_values, _not_references(fields))
     if gaps:
         yield {"type": "filling_gaps", "count": len(gaps)}
-        recovered = _fill_gaps(lesson, fields, all_values, "Building Proficiency", course_guide_text, cite,
-                               context)
+        recovered = _fill_gaps(lesson, _not_references(fields), all_values, "Building Proficiency",
+                               course_guide_text, cite, context)
         if recovered:
             all_values.update(recovered)
             yield {"type": "section_done", "section": "Filled-in gaps",
@@ -1379,6 +1439,14 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
         all_values.update(referenced)
         yield {"type": "section_done", "section": "Online references",
                "index": len(chunks), "total": len(chunks), "values": referenced}
+
+    # Coherent as written (user report 2026-11-23): one review of the whole
+    # plan, and its fixes go straight into the parts just written.
+    fixed = _apply_coherence(context, fields, all_values, written, course_guide_text, cite, plan_fields)
+    if fixed:
+        all_values.update(fixed)
+        yield {"type": "section_done", "section": "Coherence check",
+               "index": len(chunks), "total": len(chunks), "values": fixed}
 
     # `missing` answers "did everything I was asked to write come back": the
     # requested field keys with no real content even after the retry. It says

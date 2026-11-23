@@ -130,6 +130,78 @@ def is_answered(value) -> bool:
     return bare not in _PLACEHOLDERS
 
 
+# Layout repair (user report 2026-11-23, "fix the numberings, bullets, and
+# spacing"): models run a list into one line ("1. Divide ... 2. Give ...") or a
+# question's options ("a. Binary b. Decimal ..."), and a quiz in a part that
+# isn't the evaluation was renumbered line by line, options included.
+_OPTION = re.compile(r"^\(?([a-dA-D])[.)]\s+\S")
+_INLINE_OPTION = re.compile(r"(?:^|(?<=\s))\(?([a-d])[.)]\s+(?=\S)")
+_INLINE_NUMBER = re.compile(r"(?:^|(?<=\s))(\d{1,2})[.)]\s+(?=\S)")
+_LEAD_IN = re.compile(r"(?i)^(directions?|instructions?|answer key|rubric|multiple-choice quiz|performance task)\b")
+_QUIZ_LINES = 200
+
+
+def _in_sequence(markers, first):
+    """Markers that read first, first+1, ... (a, b, c / 1, 2, 3): a real list."""
+    return len(markers) >= 2 and all(m == first + i for i, m in enumerate(markers))
+
+
+def _split_runs(lines):
+    """A list run into one line, back onto one line per item."""
+    out = []
+    for line in lines:
+        options = [m for m in _INLINE_OPTION.finditer(line)]
+        numbers = [m for m in _INLINE_NUMBER.finditer(line)]
+        found = None
+        if _in_sequence([ord(m.group(1)) for m in options], ord("a")):
+            found = options
+        elif _in_sequence([int(m.group(1)) for m in numbers], 1):
+            found = numbers
+        if not found:
+            out.append(line)
+            continue
+        cuts = [m.start() for m in found]
+        head = line[:cuts[0]].strip()
+        if head:
+            out.append(head)
+        out += [line[a:b].strip() for a, b in zip(cuts, cuts[1:] + [len(line)]) if line[a:b].strip()]
+    return out
+
+
+def _strip_markers(line: str) -> str:
+    """Every bullet or number in front of a line ("• - Prayer", "1. 1. Recall")."""
+    while True:
+        bare = _LEADING_MARKER.sub("", line, count=1).strip()
+        if bare == line:
+            return line
+        line = bare
+
+
+def _looks_like_quiz(lines) -> bool:
+    return sum(1 for line in lines if _OPTION.match(_strip_markers(line))) >= 2
+
+
+def _quiz_layout(lines, max_item_words):
+    """Questions numbered 1, 2, 3; options, lead-ins and the answer key kept
+    as they are, one per line."""
+    out, n, in_key = [], 0, False
+    for line in lines:
+        bare = _strip_markers(line)
+        if re.match(r"(?i)answer key", bare):
+            in_key = True
+            out.append(bare)
+        elif in_key:
+            out.append(line.strip())
+        elif _OPTION.match(bare) or _LEAD_IN.match(bare) or bare.endswith(":"):
+            out.append(_clip_words(bare, max_item_words * 2))
+            if _LEAD_IN.match(bare) and re.match(r"(?i)(multiple-choice quiz|performance task)", bare):
+                n = 0  # a new part restarts its numbering
+        else:
+            n += 1
+            out.append(f"{n}. {_clip_words(bare, max_item_words * 2)}")
+    return "\n".join(out[:_QUIZ_LINES])
+
+
 def clean_value(value, field_type: str = "text", *, max_items: int, max_item_words: int,
                 max_sentences: int, max_prose_words: int, keep_markers: bool = False) -> str:
     """One field's returned value, trimmed to the ceilings and stripped of
@@ -145,17 +217,20 @@ def clean_value(value, field_type: str = "text", *, max_items: int, max_item_wor
     else:
         lines = str(value).split("\n")
 
-    lines = [_strip_markdown(line).strip() for line in lines]
+    lines = _split_runs([_strip_markdown(line).strip() for line in lines if line.strip()])
     if keep_markers:
         kept = [line for line in lines if line][:max_items]
         return "\n".join(_clip_words(line, max_item_words) for line in kept)
+    # A quiz anywhere (a mastery check, a practice activity) keeps a quiz's shape.
+    if _looks_like_quiz(lines):
+        return _quiz_layout(lines, max_item_words)
 
     # Whether this was a numbered list has to be read before the markers come
     # off, and only counts when at least two lines carry a number: one stray
     # "1." in front of a single line is not a procedure.
     numbered = sum(1 for line in lines if _NUMBER_MARKER.match(line)) >= 2
 
-    lines = [_LEADING_MARKER.sub("", line).strip() for line in lines]
+    lines = [_strip_markers(line) for line in lines]
     lines = [line for line in lines if line]
 
     if not lines:

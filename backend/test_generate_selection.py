@@ -295,9 +295,11 @@ def check_assessment_type():
     assert len(lines) == 121 and lines[0] == "1. Question 1?" and lines[1] == "a. one", lines[:3]
     assert lines[-1] == "20. b" and "Answer key:" in lines, lines[-3:]
     assert len(out["flow"].split("\n")) == ai_service._MAX_LIST_ITEMS
-    # Without a quiz in the setup, the evaluation field keeps the usual ceiling.
+    # Without a quiz in the setup, a quiz the model wrote still keeps a quiz's
+    # shape (cutting it at 8 lines left questions without their options).
     plain = ai_service._trim({"evaluating_learning": quiz_text}, [evaluation], context={})
-    assert len(plain["evaluating_learning"].split("\n")) == ai_service._MAX_LIST_ITEMS
+    plain_lines = plain["evaluating_learning"].split("\n")
+    assert plain_lines[:2] == ["1. Question 1?", "a. one"] and plain_lines[-1] == "20. b", plain_lines[:3]
     print("  assessment type OK")
 
 
