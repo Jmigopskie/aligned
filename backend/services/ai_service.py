@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 import requests
 
 from config import Config
-from services import ai_limits, grounding
+from services import ai_limits, field_roles, grounding
 
 _log = logging.getLogger(__name__)
 
@@ -489,7 +489,7 @@ def _field_directive(field):
     what kind of field it is. Keeps the model from writing verbose prose where the
     field is meant to be short, and from padding lists with over-specific brand or
     model detail where a general category is what's wanted."""
-    haystack = f"{field.field_key or ''} {field.label or ''}".lower()
+    haystack = field_roles.part_text(field)
 
     if "pre-lesson" in haystack or "pre lesson" in haystack:
         return (
@@ -629,7 +629,7 @@ def _grounding_directive(field, context: dict) -> str:
     """Ties the recap to the previous topic, the assignment to the next topic,
     and the procedure's times to the discussion's length, using what Alan asked
     during setup. Without it these fields were written blind."""
-    haystack = f"{field.field_key or ''} {field.label or ''}".lower().replace("_", " ")
+    haystack = field_roles.part_text(field)
     weekly = field.field_type == "weekly"
     topic = context.get("topic") or ""
     out = ""
@@ -830,7 +830,7 @@ def _objectives_for_assessment(field, context) -> str:
 
 def _sets_assessment(field, context) -> bool:
     """The field that carries the setup's quiz or performance task."""
-    haystack = f"{field.field_key or ''} {field.label or ''}".lower().replace("_", " ")
+    haystack = field_roles.part_text(field)
     return field.field_type != "weekly" and bool(_assessment_directive(haystack, context or {}))
 
 
@@ -873,10 +873,19 @@ def _part_meaning(field):
     return ""
 
 
+def _field_described(f):
+    """The part's own name, and the format admin's account of what goes in it.
+    Both: the name says which part of the plan it is, the context says how this
+    school wants it written (sending only one used to drop the name)."""
+    if not f.ai_hint:
+        return f'"{f.label}"{_part_meaning(f)}'
+    return f'"{f.label}". What this format wants here (follow it closely): {f.ai_hint.strip()}'
+
+
 def _schema_block(fields, context=None):
     context = context or {}
     return "\n".join(
-        f"- {f.field_key} ({f.field_type}): {f.ai_hint or f.label}{_part_meaning(f)}"
+        f"- {f.field_key} ({f.field_type}): {_field_described(f)}"
         f"{_field_directive(f)}{_weekly_directive(f)}"
         f"{_grounding_directive(f, context) if context else ''}"
         for f in fields
@@ -1198,7 +1207,7 @@ def _must_answer(fields):
     """The fields a reply is held to: logistics a teacher didn't give are left
     blank on purpose, so they are neither re-asked nor reported missing."""
     return [f for f in fields if not grounding.is_logistics_field(f)
-            and not re.search(r"integration|contextuali", f"{f.field_key} {f.label}", re.I)]
+            and not re.search(r"integration|contextuali", field_roles.part_text(f), re.I)]
 
 
 # A learning objective field must carry at least this many objectives
@@ -1307,8 +1316,8 @@ def _timing_problems(values: dict, fields, cap: int = _SESSION_MINUTES) -> list:
     past _SESSION_MINUTES or whose pre-lesson gives no minutes (so its time is
     unaccounted for). The model was told the cap and still timed the flow
     alone to 45 with the routine on top, so the plan is checked, not trusted."""
-    timed = [f for f in fields if _TIMED_PARTS.search(f.label or "")]
-    if not timed or not any(_PRE_LESSON.search(f.label or "") for f in timed):
+    timed = [f for f in fields if _TIMED_PARTS.search(field_roles.part_text(f))]
+    if not timed or not any(_PRE_LESSON.search(field_roles.part_text(f)) for f in timed):
         return []
 
     def cells(f):
@@ -1324,7 +1333,7 @@ def _timing_problems(values: dict, fields, cap: int = _SESSION_MINUTES) -> list:
             text = str(parts[d] if d < len(parts) else "") or ""
             mins = sum(int(m) for m in _MINUTES.findall(text))
             total += mins
-            if _PRE_LESSON.search(f.label or "") and mins:
+            if _PRE_LESSON.search(field_roles.part_text(f)) and mins:
                 pre_timed = True
         if total > cap or not pre_timed:
             problems.append((d, total, pre_timed))
@@ -1340,7 +1349,7 @@ def _fix_timing(lesson, fields, values, label, guide_text, citation, context):
         problems = _timing_problems(values, fields, cap)
         if not problems:
             return values
-        targets = [f for f in fields if _TIMED_PARTS.search(f.label or "")
+        targets = [f for f in fields if _TIMED_PARTS.search(field_roles.part_text(f))
                    and not re.search(r"formative", f.label or "", re.I)]
         if not targets:
             return values

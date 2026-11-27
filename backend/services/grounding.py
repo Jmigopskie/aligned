@@ -25,6 +25,8 @@ from urllib.parse import urljoin, urlparse
 import certifi
 import urllib3
 
+from services import field_roles
+
 # Fields whose wording must come from the curriculum documents verbatim.
 _VERBATIM_FIELD = re.compile(r"content standard|performance standard|competenc|objective|melc", re.I)
 _REFERENCE_FIELD = re.compile(r"reference", re.I)
@@ -32,7 +34,8 @@ _REFERENCE_FIELD = re.compile(r"reference", re.I)
 
 def _haystack(field):
     # kind_text: what a field is taken for when its own label says more (see competency_view).
-    return getattr(field, "kind_text", None) or f"{field.field_key or ''} {field.label or ''}"
+    # Otherwise its key and label, plus what its admin context says it is (field_roles.part_text).
+    return getattr(field, "kind_text", None) or field_roles.part_text(field)
 
 
 class _AsKind:

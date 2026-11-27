@@ -66,10 +66,84 @@ _REFLECTION_KEYWORDS = (
 )
 
 
-def _haystack(field) -> str:
+import re
+
+# Labels that are plain facts (who, where, when): known even though no part
+# keyword matches them, so their context is never read as a lesson part.
+_FACT_WORDS = ("school", "teacher", "name", "date", "time", "week", "day", "grade", "section", "quarter",
+               "term", "semester", "subject", "learning area", "modality", "title", "topic", "session",
+               "pages", "prepared by", "checked by", "noted by", "approved by", "duration")
+
+# What an admin's context ("What goes here") says a part is, for a format
+# whose own word for it is new to the app (PAL3's "Self-Check", a school's
+# "Lesson Development"). Each maps to the standard name every recogniser
+# already knows. The part named EARLIEST in the context wins: admins open
+# with what the part is ("A short quiz on...") before what it relates to.
+_HINT_KINDS = (
+    (r"content standard", "content standard"),
+    (r"performance standard", "performance standard"),
+    (r"objective|at the end of the lesson|(?:learners|students) (?:should|will|are expected to) be able",
+     "learning objectives"),
+    (r"competenc|melc", "learning competency"),
+    (r"reflection|after (?:the )?(?:session|teaching|class)|what to change next time", "reflection"),
+    (r"learner context|observations? of (?:the|these) learners", "learner context"),
+    (r"\bai\b|artificial intelligence", "declaration of ai use"),
+    (r"reference|bibliograph|sources? (?:cited|used)", "references"),
+    (r"materials?|learning resources?|instructional|equipment|tools? (?:and|&) supplies", "learning resources materials"),
+    (r"routine|prayer|greeting|attendance|classroom rules", "pre-lesson routine"),
+    (r"review|recap|previous lesson|past lesson", "review of the previous lesson"),
+    (r"motivat|hook|energi[sz]er|warm.?up|icebreaker|arouse", "motivation"),
+    (r"lesson proper|the lesson itself|discussion|lecture|(?:teach|present|explain|introduce)(?:es|s|ing)? the "
+     r"(?:new |day's |lesson's )?(?:topic|lesson|concepts?|content)|key concepts|definitions", "lesson proper"),
+    (r"flow|procedure|steps? of the lesson|activities in order|sequence of (?:the )?(?:activities|lesson)|"
+     r"whole (?:session|lesson|period)", "lesson flow procedure"),
+    (r"analy[sz]", "analysis"),
+    (r"generali[sz]|abstraction|key idea|sum(?:s|ming)? up|summar", "generalization"),
+    (r"application|apply|real.life|daily life", "application"),
+    (r"quiz|evaluat|assess|\btest\b|self.check|check (?:of |for )?(?:learning|understanding|mastery)", "evaluation"),
+    (r"assignment|homework|at home|outside (?:of )?class|extended learning|enrichment|remediation",
+     "assignment extended learning"),
+    (r"integration|contextuali|other learning areas|other subjects", "integration"),
+    (r"values?\b|attitude", "values"),
+    (r"activit|group work|hands.on|practice|exercise", "activity"),
+)
+
+
+def hint_kind(hint) -> str:
+    """The standard part an admin's context describes, or "" if none."""
+    text = str(hint or "").lower()
+    found = [(m.start(), kind) for pattern, kind in _HINT_KINDS for m in [re.search(pattern, text)] if m]
+    return min(found)[1] if found else ""
+
+
+def _label_text(field) -> str:
     key = getattr(field, "field_key", "") or ""
     label = getattr(field, "label", "") or ""
     return f"{key} {label}".replace("_", " ").lower()
+
+
+def label_known(field) -> bool:
+    """The field's own key or label already names a part or a plain fact."""
+    text = _label_text(field)
+    words = _HEAVY_KEYWORDS + _REFLECTION_KEYWORDS + _SELF_KEYWORDS + _FACT_WORDS
+    return any(w in text for w in words) or bool(re.search(r"lesson.proper|presentation|explain|\bai\b", text))
+
+
+def part_text(field) -> str:
+    """What a field is, for every recogniser: its key and label, plus, when
+    that label is a term the app doesn't know, the standard part its admin
+    context describes. A known label is never overridden, so formats that
+    already worked read exactly as before."""
+    text = _label_text(field)
+    if not label_known(field):
+        kind = hint_kind(getattr(field, "ai_hint", None))
+        if kind:
+            text = f"{text} {kind}"
+    return text
+
+
+def _haystack(field) -> str:
+    return part_text(field)
 
 
 def role_for(field) -> str:
