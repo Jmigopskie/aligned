@@ -128,4 +128,9 @@ assert.match(problem("topics", { mainTopic: "Spreadsheets", topic: "12345" }).me
 assert.strictEqual(problem("topics", { mainTopic: "asdfgh", topic: "Cell formulas" }).field, "flow-mainTopic");
 assert.strictEqual(problem("topics", { mainTopic: "Spreadsheets", topic: "Cell formulas", nextTopic: "qwerty" }).field, "flow-nextTopic");
 assert.strictEqual(problem("people", { studentTeacher: "asdf", coop: "Juan Dela Cruz" }).field, "flow-studentTeacher");
+// Step 1's learning modality fills the format's modality field; Face to Face unless Online.
+const prefill = get("prefillFieldValues");
+const modalityField = [{ field_key: "m", label: "Learning Delivery Modality" }];
+assert.strictEqual(prefill(modalityField, {}, {}).m, "Face to Face");
+assert.strictEqual(prefill(modalityField, { modality: "Online" }, {}).m, "Online");
 console.log("flow steps OK");

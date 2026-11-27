@@ -976,6 +976,8 @@ function getAdvancedContext() {
     assessment_type: assessmentText(flowFlags),
     // College only: the course syllabus week, when the student named one.
     week: isCollege ? String(flowFlags.week || "").trim() : "",
+    // Step 1: Face to Face (the default, and every plan from before the choice) or Online.
+    learning_modality: flowFlags.modality === "Online" ? "Online" : "Face to Face",
   };
   // Only when Alan actually asked (the plan went through the flow): then an
   // empty value means "first lesson" / "not sure yet" and the server grounds
@@ -4065,7 +4067,7 @@ const ANSWER_INPUTS = {
   section: sectionInput, previousTopic: prevTopicInput, topic: topicInput, nextTopic: nextTopicInput,
   mainTopic: mainTopicInput,
 };
-const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "week", "sample", "assessment", "quizItems", "guidedAt"];
+const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "week", "sample", "assessment", "quizItems", "guidedAt", "modality"];
 
 function getAnswers() {
   const answers = {};

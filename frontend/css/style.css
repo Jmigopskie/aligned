@@ -7305,6 +7305,11 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
 }
 .flow-answer { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
 .flow-label { margin: 6px 0 -4px; font-size: var(--text-sm); font-weight: 600; color: var(--text-heading); }
+/* Step 1's learning modality: two choices side by side, stacked on phones. */
+.flow-modality { display: grid; gap: 10px; margin-top: 14px; }
+.flow-modality .flow-label { margin: 0; }
+.flow-modality-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 560px) { .flow-modality-choices { grid-template-columns: 1fr; } }
 
 /* A field sits in a soft tray: the tray carries the focus state. */
 .flow-field {

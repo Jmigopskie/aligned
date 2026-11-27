@@ -16,8 +16,8 @@ const PNG_FOR_POSE = {
 
 const COPY = {
   format: {
-    q: "Which lesson plan format, and which school?",
-    help: "Pick the format your school uses, then type the school's name.",
+    q: "Which format, school and learning modality?",
+    help: "Pick the format your school uses, type the school's name, and say how the class meets.",
     say: "Hi! I'm Alan. Let's build your lesson plan together, a few questions at a time.",
   },
   assessment: {
@@ -191,6 +191,7 @@ function startNewRun() {
     coop: memory.coop || "",
     durationMinutes: 45,
     levelType: "k12",
+    modality: "Face to Face", // the most common; Online is the other choice
   });
 }
 
@@ -262,8 +263,34 @@ async function paintFormats(wrap) {
     upload.addEventListener("click", () => paintUpload(wrap));
     parts.push(upload);
   }
-  wrap.replaceChildren(row(parts, textAnswer("school", { label: "School", placeholder: "e.g. San Isidro National High School" })));
+  wrap.replaceChildren(row(parts, textAnswer("school", { label: "School", placeholder: "e.g. San Isidro National High School" })),
+    modalityChoice());
   refresh();
+}
+
+// How the class meets (user, 2026-11-28): Face to Face unless they pick
+// Online; the plan's activities, materials and assessment follow it.
+function modalityChoice() {
+  const box = el("div", { class: "flow-modality" });
+  const paint = () => {
+    const current = G.getAnswers().modality === "Online" ? "Online" : "Face to Face";
+    const choices = el("div", { class: "flow-choices flow-modality-choices", role: "group", "aria-labelledby": "flow-modality-label" });
+    [
+      { value: "Face to Face", sub: "In the classroom" },
+      { value: "Online", sub: "A live class over a video call" },
+    ].forEach((m) => {
+      const btn = el("button", { type: "button", class: "flow-choice flow-format flow-mode", "aria-pressed": String(m.value === current) },
+        twoLine(m.value, m.sub), tick());
+      btn.addEventListener("click", () => {
+        G.setAnswers({ modality: m.value });
+        paint();
+      });
+      choices.append(btn);
+    });
+    box.replaceChildren(el("p", { class: "flow-label", id: "flow-modality-label" }, "Learning modality"), choices);
+  };
+  paint();
+  return box;
 }
 
 // Teachers only: upload a blank format right here, name it, save, carry on.
@@ -1007,6 +1034,7 @@ function classText(a) {
 // [step that holds the answer, label, value]
 const DETAIL_ROWS = [
   ["format", "School", (a) => a.school],
+  ["format", "Learning modality", (a) => (a.modality === "Online" ? "Online" : "Face to Face")],
   ["assessment", "Assessment", (a) => ({
     objectives: `Based on the objectives (quiz of up to ${a.quizItems || 5} items, performance task, or both)`,
     quiz: `${a.quizItems || 5}-item multiple-choice quiz`,

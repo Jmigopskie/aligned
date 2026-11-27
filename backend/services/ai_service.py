@@ -934,7 +934,28 @@ def _learners_directive(context: dict) -> str:
     if context.get("duration_minutes"):
         out += (f"\nThe session lasts {minutes} minutes: plan only what fits in it, with every timed part "
                 f"together adding up to {minutes} minutes, and activities and the assessment sized for that time.\n")
-    return out
+    return out + _MODALITY_NOTES[learning_modality(context)]
+
+
+# Step 1's learning modality (user, 2026-11-28): Face to Face unless the
+# setup said Online, so a plan from before the choice reads as it did.
+_MODALITY_NOTES = {
+    "Face to Face": (
+        "\nLearning modality: Face to Face, in the classroom. Every activity, material and assessment works in a "
+        "room with the teacher present: the board and slides, printed or real materials, pairs and groups at their "
+        "seats, and the real tools and equipment where the skill needs them.\n"),
+    "Online": (
+        "\nLearning modality: Online, a live class over a video call. Make every part work online: the routine done "
+        "on camera and in chat (attendance in chat or a form, no classroom cleaning or seating), the lesson on a "
+        "shared screen, activities in breakout rooms, chat, polls, shared documents, online whiteboards or "
+        "simulations, hands-on tasks done with what learners have at home or in a simulator, and the quiz or task "
+        "submitted online (e.g. a Google Form or a photo or file upload). Never ask for handouts, the board or "
+        "classroom equipment.\n"),
+}
+
+
+def learning_modality(context: dict) -> str:
+    return "Online" if str((context or {}).get("learning_modality") or "").strip().lower() == "online" else "Face to Face"
 
 
 def _lesson_block(context: dict, guide_text: str, citation: str = "") -> str:

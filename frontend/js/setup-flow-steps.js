@@ -148,6 +148,8 @@ function classLabel(a) {
 
 const PREFILL_LABELS = [
   [["school"], (a) => a.school],
+  [["learning delivery modality", "learning modality", "modality", "delivery modality", "mode of delivery"],
+    (a) => (a.modality === "Online" ? "Online" : "Face to Face")],
   [["student teacher", "teacher", "name of teacher", "name of teachers"], (a) => a.studentTeacher],
   [["learning area", "learning area(s)"], (a) => a.subject],
   [["grade level", "grade level & section"], classLabel],
