@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-11-28c" />
+  <link rel="stylesheet" href="css/style.css?v=2026-11-28f" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -79,6 +79,71 @@
           </div>
         </section>
 
+        <!-- The tutorial: what AlignED is, then a walkthrough of how it works for
+             the reader's role, one step at a time with Alan (js/faq.js). Without
+             script every step shows as a list. -->
+        <section class="faq-group tutorial" id="topic-how-aligned-works" data-icon-name="sparkle" aria-labelledby="tutorial-title">
+          <div class="tutorial-head">
+            <div class="tutorial-heading">
+              <h2 class="tutorial-title" id="tutorial-title">How AlignED works</h2>
+              <p class="tutorial-lede">AlignED helps you write a DepEd-aligned TLE or EPP lesson plan in your school's own format, from the official Budget of Work and Curriculum Guide, with Alan the owl beside you. Let Alan write the plan and check it, or write it yourself part by part while he guides you.</p>
+            </div>
+            <div class="mode-switch tutorial-switch" role="tablist" aria-label="Show the steps for">
+              <button type="button" role="tab" id="tab-student" aria-controls="steps-student" aria-selected="true" class="active" data-role-tab="student">For students</button>
+              <button type="button" role="tab" id="tab-teacher" aria-controls="steps-teacher" aria-selected="false" data-role-tab="teacher">For teachers</button>
+            </div>
+          </div>
+
+          <ul class="tutorial-ideas">
+            <li><strong>Your school's format.</strong> The plan comes out in the exact layout your school uses: DLP, ILAW, 4A's, PAL3, SNHS, TUP or one your teacher uploads.</li>
+            <li><strong>Your curriculum.</strong> Standards and competencies are copied word for word from the Budget of Work or Curriculum Guide you pick, never made up.</li>
+            <li><strong>Your choice of help.</strong> <em>Building Proficiency</em> writes the whole plan for you to review. <em>Guided</em> walks you through it so you write it yourself.</li>
+          </ul>
+
+          <div class="tutorial-walk">
+            <nav class="tutorial-rail" aria-label="Steps"></nav>
+            <div class="tutorial-stage">
+              <img class="tutorial-alan" src="img/owl/alan-wave.png" alt="" />
+              <div class="tutorial-panels">
+                <ol class="tutorial-steps" id="steps-student" role="tabpanel" aria-labelledby="tab-student">
+                  <li data-pose="wave" data-where="The sign-in page"><h3>Create your account</h3>
+                    <p>On the sign-in page choose <strong>Sign up</strong> and use your school email (ending in <strong>@gsfe.tupcavite.edu.ph</strong>). AlignED emails you a 6-digit code; type it in to finish. Forgot your password later? Use <strong>Forgot Password?</strong> under the sign-in form.</p></li>
+                  <li data-pose="point" data-where="My Classes"><h3>Join your teacher's class</h3>
+                    <p>Open <strong>My Classes</strong> and enter the class code your teacher gives you. You need to be in a class before you can make lesson plans, and your teacher gives you the points Building Proficiency uses.</p></li>
+                  <li data-pose="think" data-where="Create Lesson Plan"><h3>Answer Alan's setup questions</h3>
+                    <p>Alan asks nine short questions, one at a time: the format and school, how you will assess the lesson, who is teaching, the class, the subject and how long the discussion runs, the topic (and the topics before and after it), what he should read (a Budget of Work, Curriculum Guide or your own files), an optional sample plan, and how you want to write it.</p></li>
+                  <li data-pose="idea" data-where="Create Lesson Plan"><h3>Write the plan your way</h3>
+                    <p><strong>Building Proficiency</strong> (30 points, once per plan): Alan writes the whole plan from your sources, and you read and edit it.</p>
+                    <p><strong>Guided</strong> (free): you write each part yourself. Every part opens with a short explanation, and you can chat with Alan for ideas; for the lesson proper he writes out the whole lesson from your sources. If a part doesn't apply, choose <strong>None for this part</strong>. When every part is written, Alan organizes the plan's spacing, bullets and spelling, never what you wrote.</p></li>
+                  <li data-pose="check" data-where="The plan's toolbar"><h3>Check it and save</h3>
+                    <p>Open the document to see the plan in its real layout and edit anything directly. <strong>Check coherence</strong> tells you whether the objectives, lesson and evaluation fit together. <strong>Regenerate</strong> rewrites chosen parts (5 points). Then use <strong>Save lesson plan</strong>.</p></li>
+                  <li data-pose="celebrate" data-where="List of Lesson Plans"><h3>Export and hand it in</h3>
+                    <p>After saving, use <strong>Export as Word</strong> or <strong>Save as PDF</strong>. To hand it in, open <strong>List of Lesson Plans</strong>, open the plan's menu and choose <strong>Submit to class</strong>. You are notified when your teacher scores it, and the score and feedback show on the plan.</p></li>
+                  <li data-pose="wave" data-where="List of Lesson Plans"><h3>Share it, if you like</h3>
+                    <p><strong>Make public</strong> (in the same menu) puts the plan in <strong>Public Lesson Plans</strong>, in the folder for its learning area. Others can read it but not download it, and teachers can rate it with stars.</p></li>
+                </ol>
+
+                <ol class="tutorial-steps" id="steps-teacher" role="tabpanel" aria-labelledby="tab-teacher" hidden>
+                  <li data-pose="wave" data-where="The sign-in page"><h3>Sign in</h3>
+                    <p>Teacher accounts are made by your school's AlignED admin. Sign in with the email and password they give you, then change your password in <strong>Settings</strong>.</p></li>
+                  <li data-pose="point" data-where="My Sections"><h3>Set up your classes</h3>
+                    <p>Use <strong>Create Section</strong>. Each section gets a join code; share it with your students. You also give your students points here, which they use when Alan writes a whole plan for them.</p></li>
+                  <li data-pose="think" data-where="Formats"><h3>Choose or add a format</h3>
+                    <p>Use a ready-made format, or add your school's own with <strong>New format</strong> (a blank .docx, .dotx or .pdf). Check the fields AlignED finds, and for each one you can write <strong>What goes here</strong>: a sentence saying what belongs in that part. Alan follows it, even when your format names a part differently from other formats. Your students can use every format you upload.</p></li>
+                  <li data-pose="idle" data-where="Curriculum/Course Guide"><h3>Keep your curriculum documents in one place</h3>
+                    <p>DepEd's official Budgets of Work and Curriculum Guides are kept here in folders by type. Upload other guides for everyone to use.</p></li>
+                  <li data-pose="idea" data-where="Create Lesson Plan"><h3>Make your own plans</h3>
+                    <p>It works the same way for you as for students: Alan's setup questions, then Building Proficiency or Guided. Teachers never use points.</p></li>
+                  <li data-pose="check" data-where="List of Lesson Plans, Student Submissions tab"><h3>Review your students' work</h3>
+                    <p>Pick a section and choose <strong>Open &amp; review</strong>. Give a score from 1 to 100 and feedback, and rate it with stars if you like. Each submission can also be downloaded as Word or saved as a PDF.</p></li>
+                  <li data-pose="celebrate" data-where="List of Lesson Plans, Public Lesson Plans tab"><h3>Browse and rate public plans</h3>
+                    <p>Shared plans are grouped in folders by learning area: ICT, CP, HE, AGRI, IA and Electrical. Open a folder and preview any plan. Public plans can be read but not downloaded, and you can rate students' plans with stars.</p></li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <div class="help-layout">
           <nav class="help-topics" id="help-topics" aria-label="Topics"></nav>
 
@@ -86,60 +151,6 @@
             <p class="faq-empty" id="faq-empty" hidden>No questions match that. Try a shorter word, such as "export" or "guide".</p>
 
         <div class="faq" id="faq">
-          <!-- The tutorial: what AlignED is, then how it works, step by step, for
-               the reader's role (students and teachers use it differently). -->
-          <section class="faq-group tutorial" id="topic-how-aligned-works" data-icon-name="sparkle" aria-labelledby="tutorial-title">
-            <h2 class="faq-group-title" id="tutorial-title">How AlignED works</h2>
-            <div class="tutorial-intro">
-              <p><strong>AlignED is a lesson plan maker for TLE and EPP.</strong> It helps you write a DepEd-aligned lesson plan in your school's own format, from the official Budget of Work and Curriculum Guide, with Alan the owl beside you. You can let Alan write the plan and then check it, or write it yourself part by part while he guides you.</p>
-              <ul class="tutorial-ideas">
-                <li><strong>Your school's format.</strong> The plan comes out in the exact layout your school uses: DLP, ILAW, 4A's, PAL3, SNHS, TUP or one your teacher uploads.</li>
-                <li><strong>Your curriculum.</strong> Standards and competencies are copied word for word from the Budget of Work or Curriculum Guide you pick, never made up.</li>
-                <li><strong>Your choice of help.</strong> <em>Building Proficiency</em> writes the whole plan for you to review. <em>Guided</em> walks you through it so you write it yourself.</li>
-              </ul>
-            </div>
-
-            <div class="mode-switch tutorial-switch" role="tablist" aria-label="Show the steps for">
-              <button type="button" role="tab" id="tab-student" aria-controls="steps-student" aria-selected="true" class="active" data-role-tab="student">For students</button>
-              <button type="button" role="tab" id="tab-teacher" aria-controls="steps-teacher" aria-selected="false" data-role-tab="teacher">For teachers</button>
-            </div>
-
-            <ol class="tutorial-steps" id="steps-student" role="tabpanel" aria-labelledby="tab-student">
-              <li><h3>Create your account</h3>
-                <p>On the sign-in page choose <strong>Sign up</strong> and use your school email (ending in <strong>@gsfe.tupcavite.edu.ph</strong>). AlignED emails you a 6-digit code; type it in to finish. Forgot your password later? Use <strong>Forgot Password?</strong> under the sign-in form.</p></li>
-              <li><h3>Join your teacher's class</h3>
-                <p>Open <strong>My Classes</strong> and enter the class code your teacher gives you. You need to be in a class before you can make lesson plans, and your teacher gives you the points Building Proficiency uses.</p></li>
-              <li><h3>Answer Alan's setup questions</h3>
-                <p>In <strong>Create Lesson Plan</strong>, Alan asks nine short questions, one at a time: the format and school, how you will assess the lesson, who is teaching, the class, the subject and how long the discussion runs, the topic (and the topics before and after it), what he should read (a Budget of Work, Curriculum Guide or your own files), an optional sample plan, and how you want to write it.</p></li>
-              <li><h3>Write the plan your way</h3>
-                <p><strong>Building Proficiency</strong> (30 points, once per plan): Alan writes the whole plan from your sources, and you read and edit it.<br />
-                <strong>Guided</strong> (free): you write each part yourself. Every part opens with a short explanation, and you can chat with Alan for ideas. If a part doesn't apply to this lesson, choose <strong>None for this part</strong>. When every part is written, Alan organizes the plan: spacing, bullets, numbering, spelling and punctuation. He never changes what you wrote.</p></li>
-              <li><h3>Check it and save</h3>
-                <p>Open the document to see the plan in its real layout and edit anything directly. <strong>Check coherence</strong> tells you whether the objectives, lesson and evaluation fit together. <strong>Regenerate</strong> rewrites chosen parts (5 points). Then use <strong>Save lesson plan</strong>.</p></li>
-              <li><h3>Export and hand it in</h3>
-                <p>After saving, use <strong>Export as Word</strong> or <strong>Save as PDF</strong>. To hand it in, open <strong>List of Lesson Plans</strong>, open the plan's menu and choose <strong>Submit to class</strong>. You are notified when your teacher scores it, and the score and feedback show on the plan.</p></li>
-              <li><h3>Share it, if you like</h3>
-                <p><strong>Make public</strong> (in the same menu) puts the plan in <strong>Public Lesson Plans</strong>, in the folder for its learning area. Others can read it but not download it, and teachers can rate it with stars.</p></li>
-            </ol>
-
-            <ol class="tutorial-steps" id="steps-teacher" role="tabpanel" aria-labelledby="tab-teacher" hidden>
-              <li><h3>Sign in</h3>
-                <p>Teacher accounts are made by your school's AlignED admin. Sign in with the email and password they give you, then change your password in <strong>Settings</strong>.</p></li>
-              <li><h3>Set up your classes</h3>
-                <p>In <strong>My Sections</strong>, use <strong>Create Section</strong>. Each section gets a join code; share it with your students. You also give your students points here, which they use when Alan writes a whole plan for them.</p></li>
-              <li><h3>Choose or add a format</h3>
-                <p>Use a ready-made format, or add your school's own in <strong>Formats</strong> with <strong>New format</strong> (a blank .docx, .dotx or .pdf). Check the fields AlignED finds, and for each one you can write <strong>What goes here</strong>: a sentence saying what belongs in that part. Alan follows it, even when your format names a part differently from other formats. Your students can use every format you upload.</p></li>
-              <li><h3>Keep your curriculum documents in one place</h3>
-                <p><strong>Curriculum/Course Guide</strong> holds DepEd's official Budgets of Work and Curriculum Guides in folders by type. Upload other guides there for everyone to use.</p></li>
-              <li><h3>Make your own plans</h3>
-                <p><strong>Create Lesson Plan</strong> works the same way for you as for students: Alan's setup questions, then Building Proficiency or Guided. Teachers never use points.</p></li>
-              <li><h3>Review your students' work</h3>
-                <p>In <strong>List of Lesson Plans</strong>, open the <strong>Student Submissions</strong> tab and pick a section. <strong>Open &amp; review</strong> shows the plan. Give a score from 1 to 100 and feedback, and rate it with stars if you like. Each submission can also be downloaded as Word or saved as a PDF.</p></li>
-              <li><h3>Browse and rate public plans</h3>
-                <p><strong>Public Lesson Plans</strong> groups shared plans by learning area: ICT, CP, HE, AGRI, IA and Electrical. Open a folder and preview any plan. Public plans can be read but not downloaded, and you can rate students' plans there with stars.</p></li>
-            </ol>
-          </section>
-
           <section class="faq-group" id="topic-getting-started" data-icon-name="list">
             <h2 class="faq-group-title">Getting started</h2>
             <div class="faq-list">
@@ -304,6 +315,6 @@
 
   <script src="js/api.js?v=2026-11-23b"></script>
   <script src="js/icons.js?v=2026-11-23a"></script>
-  <script src="js/faq.js?v=2026-11-28a"></script>
+  <script src="js/faq.js?v=2026-11-28b"></script>
 </body>
 </html>

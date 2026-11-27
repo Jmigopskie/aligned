@@ -75,9 +75,77 @@ async function linkTutorial() {
   }
 }
 
-// The tutorial's steps for students or for teachers; opens on the reader's own.
+// ---- The tutorial: a walkthrough, one step at a time with Alan ----
+// The steps are plain list items in the page (readable without script); this
+// shows one, lists them all in the rail, and moves Alan with them. Students
+// and teachers each have their own steps; it opens on the reader's role.
 const roleTabs = Array.from(document.querySelectorAll("[data-role-tab]"));
+const tutorial = document.getElementById("topic-how-aligned-works");
+const rail = tutorial.querySelector(".tutorial-rail");
+const alan = tutorial.querySelector(".tutorial-alan");
+const panels = tutorial.querySelector(".tutorial-panels");
+let stepsRole = "student";
+let stepAt = 0;
+
+const foot = document.createElement("div");
+foot.className = "tutorial-foot";
+foot.innerHTML = `
+  <p class="tutorial-where"><span class="tutorial-where-icon">${Icons.arrowRight}</span><span>Find it in <strong></strong></span></p>
+  <div class="tutorial-nav">
+    <button type="button" class="btn btn-secondary tutorial-back">Back</button>
+    <span class="tutorial-count" aria-live="polite"></span>
+    <button type="button" class="btn btn-primary tutorial-next">Next</button>
+    <a class="btn btn-primary tutorial-start" href="generator.html">Make a lesson plan</a>
+  </div>`;
+panels.append(foot);
+tutorial.classList.add("is-walkthrough");
+
+const stepItems = () => Array.from(document.getElementById(`steps-${stepsRole}`).children);
+
+function drawRail() {
+  rail.innerHTML = `<ol>${stepItems().map((li, i) => `
+    <li><button type="button" class="tutorial-rail-step" data-step="${i}">
+      <span class="tutorial-rail-num" aria-hidden="true">${i + 1}</span>
+      <span class="tutorial-rail-label">${escapeHtml(li.querySelector("h3").textContent)}</span>
+    </button></li>`).join("")}</ol>`;
+}
+
+function showStep(i, focusStep = false) {
+  const list = stepItems();
+  stepAt = Math.max(0, Math.min(i, list.length - 1));
+  const li = list[stepAt];
+  list.forEach((item, n) => { item.hidden = n !== stepAt; });
+  alan.src = `img/owl/alan-${li.dataset.pose || "idle"}.png`;
+  rail.querySelectorAll(".tutorial-rail-step").forEach((btn, n) => {
+    btn.classList.toggle("is-done", n < stepAt);
+    if (n === stepAt) btn.setAttribute("aria-current", "step");
+    else btn.removeAttribute("aria-current");
+  });
+  foot.querySelector(".tutorial-where").hidden = !li.dataset.where;
+  foot.querySelector(".tutorial-where strong").textContent = li.dataset.where || "";
+  foot.querySelector(".tutorial-count").textContent = `Step ${stepAt + 1} of ${list.length}`;
+  foot.querySelector(".tutorial-back").disabled = stepAt === 0;
+  const last = stepAt === list.length - 1;
+  foot.querySelector(".tutorial-next").hidden = last;
+  foot.querySelector(".tutorial-start").hidden = !last;
+  // The one authored moment: the step and Alan arrive together.
+  panels.classList.remove("is-arriving");
+  void panels.offsetWidth;
+  panels.classList.add("is-arriving");
+  if (focusStep) li.querySelector("h3").focus();
+}
+
+rail.addEventListener("click", (e) => {
+  const btn = e.target.closest(".tutorial-rail-step");
+  if (btn) showStep(Number(btn.dataset.step), e.detail === 0);
+});
+// Focus moves to the step only for the keyboard (detail 0), not a mouse click.
+foot.querySelector(".tutorial-back").addEventListener("click", (e) => showStep(stepAt - 1, e.detail === 0));
+foot.querySelector(".tutorial-next").addEventListener("click", (e) => showStep(stepAt + 1, e.detail === 0));
+tutorial.querySelectorAll(".tutorial-steps h3").forEach((h) => { h.tabIndex = -1; });
+
 function showSteps(role) {
+  stepsRole = role;
   roleTabs.forEach((tab) => {
     const on = tab.dataset.roleTab === role;
     tab.classList.toggle("active", on);
@@ -85,6 +153,8 @@ function showSteps(role) {
     tab.tabIndex = on ? 0 : -1;
     document.getElementById(tab.getAttribute("aria-controls")).hidden = !on;
   });
+  drawRail();
+  showStep(0);
 }
 roleTabs.forEach((tab, i) => {
   tab.addEventListener("click", () => showSteps(tab.dataset.roleTab));
