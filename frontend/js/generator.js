@@ -525,7 +525,14 @@ function drawTurns(turns) {
   });
 }
 
-const startersFor = (field) => (field.locked ? OWL_COACH_STARTERS : OWL_STARTERS);
+// The lesson proper: the whole lesson, from the student's sources, is one click.
+const OWL_LESSON_STARTERS = [
+  { type: "ask", label: "Write the whole lesson from my sources",
+    text: "Give me the whole content of the lesson proper, taken from my references and the sources I selected." },
+  { type: "ask", label: "What should this part include?", text: "What should this part include?" },
+  { type: "ask", label: "Check what I wrote", text: "Read what I wrote so far and tell me what is missing from the lesson." },
+];
+const startersFor = (field) => (field.locked ? OWL_COACH_STARTERS : isLessonProper(field) ? OWL_LESSON_STARTERS : OWL_STARTERS);
 
 // The lesson proper (TUP's "Lesson Proper", a "Discussion", the 4A's
 // "Abstraction", ILAW's "Flow"): the lesson itself, taught from the plan's
@@ -557,8 +564,8 @@ function partIntro(field) {
   if (isLessonProper(field)) {
     const refs = planReferences();
     intro += refs.length
-      ? `\n\nThese are your references:\n${refs.map((r) => `- ${r}`).join("\n")}\nMake sure your discussion comes from them. Ask me and I'll draft the lesson from what they say: definitions, terms and examples.`
-      : "\n\nYou haven't listed any references yet. Add them in the References part first (I can find some for you), so your discussion comes from real sources.";
+      ? `\n\nThese are your references:\n${refs.map((r) => `- ${r}`).join("\n")}\nMake sure your discussion comes from them. Ask me and I'll write out the whole lesson from what they say, with the sources you selected: every definition, term and example.`
+      : "\n\nYou haven't listed any references yet. Add them in the References part (I can find some for you). Meanwhile, ask me and I'll write the whole lesson from the sources you selected or uploaded.";
   }
   return intro + (field.locked
     ? "\n\nYour teacher wants this part in your own words, so I won't write it for you, but I can help you think it through."

@@ -64,7 +64,7 @@ def main():
         out = ai_service.owl_chat(CTX, MOTIVATION, WRITTEN, "", [], "Go with: Recall game",
                                   direction={"label": "Recall game", "text": "Focus on recall game."})
         use = [c for c in out["choices"] if c["type"] == "use"]
-        assert len(use) == 1 and use[0]["text"] == game[:8000], len(use[0]["text"]) if use else out
+        assert len(use) == 1 and use[0]["text"] == game[:ai_service._MAX_USE_TEXT], len(use[0]["text"]) if use else out
         assert not [c for c in out["choices"] if c["type"] == "direction"], out
         assert "Recall game" in prompts[-1] and "complete" in prompts[-1], prompts[-1][-600:]
         print("  a chosen direction gets the complete part OK")

@@ -162,7 +162,8 @@ _OWL_SYSTEM_INSTRUCTION = (
     "- The reply is a short lead-in: one or two sentences, or one line and at most 5 short "
     "'- ' points. No greetings, praise, filler or markdown. Content goes in the choices, not the reply.\n"
     "- A GENERAL request for help or ideas for this part (\"help me\", \"give me ideas\", \"what "
-    "should I write\"): give exactly 2 directions, as choices of type \"direction\", that differ "
+    "should I write\"), except for the lesson proper or discussion, which always gets its complete "
+    "content (see below): give exactly 2 directions, as choices of type \"direction\", that differ "
     "in approach (e.g. for objectives: 'Introductory: recall and identify' vs 'Performance: apply "
     "and create'; for a motivation: two different activities). Its label names it in at most 6 "
     "words, its text says in one or two sentences what that direction focuses on, its why says in "
@@ -175,8 +176,9 @@ _OWL_SYSTEM_INSTRUCTION = (
     "activity, game or motivation its title, materials, complete step-by-step directions and every "
     "question with its answer; for an assessment the complete quiz with its answer key and/or the "
     "task with its rubric rows (cells separated by ' | '); for the lesson proper or discussion the "
-    "whole lesson as that part's instructions describe, taken only from the references' content "
-    "given. Its label names it in at most 6 words, its why says in one sentence why it fits. "
+    "whole lesson as that part's instructions describe, every concept, definition, term and example "
+    "written out (never an outline of what to teach), taken only from the references' content and "
+    "the sources the student selected or uploaded. Its label names it in at most 6 words, its why says in one sentence why it fits. "
     "Add 1 or 2 \"ask\" choices.\n"
     "- A \"use\" choice is read and learned from, never inserted: the student writes the part in "
     "their own words. Classroom-ready, DepEd K-12 terminology, grounded in the topic and guide.\n"
@@ -191,7 +193,27 @@ _OWL_SYSTEM_INSTRUCTION = (
     "\"ask\", \"label\": \"...\", \"text\": \"...\", \"why\": \"...\" (direction and use only)}]}"
 )
 _MAX_DIRECTIONS = 2
-_MAX_USE_TEXT = 8000
+_MAX_USE_TEXT = 12000  # room for a whole lesson proper
+
+# "Give me the whole content", "complete", "buong lesson": the content itself, now.
+_WANTS_FULL = re.compile(r"\b(?:whole|complete|full|entire|everything|all of (?:the|it)|buo|buong|lahat)\b", re.I)
+_TEACHING_NOTE = (
+    "\nThis part is the lesson proper: the lesson itself as the teacher teaches it. Whatever the student asks "
+    "for here (help, ideas, an example, the whole content), answer with ONE \"use\" choice holding the COMPLETE "
+    "lesson content, never an outline, an overview, a summary or a guide to what to teach: every concept with its "
+    "definition, the key terms, the parts, types, steps or rules, and worked examples, written out in full the "
+    "way the teacher will say and show them. Take every fact only from the sources given above: the online "
+    "references' pages, the Budget of Work or Curriculum Guide, and any files the student selected or uploaded "
+    "(name the source a part comes from). Never invent facts the sources don't give. No \"direction\" choices."
+)
+_FLOW_NOTE = (
+    " This part runs the whole session: give each step under its heading with its minutes, and inside the step "
+    "where the topic is taught write that complete lesson content itself, not a description of it."
+)
+_FULL_RETRY = (
+    "\nYour last answer gave directions or an outline instead of the content. Answer again with ONE \"use\" "
+    "choice that holds the complete content itself, nothing left out."
+)
 
 
 # ---------------------------------------------------------------------------
@@ -1970,6 +1992,17 @@ def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
         weekly_note += ("\nThe supervising teacher locked this field: the student must write it in their own words. "
                         "Coach them instead: say what it should contain, ask guiding questions, point to the guide. "
                         "Never write the field's content for them; offer only \"direction\" and \"ask\" choices.")
+    # The lesson proper (user, 2026-11-28): asked for help or for "the whole
+    # content", Alan used to answer with directions, an outline of what to
+    # teach. It is the lesson itself, so it always comes in full, from the
+    # sources. Any other part asked for its complete content gets it too.
+    teaching = grounding.is_lesson_proper_field(field) and not locked
+    full = bool(direction) or teaching or bool(_WANTS_FULL.search(message))
+    if teaching:
+        weekly_note += _TEACHING_NOTE + (_FLOW_NOTE if grounding.is_lesson_flow(field) else "")
+    elif full and not locked:
+        weekly_note += ("\nThe student asks for the complete content: give it now as ONE \"use\" choice with "
+                        "nothing left out, not directions or an outline.")
     chosen = ""
     if direction:
         picked = f"{direction.get('label', '')}: {direction.get('text', '')}"
@@ -1999,13 +2032,17 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
     searching = pool.submit(find_references, context) if pool else None
     try:
         data = _call(_OWL_SYSTEM_INSTRUCTION, [lesson, task], "Owl chat")
+        answer = _clean_owl_reply(data, _MAX_USE_TEXT)
+        if full and not locked and not any(c["type"] == "use" for c in answer["choices"]):
+            # Directions again instead of the content: asked once more, plainly.
+            data = _call(_OWL_SYSTEM_INSTRUCTION, [lesson, task + _FULL_RETRY], "Owl chat (full content)")
+            answer = _clean_owl_reply(data, _MAX_USE_TEXT)
     finally:
         if pool:
             pool.shutdown(wait=False)
-    answer = _clean_owl_reply(data, _MAX_USE_TEXT)
     choices = answer["choices"]
-    if direction:
-        # Chosen: the complete part, not another round of directions.
+    if full:
+        # Chosen, or asked for in full: the complete part, not another round of directions.
         choices = [c for c in choices if c["type"] != "direction"]
     elif any(c["type"] == "direction" for c in choices):
         # Directions offered: the student chooses before any finished content.
@@ -2152,9 +2189,9 @@ def _lesson_references(prior_values: dict, context: dict, fields=None) -> str:
             for v in value if isinstance(value, list) else [value]:
                 lines += [l.strip() for l in str(v or "").split("\n") if l.strip()]
     if not grounding.reference_urls(lines):
-        return ("\nThe student has not listed any online references yet. Say so in the reply: the discussion "
-                "should come from references they choose, so they should add them in the references part "
-                "first. Meanwhile use only the course guide.\n")
+        return ("\nThe student has not listed any online references yet. Say so in one sentence in the reply "
+                "(they can add them in the references part), and meanwhile write the lesson from the sources "
+                "selected or uploaded in the setup (the guide and files above).\n")
     return _references_block(lines, reference_material(lines, context)) + (
         "\nIn the reply, remind the student in one short sentence that their discussion must come from "
         "these references.\n")

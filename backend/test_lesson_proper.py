@@ -95,6 +95,36 @@ def main():
         ai_service.owl_chat(context, GEN, {"references": f"• {REF_LINE}"}, "", [], "Help")
         assert PAGE not in prompts[0], "only the lesson proper reads the pages"
         print("  guided chat uses the student's references OK")
+
+        # --- Guided, lesson proper: the whole lesson, never directions (user, 2026-11-28) ---
+        DIRECTIONS = {"reply": "Two ways to teach it.", "choices": [
+            {"type": "direction", "label": "Concept first", "text": "Start with definitions.", "why": "Clear."},
+            {"type": "direction", "label": "Example first", "text": "Start with examples.", "why": "Concrete."}]}
+        FULL = {"reply": "Here is the whole lesson.", "choices": [
+            {"type": "use", "label": "Lesson", "text": TAUGHT, "why": "From your references."},
+            {"type": "direction", "label": "Another way", "text": "Outline only.", "why": "x"}]}
+        replies, prompts = [DIRECTIONS, FULL], []
+        ai_service._call = lambda system, parts, label: prompts.append(" ".join(parts)) or replies.pop(0)
+        answer = ai_service.owl_chat(context, LESSON, {"references": f"• {REF_LINE}"}, "", [],
+                                     "give me the whole content of the lesson proper")
+        assert len(prompts) == 2 and "instead of the content" in prompts[1], "directions are asked again, plainly"
+        assert "COMPLETE lesson content" in prompts[0] and "uploaded" in prompts[0]
+        assert [c["type"] for c in answer["choices"]] == ["use"] and answer["choices"][0]["text"] == TAUGHT, answer
+        # ILAW's Flow carries the session: the lesson goes inside its teaching step.
+        flow = grounding.competency_view([Field("flow", "Flow", ai_hint="That day's activities in order.")])[0]
+        prompts.clear()
+        ai_service._call = lambda system, parts, label: prompts.append(" ".join(parts)) or FULL
+        ai_service.owl_chat(context, flow, {}, "", [], "Help me")
+        assert "inside the step" in prompts[0] and "COMPLETE lesson content" in prompts[0]
+        # Any part asked for its whole content gets it, not directions.
+        prompts.clear()
+        answer = ai_service.owl_chat(context, GEN, {}, "", [], "Give me the complete generalization")
+        assert "asks for the complete content" in prompts[0] and all(c["type"] != "direction" for c in answer["choices"])
+        # A general request on another part still starts with directions.
+        ai_service._call = lambda system, parts, label: DIRECTIONS
+        answer = ai_service.owl_chat(context, GEN, {}, "", [], "Help me")
+        assert [c["type"] for c in answer["choices"]] == ["direction", "direction"], answer
+        print("  guided lesson proper comes whole, from the sources OK")
     finally:
         ai_service.find_references, grounding.page_text, ai_service._call = real
     print("lesson proper OK")
