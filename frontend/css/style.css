@@ -315,6 +315,35 @@ button {
 .activity-pager { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 12px 16px; }
 .activity-pager .text-sm { margin-right: auto; }
 
+/* Admin User Activity: everyone, then one person day by day. */
+.activity-people .num { text-align: right; font-variant-numeric: tabular-nums; }
+.activity-person-row { cursor: pointer; }
+.activity-person-row:hover td { background: var(--bg); }
+.activity-person-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.person-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 12px 0 16px; }
+.person-head .section-title { margin: 0 0 2px; }
+.person-head .text-sm { margin: 0; }
+.person-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.person-stat { display: flex; flex-direction: column; min-width: 92px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-size: 12px; color: var(--text-body); }
+.person-stat strong { font: 600 20px/1.2 var(--font-display); color: var(--text-heading); font-variant-numeric: tabular-nums; }
+.activity-timeline { padding: 6px 18px 0; }
+.activity-day h3 { margin: 16px 0 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: var(--text-heading); }
+.activity-day ol { margin: 0; padding: 0; list-style: none; border-left: 2px solid var(--border); margin-left: 76px; }
+.activity-item { position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 8px 0 8px 16px; }
+.activity-item time { position: absolute; left: -84px; top: 9px; width: 66px; text-align: right; font-size: 12.5px; color: var(--text-body); font-variant-numeric: tabular-nums; }
+.activity-dot { position: absolute; left: -7px; top: 13px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--surface); background: #9AA8A2; }
+.activity-what { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--text-heading); }
+.activity-what strong { font-weight: 600; }
+.activity-ip { font-size: 11.5px; color: var(--text-body); opacity: 0.75; }
+.kind-sign-in .activity-dot { background: #4A7FC1; }
+.kind-plan .activity-dot { background: var(--primary); }
+.kind-submit .activity-dot { background: #C98A1B; }
+.kind-review .activity-dot { background: #8A5CC2; }
+.kind-download .activity-dot { background: #2E8B6F; }
+.kind-class .activity-dot, .kind-library .activity-dot { background: #5B8C9A; }
+.kind-admin .activity-dot { background: #B0473F; }
+.activity-empty { padding: 24px 0; text-align: center; color: var(--text-body); }
+
 /* A field's own error, under it (checkFields in api.js). */
 .field-error {
   margin: 5px 0 0;

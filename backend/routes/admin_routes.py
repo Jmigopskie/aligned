@@ -1,8 +1,10 @@
 from flask import Blueprint, request, jsonify
 
 import os
+import re
 
-from extensions import db
+from extensions import db, iso_utc
+from services import activity
 from models.user import User
 from models.section import Section, SectionMembership
 from models.lesson_plan import LessonPlan
@@ -41,10 +43,17 @@ def stats():
 def list_activity():
     """The activity log, newest first: ?user_id= one user, ?q= words in the
     action, detail or user's name/email, ?page= and ?per_page= (max 200)."""
-    query = ActivityLog.query.outerjoin(User, ActivityLog.user_id == User.id)
+    query = (ActivityLog.query.outerjoin(User, ActivityLog.user_id == User.id)
+             .filter(ActivityLog.action.in_(activity.SHOWN_ACTIONS)))
     user_id = request.args.get("user_id", type=int)
     if user_id:
-        query = query.filter(ActivityLog.user_id == user_id)
+        # Their failed sign-ins carry no user, only the email that was tried.
+        person = User.query.get(user_id)
+        mine = ActivityLog.user_id == user_id
+        if person:
+            mine = db.or_(mine, db.and_(ActivityLog.user_id.is_(None), ActivityLog.action == activity.FAILED_LOGIN,
+                                        ActivityLog.detail == person.email.lower()))
+        query = query.filter(mine)
     q = (request.args.get("q") or "").strip()[:100]
     if q:
         like = f"%{q}%"
@@ -53,9 +62,66 @@ def list_activity():
     per_page = max(1, min(request.args.get("per_page", 50, type=int), 200))
     page = max(1, request.args.get("page", 1, type=int))
     total = query.count()
-    rows = query.order_by(ActivityLog.id.desc()).offset((page - 1) * per_page).limit(per_page).all()
-    return jsonify({"status": "ok", "entries": [r.to_dict() for r in rows], "total": total,
+    rows = (query.order_by(ActivityLog.created_at.desc(), ActivityLog.id.desc())
+            .offset((page - 1) * per_page).limit(per_page).all())
+    entries =[r.to_dict() for r in rows]
+    # "Lesson plan #12" reads as its title.
+    ids = {int(m) for e in entries for m in re.findall(r"Lesson plan #(\d+)", e["detail"] or "")}
+    titles = {p.id: p.title for p in LessonPlan.query.filter(LessonPlan.id.in_(ids)).all()} if ids else {}
+    for e in entries:
+        e["kind"] = activity.KIND_OF.get(e["action"], "account")
+        if e["detail"]:
+            e["detail"] = re.sub(r"Lesson plan #(\d+)(?::[^,]*)?",
+                                 lambda m: f'"{titles[int(m.group(1))]}"' if int(m.group(1)) in titles else m.group(0),
+                                 e["detail"])
+    return jsonify({"status": "ok", "entries": entries, "total": total,
                     "page": page, "pages": max(1, -(-total // per_page))})
+
+
+# Columns of the people list: how many of each kind of action.
+_SUMMARY_KINDS = ("sign-in", "plan", "submit", "review", "download")
+
+
+@admin_bp.get("/admin/activity/people")
+@admin_required
+def activity_people():
+    """One row per account, most recently active first: when they were last
+    active and how many sign-ins, plan actions, submissions, reviews and
+    downloads they have. ?q= name or email, ?role=, ?page=."""
+    query = User.query
+    q = (request.args.get("q") or "").strip()[:100]
+    if q:
+        like = f"%{q}%"
+        query = query.filter(db.or_(User.full_name.ilike(like), User.email.ilike(like)))
+    role = request.args.get("role")
+    if role in ALLOWED_ROLES:
+        query = query.filter(User.role == role)
+    if request.args.get("user_id", type=int):
+        query = query.filter(User.id == request.args.get("user_id", type=int))
+    users = query.all()
+    counts = (db.session.query(ActivityLog.user_id, ActivityLog.action, db.func.count(ActivityLog.id),
+                               db.func.max(ActivityLog.created_at))
+              .filter(ActivityLog.user_id.in_([u.id for u in users] or [0]),
+                      ActivityLog.action.in_(activity.SHOWN_ACTIONS))
+              .group_by(ActivityLog.user_id, ActivityLog.action).all())
+    people = {u.id: {"user_id": u.id, "name": u.full_name, "email": u.email, "role": u.role,
+                     "last_active": None, "counts": dict.fromkeys(_SUMMARY_KINDS, 0)} for u in users}
+    for user_id, action, n, last in counts:
+        row = people[user_id]
+        kind = activity.KIND_OF.get(action)
+        if kind in row["counts"]:
+            row["counts"][kind] += n
+        if last and (row["last_active"] is None or last > row["last_active"]):
+            row["last_active"] = last
+    rows = sorted(people.values(), key=lambda r: (r["last_active"] is not None, r["last_active"] or 0), reverse=True)
+    per_page = 50
+    page = max(1, request.args.get("page", 1, type=int))
+    total = len(rows)
+    rows = rows[(page - 1) * per_page: page * per_page]
+    for r in rows:
+        r["last_active"] = iso_utc(r["last_active"])
+    return jsonify({"status": "ok", "people": rows, "total": total, "page": page,
+                    "pages": max(1, -(-total // per_page))})
 
 
 @admin_bp.get("/admin/users")

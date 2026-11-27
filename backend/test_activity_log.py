@@ -44,8 +44,9 @@ def main():
 
         rows = ActivityLog.query.order_by(ActivityLog.id).all()
         got = [(r.user_id, r.action) for r in rows]
+        # Autosave edits aren't activity worth showing: not logged at all.
         assert got == [(None, "Failed login"), (tess.id, "Logged in"), (tess.id, "Saved a lesson plan"),
-                       (tess.id, "Edited a lesson plan"), (tess.id, "Logged out")], got
+                       (tess.id, "Logged out")], got
         assert "tess.log@example.test" in rows[0].detail and f"#{plan_id}" in rows[2].detail, rows[2].detail
         assert all(r.created_at for r in rows) and rows[1].ip
         assert "password" not in " ".join(r.detail or "" for r in rows).lower()
@@ -58,11 +59,25 @@ def main():
         with client.session_transaction() as s:
             s["user_id"] = admin.id
         data = client.get("/api/admin/activity").get_json()
-        assert data["status"] == "ok" and data["total"] >= 5, data
+        assert data["status"] == "ok" and data["total"] >= 4, data
+        # A row from before the cleanup that isn't relevant stays out of sight.
+        db.session.add(ActivityLog(user_id=tess.id, action="Edited a lesson plan", detail=f"Lesson plan #{plan_id}"))
+        db.session.commit()
+        assert all(e["action"] != "Edited a lesson plan"
+                   for e in client.get(f"/api/admin/activity?user_id={tess.id}").get_json()["entries"])
+        # Her timeline: her failed sign-in too, and the plan by its title.
+        timeline = client.get(f"/api/admin/activity?user_id={tess.id}").get_json()["entries"]
+        assert [e["action"] for e in timeline] == ["Logged out", "Saved a lesson plan", "Logged in", "Failed login"], timeline
+        assert '"Measuring tools 4"' in timeline[1]["detail"], timeline[1]["detail"]
+        # People: one row each, with counts by kind.
+        people = client.get("/api/admin/activity/people?q=tess").get_json()["people"]
+        assert len(people) == 1 and people[0]["counts"]["sign-in"] == 1 and people[0]["counts"]["plan"] == 1, people
+        assert people[0]["last_active"]
+        print("  people summary, relevant-only timeline, plan titles OK")
         first = data["entries"][0]
         assert {"user_name", "user_email", "role", "action", "detail", "ip", "created_at"} <= set(first), first
         mine = client.get(f"/api/admin/activity?user_id={tess.id}").get_json()["entries"]
-        assert mine and all(e["user_email"] == "tess.log@example.test" for e in mine)
+        assert mine and all(e["user_email"] == "tess.log@example.test" for e in mine if e["user_id"])
         assert mine[0]["action"] == "Logged out", "newest first"
         found = client.get("/api/admin/activity?q=failed").get_json()["entries"]
         assert [e["action"] for e in found] == ["Failed login"], found
