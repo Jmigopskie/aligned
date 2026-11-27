@@ -57,6 +57,29 @@ function wordy(value) {
   return (String(value || "").match(/\p{L}/gu) || []).length >= 2;
 }
 
+// Reads as real words, not a number, a keyboard mash or a placeholder (user,
+// 2026-11-28: "topic input is number or a word that doesn't make any sense").
+// Kept in step with backend/services/text_sense.py. Acronyms in capitals
+// (HTML, CSS, LAN) and words with digits (IPv4, Excel 2019) are fine.
+const PLACEHOLDERS = new Set(["test", "testing", "sample", "topic", "none", "na", "n/a", "nothing", "idk", "blah",
+  "abc", "xyz", "asdf", "qwerty", "lorem ipsum", "lorem", "aaa", "xxx", "etc", "something", "anything", "wala"]);
+const MASHES = ["qwer", "wert", "asdf", "sdfg", "dfgh", "fghj", "ghjk", "hjkl", "zxcv", "xcvb", "cvbn", "vbnm"];
+function sensible(value) {
+  const text = String(value || "").trim();
+  const letters = (text.match(/\p{L}/gu) || []).length;
+  if (letters < 3 || letters * 2 < (text.match(/\d/g) || []).length) return false;
+  if (PLACEHOLDERS.has(text.toLowerCase().replace(/[.!?]+$/, ""))) return false;
+  return (text.match(/\p{L}+/gu) || []).every((word) => {
+    if (/^\p{Lu}{2,6}s?$/u.test(word)) return true; // an acronym
+    const w = word.toLowerCase();
+    if (/(.)\1\1/.test(w)) return false; // "aaaa", "zzz"
+    if (MASHES.some((m) => w.includes(m))) return false;
+    if (w.length < 4) return !["asd", "qwe", "zxc", "sdf", "jkl", "hjk", "dfg"].includes(w);
+    if (!/[aeiouy]/.test(w)) return false; // no vowel at all
+    return !/[bcdfghjklmnpqrstvwxz]{6,}/.test(w); // "bcdfgh" ("strengths" has 5)
+  });
+}
+
 // What is wrong with a step's answers, as { field, message } (field: the
 // input's id, to mark and focus), or null when the step is answered. Next
 // shows the message instead of greying out with no reason (user report
@@ -66,7 +89,9 @@ function stepProblem(stepId, answers) {
   const problem = (field, message) => ({ field, message });
   // An optional box may stay empty, but what is typed in it must read as words.
   const optional = (key, field, what) =>
-    (filled(a[key]) && !wordy(a[key]) ? problem(field, `${what} should be words, not just symbols or numbers.`) : null);
+    (filled(a[key]) && !sensible(a[key]) ? problem(field, `${what} doesn't look like real words. Check it, or leave it empty.`) : null);
+  const name = (key, field, who) =>
+    (sensible(a[key]) ? null : problem(field, `${who} should be a real name, as it appears on the plan.`));
   switch (stepId) {
     case "format":
       if (!filled(a.formatId)) return problem(null, "Choose a lesson plan format.");
@@ -79,15 +104,14 @@ function stepProblem(stepId, answers) {
       return null;
     case "people":
       if (!filled(a.studentTeacher)) return problem("flow-studentTeacher", "Type your name.");
-      if (!wordy(a.studentTeacher)) return problem("flow-studentTeacher", "Your name should be letters, as it appears on the plan.");
+      if (name("studentTeacher", "flow-studentTeacher", "Your name")) return name("studentTeacher", "flow-studentTeacher", "Your name");
       if (!filled(a.coop)) return problem("flow-coop", "Type the cooperating or subject teacher's name.");
-      if (!wordy(a.coop)) return problem("flow-coop", "The teacher's name should be letters, as it appears on the plan.");
-      return null;
+      return name("coop", "flow-coop", "The teacher's name");
     case "class":
       if (a.levelType === "college") {
         if (!filled(a.year)) return problem("flow-grade", "Choose the year level.");
         if (!filled(a.program)) return problem("flow-program", "Type the program, e.g. BS Information Technology.");
-        if (!wordy(a.program)) return problem("flow-program", "The program should be words, e.g. BS Information Technology.");
+        if (!sensible(a.program)) return problem("flow-program", "That doesn't look like a program name. Type it out, e.g. BS Information Technology.");
       } else if (!filled(a.grade)) {
         return problem("flow-grade", "Choose the grade level.");
       }
@@ -101,9 +125,9 @@ function stepProblem(stepId, answers) {
       return null;
     case "topics":
       if (!filled(a.mainTopic)) return problem("flow-mainTopic", "Type the main topic.");
-      if (!wordy(a.mainTopic)) return problem("flow-mainTopic", "The main topic should be words, e.g. Spreadsheets.");
+      if (!sensible(a.mainTopic)) return problem("flow-mainTopic", "That doesn't look like a topic. Type what the unit is about in words, e.g. Spreadsheets.");
       if (!filled(a.topic)) return problem("flow-topic", "Type today's specific topic.");
-      if (!wordy(a.topic)) return problem("flow-topic", "Today's topic should be words, e.g. Cell formulas.");
+      if (!sensible(a.topic)) return problem("flow-topic", "That doesn't look like a topic. Type what today's lesson teaches in words, e.g. Cell formulas.");
       // previous and next are encouraged, not required
       return optional("previousTopic", "flow-previousTopic", "The last topic")
         || optional("nextTopic", "flow-nextTopic", "The next topic");

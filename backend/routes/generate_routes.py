@@ -12,7 +12,7 @@ from models.supplementary_source import SupplementarySource
 from models.section import Section, SectionMembership
 from routes.auth_routes import login_required, enrollment_required, current_user
 from routes import points_routes
-from services import ai_limits, ai_service, docx_service, field_roles, grounding
+from services import ai_limits, ai_service, docx_service, field_roles, grounding, text_sense
 from services.notify import notify
 
 generate_bp = Blueprint("generate", __name__)
@@ -79,6 +79,17 @@ def _clean_context(raw):
             context[key] = value
     return context
 
+
+def _nonsense_topic(data):
+    """A 400 when the topic is a number, a keyboard mash or a placeholder
+    (services/text_sense); the page says so first, this catches the rest."""
+    context = data.get("context") if isinstance(data.get("context"), dict) else {}
+    for key, what in (("main_topic", "The main topic"), ("topic", "Today's topic")):
+        value = str(context.get(key) or "").strip()
+        if value and not text_sense.sensible(value):
+            return jsonify({"status": "error", "message": f"{what} \"{value[:60]}\" doesn't look like a real topic. "
+                                                          "Type what the lesson teaches in words."}), 400
+    return None
 
 def _build_context(data, guides):
     context = _clean_context(data.get("context"))
@@ -161,6 +172,9 @@ def _generatable_keys(include_keys, fmt):
 @enrollment_required
 def generate_full():
     data = request.get_json(silent=True) or {}
+    nonsense = _nonsense_topic(data)
+    if nonsense:
+        return nonsense
     unpaid = points_routes.require_paid_build(current_user(), data)
     if unpaid:
         return unpaid
@@ -219,6 +233,9 @@ def _settle_write(user, data, charge, values, include_keys, fields):
 @enrollment_required
 def generate_full_stream():
     data = request.get_json(silent=True) or {}
+    nonsense = _nonsense_topic(data)
+    if nonsense:
+        return nonsense
     unpaid = points_routes.require_paid_build(current_user(), data)
     if unpaid:
         return unpaid

@@ -114,4 +114,18 @@ assert.strictEqual(problem("people", { studentTeacher: "Ána Cruz", coop: "Juan 
 assert.strictEqual(problem("format", { formatId: 3, school: "@@@" }).field, "flow-school");
 assert.strictEqual(problem("class", { levelType: "college", year: "1st Year", program: "" }).field, "flow-program");
 assert.match(problem("sources", {}).message, /Budget of Work/);
+
+// Real words pass; numbers, mashes and placeholders don't (user, 2026-11-28).
+const sensible = get("sensible");
+["Cell formulas", "Spreadsheets", "IPv4 addressing", "HTML and CSS basics", "Excel 2019 charts", "LAN cabling",
+  "Pagsasaka at pag-aalaga ng hayop", "Measuring tools", "Ohm's law", "Strengths of materials", "Ana Cruz",
+  "Juan Dela Cruz", "Mary Schmidt", "BS Information Technology", "Food preparation"]
+  .forEach((ok) => assert.strictEqual(sensible(ok), true, ok));
+["123", "12345 678", "a1", "asdf", "asdfgh", "qwerty", "sdfghj", "zzzz", "Test", "n/a", "lorem ipsum", "xyz",
+  "hgfdkjl", "bcdfgh lesson", "aaaaa", "!!!", "12 ab"]
+  .forEach((bad) => assert.strictEqual(sensible(bad), false, bad));
+assert.match(problem("topics", { mainTopic: "Spreadsheets", topic: "12345" }).message, /doesn't look like a topic/);
+assert.strictEqual(problem("topics", { mainTopic: "asdfgh", topic: "Cell formulas" }).field, "flow-mainTopic");
+assert.strictEqual(problem("topics", { mainTopic: "Spreadsheets", topic: "Cell formulas", nextTopic: "qwerty" }).field, "flow-nextTopic");
+assert.strictEqual(problem("people", { studentTeacher: "asdf", coop: "Juan Dela Cruz" }).field, "flow-studentTeacher");
 console.log("flow steps OK");
