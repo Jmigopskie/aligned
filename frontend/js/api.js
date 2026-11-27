@@ -333,6 +333,7 @@ const Api = {
   },
   // Built-in formats: the admin reworks them and switches each one on or off.
   adminBuiltinFormats: () => apiFetch("/api/admin/builtin-formats"),
+  adminTeacherFormats: () => apiFetch("/api/admin/teacher-formats"),
   setFormatAvailability: (id, available) =>
     apiFetch(`/api/formats/${id}/availability`, { method: "PATCH", body: JSON.stringify({ available }) }),
   // kind is "users" or "sections". Resolves to

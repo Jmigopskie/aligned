@@ -143,6 +143,29 @@ async function init() {
   hydrateIcons(document.querySelector(".page-actions"));
   load();
   loadDeletions();
+  loadTeacherFormats();
+}
+
+// Teachers' uploads: the admin opens one in the format builder to edit its
+// document or fields (user, 2026-11-28).
+async function loadTeacherFormats() {
+  const body = document.getElementById("teacher-formats-body");
+  try {
+    const rows = (await Api.adminTeacherFormats()).formats || [];
+    body.innerHTML = rows.length ? rows.map((f) => {
+      const name = escapeHtml(f.name || "Untitled format");
+      return `
+        <tr>
+          <td>${name}${f.delete_requested_at ? ` <span class="badge badge-neutral">Deletion requested</span>` : ""}</td>
+          <td data-label="Uploaded by">${escapeHtml(f.owner_name || "–")}</td>
+          <td data-label="Fields">${f.field_count || 0}</td>
+          <td data-label="Actions"><a class="btn btn-secondary btn-sm" href="format-builder.html?id=${f.id}"
+            aria-label="Edit the document and fields of ${name}">${Icons.edit}<span>Edit document</span></a></td>
+        </tr>`;
+    }).join("") : `<tr class="table-empty-row"><td colspan="4">No teacher has uploaded a format yet.</td></tr>`;
+  } catch (err) {
+    body.innerHTML = `<tr class="table-empty-row"><td colspan="4">${escapeHtml(err.message)}</td></tr>`;
+  }
 }
 
 init();

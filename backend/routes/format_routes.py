@@ -82,6 +82,13 @@ def _build_format_fields(format_id, fields_payload):
         ))
     return rows
 
+def _can_manage(fmt, user):
+    """Its uploader, or any admin (user, 2026-11-28: the admin edits any
+    format's document in the system, e.g. to remove names a school's file
+    carried). Shipped built-ins stay read-only where their routes say so."""
+    return fmt.owner_id == user.id or user.role == "admin"
+
+
 def _reject_if_builtin(fmt, user=None):
     """The ready-made formats are shared by everyone and only the admin
     manages them (reworking their fields, switching them on or off; see
@@ -339,7 +346,7 @@ def update_format(format_id):
     if locked:
         return locked
 
-    if fmt.owner_id != user.id and not (fmt.is_builtin and user.role == "admin"):
+    if not _can_manage(fmt, user):
         return jsonify({"status": "error", "message": "Only the teacher who created this format can edit it."}), 403
 
     data = request.get_json(silent=True) or {}
@@ -383,7 +390,7 @@ def delete_format(format_id):
     if locked:
         return locked
 
-    if fmt.owner_id != user.id and not (fmt.is_builtin and user.role == "admin"):
+    if not _can_manage(fmt, user):
         return jsonify({"status": "error", "message": "Only the teacher who created this format can delete it."}), 403
     if fmt.builtin_key:
         # Shipped with the app: its files live in backend/builtin and it would
@@ -586,7 +593,7 @@ def edit_format_content(format_id):
     if locked:
         return locked
 
-    if fmt.owner_id != user.id and not (fmt.is_builtin and user.role == "admin"):
+    if not _can_manage(fmt, user):
         return jsonify({"status": "error", "message": "Only the teacher who created this format can edit its document."}), 403
     if fmt.builtin_key:
         # Its document is the file shipped in backend/builtin: an edit would
@@ -669,7 +676,7 @@ def set_field_roles(format_id):
     locked = _reject_if_builtin(fmt, user)
     if locked:
         return locked
-    if fmt.owner_id != user.id and not (fmt.is_builtin and user.role == "admin"):
+    if not _can_manage(fmt, user):
         return jsonify({"status": "error", "message": "You don't have access to this format."}), 403
 
     data = request.get_json(silent=True) or {}
@@ -711,7 +718,7 @@ def set_field_setup(format_id):
     blocked = _reject_if_builtin(fmt, user)
     if blocked:
         return blocked
-    if fmt.owner_id != user.id and not (fmt.is_builtin and user.role == "admin"):
+    if not _can_manage(fmt, user):
         return jsonify({"status": "error", "message": "Only the teacher who created this format can change its fields."}), 403
     template_path = docx_service.resolve_template_path(fmt)
     if not template_path:
@@ -780,6 +787,14 @@ def set_field_setup(format_id):
 def admin_builtin_formats():
     """Every built-in format, on or on hold, for the admin's Built-in formats page."""
     formats = (LessonPlanFormat.query.filter(LessonPlanFormat.is_builtin.is_(True))
+               .order_by(LessonPlanFormat.name).all())
+    return jsonify({"status": "ok", "formats": [f.to_dict() for f in formats]})
+
+@format_bp.get("/admin/teacher-formats")
+@admin_required
+def admin_teacher_formats():
+    """Every format a teacher uploaded, for the admin to open and edit."""
+    formats = (LessonPlanFormat.query.filter(LessonPlanFormat.is_builtin.is_(False))
                .order_by(LessonPlanFormat.name).all())
     return jsonify({"status": "ok", "formats": [f.to_dict() for f in formats]})
 

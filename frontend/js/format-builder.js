@@ -1107,12 +1107,12 @@ async function init() {
   const params = new URLSearchParams(window.location.search);
   const isAdmin = user.role === "admin";
   if (isAdmin) {
-    // The admin looks after the built-in formats from Admin > Built-in formats.
+    // The admin looks after built-ins and edits any teacher's format from Admin > Formats.
     doneUrl = "admin-formats.html";
     document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("admin-formats");
     const back = document.querySelector(".back-link");
     back.href = doneUrl;
-    back.lastChild.textContent = "Back to built-in formats";
+    back.lastChild.textContent = "Back to formats";
   }
   const formatId = params.get("format_id") || params.get("id");
   if (!formatId && isAdmin && params.get("builtin")) {
@@ -1126,7 +1126,7 @@ async function init() {
     try {
       const data = await Api.getFormat(formatId);
       const fmt = data.format;
-      if (fmt.owner_id !== user.id && !(isAdmin && fmt.is_builtin)) {
+      if (fmt.owner_id !== user.id && !isAdmin) {
         showToast("Only the teacher who created this format can edit it.", true);
         window.location.href = doneUrl;
         return;
