@@ -6,7 +6,7 @@ import re
 
 from extensions import db
 from models.format import LessonPlanFormat
-from models.lesson_plan import LessonPlan
+from models.lesson_plan import LessonPlan, PlanRating
 from models.course_guide import CourseGuide
 from models.supplementary_source import SupplementarySource
 from models.section import Section, SectionMembership
@@ -634,6 +634,37 @@ def submit_lesson_plan(plan_id):
 
     db.session.commit()
 
+    return jsonify({"status": "ok", "lesson_plan": plan.to_dict()})
+
+@generate_bp.post("/lesson-plans/<int:plan_id>/rating")
+@login_required
+def rate_lesson_plan(plan_id):
+    """Teacher: give a student's plan 1-5 stars, once it is public or
+    submitted to one of their classes. Rating again replaces the old one."""
+    user = current_user()
+    if user.role != "teacher":
+        return jsonify({"status": "error", "message": "Only teachers can rate lesson plans."}), 403
+    plan = LessonPlan.query.get_or_404(plan_id)
+    if not plan.user or plan.user.role != "student":
+        return jsonify({"status": "error", "message": "Only students' lesson plans can be rated."}), 403
+    section = Section.query.get(plan.section_id) if plan.section_id else None
+    submitted_to_me = bool(section and section.teacher_id == user.id and plan.status != "draft")
+    if not (plan.is_public or submitted_to_me):
+        return jsonify({"status": "error", "message": "You can rate a plan once it is public or submitted to your class."}), 403
+
+    stars = (request.get_json(silent=True) or {}).get("stars")
+    if not isinstance(stars, int) or isinstance(stars, bool) or not 1 <= stars <= 5:
+        return jsonify({"status": "error", "message": "Choose 1 to 5 stars."}), 400
+
+    rating = PlanRating.query.filter_by(plan_id=plan.id, teacher_id=user.id).first()
+    if rating:
+        rating.stars = stars
+    else:
+        db.session.add(PlanRating(plan_id=plan.id, teacher_id=user.id, stars=stars))
+        notify(plan.user_id, "review", "Lesson plan rated",
+               f"{user.full_name} rated \"{plan.title}\" {stars} out of 5 stars.", link="lesson-plan-list.html")
+    db.session.commit()
+    db.session.refresh(plan)
     return jsonify({"status": "ok", "lesson_plan": plan.to_dict()})
 
 @generate_bp.post("/lesson-plans/<int:plan_id>/review")

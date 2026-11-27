@@ -178,6 +178,7 @@ function renderPlans(plans) {
               ${isMineTab && p.status === "draft" ? `<span class="plan-progress">${escapeHtml(draftProgress(p))}</span>` : ""}
             </span>
             ${isMineTab && p.is_public ? `<span class="badge">Public</span>` : ""}
+            ${ratingSummaryHtml(p)}
           </div>
         </td>
         <td>${escapeHtml(p.subject || "\u2013")}</td>
@@ -549,6 +550,14 @@ function renderPlanPreviewModal(fmt, plan, templateData, docAvailable) {
   }
 
   previewBody.innerHTML = meta + toolbar + warning + content;
+  // Teachers rate a student's public plan right where they read it.
+  if (currentUser.role === "teacher" && plan.author_role === "student" && plan.is_public) {
+    previewBody.querySelector(".preview-meta").after(ratingWidget(plan, currentUser, (updated) => {
+      const row = allPlans.find((p) => String(p.id) === String(updated.id));
+      if (row) Object.assign(row, { ratings: updated.ratings, rating_avg: updated.rating_avg, rating_count: updated.rating_count });
+      applyFilter();
+    }));
+  }
   previewBody.querySelectorAll(".lp-doc-wrap").forEach(fitDocPage);
 
   if (previewViewMode === "doc") fillAndLockDocCanvas(plan);

@@ -5620,6 +5620,20 @@ body.owl-chat-shown .dash-main {
 .folder-name { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--text-heading); }
 .folder-count { font-size: 13px; color: var(--text-body); }
 
+/* Teachers' star ratings of students' plans. */
+.rating-sum { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 600; color: var(--text-heading); white-space: nowrap; }
+.rating-sum svg { width: 14px; height: 14px; fill: #E0A526; }
+.rating-n { font-weight: 400; color: var(--text-body); }
+.rating-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; }
+.rating-label { font-size: 13px; font-weight: 600; color: var(--text-heading); }
+.rating-stars { display: inline-flex; }
+.rating-star { display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 8px; }
+.rating-star svg { width: 24px; height: 24px; fill: none; stroke: #B88A1E; stroke-width: 1.6; transition: fill 0.15s ease; }
+.rating-star.on svg { fill: #E0A526; stroke: #E0A526; }
+.rating-stars:hover .rating-star svg { fill: #E0A526; stroke: #E0A526; }
+.rating-stars .rating-star:hover ~ .rating-star svg { fill: none; stroke: #B88A1E; }
+.rating-star:focus-visible { outline: 3px solid var(--primary); outline-offset: 1px; }
+
 /* Public lesson plans: an opened learning-area folder's heading row. */
 .public-folder-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 0 0 var(--space-4); }
 .public-folder-head .section-title { margin: 0; }

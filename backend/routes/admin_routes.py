@@ -170,6 +170,8 @@ def delete_user(user_id):
     from models.format import LessonPlanFormat
     LessonPlanFormat.query.filter_by(owner_id=user.id, is_builtin=True).update({"owner_id": acting_admin.id})
     CourseGuide.query.filter_by(uploader_id=user.id, is_builtin=True).update({"uploader_id": acting_admin.id})
+    from models.lesson_plan import PlanRating
+    PlanRating.query.filter_by(teacher_id=user.id).delete()
     db.session.flush()
     db.session.expire(user)
 

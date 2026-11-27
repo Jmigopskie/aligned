@@ -73,6 +73,9 @@ class LessonPlan(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Teachers' star ratings of a student's plan; deleting the plan drops them.
+    ratings = db.relationship("PlanRating", cascade="all, delete-orphan", lazy=True)
+
     def get_values(self):
         return json.loads(self.field_values or "{}")
 
@@ -149,6 +152,7 @@ class LessonPlan(db.Model):
             "id": self.id,
             "user_id": self.user_id,
             "author_name": self.user.full_name if self.user else None,
+            "author_role": self.user.role if self.user else None,
             "format_id": self.format_id,
             "build_id": self.build_id,
             "title": self.title,
@@ -174,4 +178,21 @@ class LessonPlan(db.Model):
             "revision": self.revision or 0,
             "created_at": iso_utc(self.created_at),
             "updated_at": iso_utc(self.updated_at),
+            # ponytail: one lazy load per plan in a list; join if lists grow large.
+            "ratings": [{"teacher_id": r.teacher_id, "stars": r.stars} for r in self.ratings],
+            "rating_avg": round(sum(r.stars for r in self.ratings) / len(self.ratings), 1) if self.ratings else None,
+            "rating_count": len(self.ratings),
         }
+
+
+class PlanRating(db.Model):
+    """One teacher's 1-5 star rating of a student's lesson plan, changeable."""
+    __tablename__ = "plan_ratings"
+    __table_args__ = (db.UniqueConstraint("plan_id", "teacher_id", name="uq_plan_rating"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    plan_id = db.Column(db.Integer, db.ForeignKey("lesson_plans.id"), nullable=False, index=True)
+    teacher_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    stars = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -117,6 +117,7 @@ function renderSubmissions(plans) {
           </div>
           <span class="status-pill ${p.status}">${statusLabel(p.status)}</span>
         </div>
+        ${p.rating_count ? `<div class="score-row">${ratingSummaryHtml(p)}</div>` : ""}
         ${p.score != null ? `<div class="score-row"><span class="score-pill ${scoreTone(p.score)}">${p.score}/100</span></div>` : ""}
         ${p.teacher_feedback ? `<div class="feedback-box"><strong>Your feedback:</strong> ${escapeHtml(p.teacher_feedback)}</div>` : ""}
         <div class="row-actions" style="margin-top:12px;">
@@ -208,6 +209,10 @@ async function openReview(planId) {
 
     reviewBody.innerHTML = meta + (sectionsHtml || `<p>This format has no fields defined.</p>`) + feedbackForm;
     wireFileButtons(reviewBody);
+    const me = getCachedUser();
+    if (me && plan.author_role === "student") {
+      reviewBody.querySelector(".preview-meta").after(ratingWidget(plan, me, loadSubmissions));
+    }
 
     document.getElementById("mark-reviewed-btn").addEventListener("click", async (e) => {
       const btn = e.currentTarget;

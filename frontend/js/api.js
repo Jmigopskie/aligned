@@ -277,6 +277,8 @@ const Api = {
       method: "POST",
       body: JSON.stringify({ section_id: sectionId }),
     }),
+  rateLessonPlan: (planId, stars) =>
+    apiFetch(`/api/lesson-plans/${planId}/rating`, { method: "POST", body: JSON.stringify({ stars }) }),
   reviewLessonPlan: (planId, feedback, score) =>
     apiFetch(`/api/lesson-plans/${planId}/review`, {
       method: "POST",
@@ -1618,3 +1620,42 @@ function labelTableCells(root = document) {
     }
   }).observe(document.documentElement, { childList: true, subtree: true });
 })();
+
+// ---- Teachers' star ratings of students' plans ----
+const STAR_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></svg>`;
+
+// "★ 4.5 (2)" for a list row; empty when nobody has rated the plan.
+function ratingSummaryHtml(plan) {
+  if (!plan.rating_count) return "";
+  const n = plan.rating_count;
+  return `<span class="rating-sum" title="Average of ${n} teacher rating${n === 1 ? "" : "s"}">${STAR_SVG}${plan.rating_avg}<span class="rating-n">(${n})</span></span>`;
+}
+
+// Five star buttons for a teacher; onRated gets the updated plan.
+function ratingWidget(plan, user, onRated) {
+  const row = document.createElement("div");
+  row.className = "rating-row";
+  const mine = (plan.ratings || []).find((r) => r.teacher_id === user.id);
+  const draw = (stars) => {
+    row.innerHTML = `<span class="rating-label">Your rating</span><span class="rating-stars" role="group" aria-label="Rate this lesson plan">${
+      [1, 2, 3, 4, 5].map((n) => `<button type="button" class="rating-star${n <= stars ? " on" : ""}" data-stars="${n}"
+        aria-label="${n} star${n === 1 ? "" : "s"}" aria-pressed="${n === stars}">${STAR_SVG}</button>`).join("")
+    }</span>${ratingSummaryHtml(plan)}`;
+  };
+  draw(mine ? mine.stars : 0);
+  row.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".rating-star");
+    if (!btn) return;
+    try {
+      const data = await Api.rateLessonPlan(plan.id, Number(btn.dataset.stars));
+      Object.assign(plan, data.lesson_plan);
+      draw(Number(btn.dataset.stars));
+      row.querySelector(`[data-stars="${btn.dataset.stars}"]`).focus();
+      showToast("Rating saved.");
+      if (onRated) onRated(plan);
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  });
+  return row;
+}
