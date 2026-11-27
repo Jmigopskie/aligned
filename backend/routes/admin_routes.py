@@ -145,7 +145,23 @@ def list_users():
         query = query.filter(db.or_(User.full_name.ilike(like), User.email.ilike(like)))
 
     users = query.order_by(User.created_at.desc()).all()
-    return jsonify({"status": "ok", "users": [u.to_dict() for u in users]})
+    # The sections each account is in (user, 2026-11-28: the list is grouped
+    # by section, Unenrolled for none): the ones a student joined, the ones a
+    # teacher teaches, A to Z. One query each, not one per user.
+    sections = {s.id: s for s in Section.query.all()}
+    in_sections = {}
+    for m in SectionMembership.query.all():
+        in_sections.setdefault(m.student_id, []).append(m.section_id)
+    for s in sections.values():
+        in_sections.setdefault(s.teacher_id, []).append(s.id)
+
+    def with_sections(u):
+        named = sorted((sections[i] for i in set(in_sections.get(u.id, [])) if i in sections),
+                       key=lambda s: (s.name or "").lower())
+        return {**u.to_dict(), "sections": [{"id": s.id, "name": s.name,
+                                             "teacher_name": s.teacher.full_name if s.teacher else None} for s in named]}
+
+    return jsonify({"status": "ok", "users": [with_sections(u) for u in users]})
 
 
 @admin_bp.post("/admin/users")

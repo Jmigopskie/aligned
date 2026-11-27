@@ -49,12 +49,68 @@ function renderUsers(users) {
     return;
   }
 
-  usersBody.innerHTML = users
-    .map(
-      (u) => `
-      <tr>
+  usersBody.innerHTML = groupBySection(users)
+    .map((g) => `
+      <tr class="user-group-row">
+        <th colspan="7" scope="rowgroup">
+          <button type="button" class="user-group-toggle" data-group="${g.key}" aria-expanded="${!collapsed.has(g.key)}">
+            <span class="user-group-chevron" aria-hidden="true"></span>
+            <span class="user-group-name">${escapeHtml(g.name)}</span>
+            ${g.teacher ? `<span class="user-group-meta">${escapeHtml(g.teacher)}</span>` : ""}
+            <span class="user-group-count">${g.users.length} ${g.users.length === 1 ? "account" : "accounts"}</span>
+          </button>
+        </th>
+      </tr>` + g.users.map((u) => userRow(u, g)).join(""))
+    .join("");
+
+  usersBody.querySelectorAll(".user-group-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.group;
+      if (collapsed.has(key)) collapsed.delete(key);
+      else collapsed.add(key);
+      btn.setAttribute("aria-expanded", String(!collapsed.has(key)));
+      usersBody.querySelectorAll(`tr[data-group="${key}"]`).forEach((row) => { row.hidden = collapsed.has(key); });
+    });
+  });
+
+  usersBody.querySelectorAll("[data-action]").forEach((btn) => {
+    btn.addEventListener("click", () => handleAction(btn));
+  });
+
+  // Rows were just replaced, so re-apply whatever is still selected.
+  if (bulk) bulk.sync();
+}
+
+// Grouped by section (user, 2026-11-28): each section A to Z with its teacher
+// first, then students; anyone in no section under Unenrolled; admins last.
+// Someone in several sections is listed under the first, the rest named.
+const collapsed = new Set();
+const ROLE_ORDER = { teacher: 0, student: 1, admin: 2 };
+function groupBySection(users) {
+  const groups = new Map();
+  const add = (key, name, teacher, u) => {
+    if (!groups.has(key)) groups.set(key, { key, name, teacher, users: [] });
+    groups.get(key).users.push(u);
+  };
+  users.forEach((u) => {
+    const first = (u.sections || [])[0];
+    if (u.role === "admin") add("admins", "Admins", "", u);
+    else if (first) add(`s${first.id}`, first.name, first.teacher_name ? `Teacher: ${first.teacher_name}` : "", u);
+    else add("unenrolled", "Unenrolled", "Not in any section", u);
+  });
+  const rank = (g) => (g.key === "admins" ? 2 : g.key === "unenrolled" ? 1 : 0);
+  return [...groups.values()]
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
+    .map((g) => ({ ...g, users: g.users.sort((a, b) =>
+      ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.full_name.localeCompare(b.full_name)) }));
+}
+
+function userRow(u, g) {
+  const others = (u.sections || []).slice(1).map((s) => s.name);
+  return `
+      <tr data-group="${g.key}"${collapsed.has(g.key) ? " hidden" : ""}>
         ${bulkCheckboxCell(u.id, u.full_name)}
-        <td>${escapeHtml(u.full_name)}</td>
+        <td>${escapeHtml(u.full_name)}${others.length ? `<span class="user-also">Also in ${escapeHtml(others.join(", "))}</span>` : ""}</td>
         <td>${escapeHtml(u.email)}</td>
         <td><span class="badge">${roleLabel(u.role)}</span></td>
         <td>${u.is_active ? `<span class="status-pill reviewed">Active</span>` : `<span class="status-pill draft">Archived</span>`}</td>
@@ -64,16 +120,7 @@ function renderUsers(users) {
             <button class="row-action-btn" type="button" data-action="edit" data-id="${u.id}" title="Edit" aria-label="Edit ${escapeHtml(u.full_name)}">${Icons.edit}</button>
             <button class="row-action-btn" type="button" data-action="toggle" data-id="${u.id}" data-active="${u.is_active}" title="${u.is_active ? "Archive" : "Restore"}" aria-label="${u.is_active ? "Archive" : "Restore"} ${escapeHtml(u.full_name)}">${u.is_active ? Icons.archive : Icons.upload}</button>          </div>
         </td>
-      </tr>`
-    )
-    .join("");
-
-  usersBody.querySelectorAll("[data-action]").forEach((btn) => {
-    btn.addEventListener("click", () => handleAction(btn));
-  });
-
-  // Rows were just replaced, so re-apply whatever is still selected.
-  if (bulk) bulk.sync();
+      </tr>`;
 }
 
 let allUsers = [];
