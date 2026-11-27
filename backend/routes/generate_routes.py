@@ -18,15 +18,16 @@ from services.notify import notify
 generate_bp = Blueprint("generate", __name__)
 
 
-def _can_access_plan(user, plan):
+def _can_access_plan(user, plan, public_ok=True):
     """A plan is visible to its author, to the teacher of the section it was
     submitted to, to any admin, or to anyone at all once the author has made
-    it public."""
+    it public. public_ok=False drops that last case: a public plan can be
+    read by everyone but downloaded only by those who could see it anyway."""
     if user.role == "admin":
         return True
     if plan.user_id == user.id:
         return True
-    if plan.is_public:
+    if public_ok and plan.is_public:
         return True
     if user.role == "teacher" and plan.section_id:
         section = Section.query.get(plan.section_id)
@@ -574,8 +575,10 @@ def delete_lesson_plan(plan_id):
 def export_lesson_plan(plan_id):
     user = current_user()
     plan = LessonPlan.query.get_or_404(plan_id)
-    if not _can_access_plan(user, plan):
-        return jsonify({"status": "error", "message": "You don't have access to this lesson plan."}), 403
+    if not _can_access_plan(user, plan, public_ok=False):
+        message = ("Public lesson plans can be viewed but not downloaded." if plan.is_public
+                   else "You don't have access to this lesson plan.")
+        return jsonify({"status": "error", "message": message}), 403
 
     fmt = LessonPlanFormat.query.get_or_404(plan.format_id)
 

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=2026-11-23a" />
+  <link rel="stylesheet" href="css/style.css?v=2026-11-28a" />
 </head>
 <body>
   <div class="page-transition" id="page-transition">
@@ -138,7 +138,14 @@
           </div>
         </div>
 
-        <div class="section-card">
+        <!-- Public tab: one folder per learning area, like the curriculum library. -->
+        <div id="public-folders" class="folder-grid" aria-label="Learning areas" hidden></div>
+        <div class="public-folder-head" id="public-folder-head" hidden>
+          <button type="button" class="btn btn-ghost btn-sm" id="public-folder-back"><span data-icon="arrowLeft"></span>All learning areas</button>
+          <h2 class="section-title" id="public-folder-name"></h2>
+        </div>
+
+        <div class="section-card" id="plans-table-card">
           <div class="table-scroll">
             <table class="data-table">
               <thead>
@@ -209,6 +216,6 @@
   <script src="js/icons.js?v=2026-11-23a"></script>
   <script src="js/submissions.js?v=2026-11-22b"></script>
   <script src="js/bulk-select.js?v=2026-10-26g"></script>
-  <script src="js/lesson-plan-list.js?v=2026-11-22b"></script>
+  <script src="js/lesson-plan-list.js?v=2026-11-28a"></script>
 </body>
 </html>

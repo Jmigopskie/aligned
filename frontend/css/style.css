@@ -5620,6 +5620,12 @@ body.owl-chat-shown .dash-main {
 .folder-name { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--text-heading); }
 .folder-count { font-size: 13px; color: var(--text-body); }
 
+/* Public lesson plans: an opened learning-area folder's heading row. */
+.public-folder-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 0 0 var(--space-4); }
+.public-folder-head .section-title { margin: 0; }
+.public-folder-head .btn svg { width: 16px; height: 16px; }
+#public-folders { margin-top: 0; }
+
 /* A folder, opened: its banner, then what's in it. */
 .folder-dialog { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: hidden; }
 .folder-dialog .modal-body { overflow-y: auto; }

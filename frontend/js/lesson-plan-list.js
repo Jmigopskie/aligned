@@ -23,6 +23,64 @@ let currentUser = null;
 let mySections = [];
 let submitPlanId = null;
 let activeTab = "mine";
+let publicFolder = null; // the learning area opened on the Public tab
+
+// The generator's subject values (generator.html #ctx-subject), in folder order.
+const LEARNING_AREAS = [
+  ["ICT", "ICT"],
+  ["CP (ComProg)", "CP (Computer Programming)"],
+  ["HE (FCS)", "HE (Home Economics)"],
+  ["AFA", "AGRI (Agri-Fishery Arts)"],
+  ["IA", "IA (Industrial Arts)"],
+  ["Electrical (EES)", "Electrical (EES)"],
+];
+const OTHER_AREA = "Other";
+const publicFolders = document.getElementById("public-folders");
+const publicFolderHead = document.getElementById("public-folder-head");
+const plansTableCard = document.getElementById("plans-table-card");
+
+// A plan's learning area is the subject picked in its setup.
+function learningArea(plan) {
+  const subject = (((plan.setup_context || {}).setup || {}).subject || "").trim();
+  return LEARNING_AREAS.some(([v]) => v === subject) ? subject : OTHER_AREA;
+}
+
+function areaLabel(value) {
+  const hit = LEARNING_AREAS.find(([v]) => v === value);
+  return hit ? hit[1] : value;
+}
+
+function renderPublicFolders(plans) {
+  const counts = {};
+  plans.forEach((p) => { const a = learningArea(p); counts[a] = (counts[a] || 0) + 1; });
+  const areas = LEARNING_AREAS.map(([v]) => v).concat(counts[OTHER_AREA] ? [OTHER_AREA] : []);
+  publicFolders.replaceChildren(...areas.map((area) => {
+    const n = counts[area] || 0;
+    const noun = `${n} lesson plan${n === 1 ? "" : "s"}`;
+    const item = document.createElement("div");
+    item.className = "folder-item";
+    const box = document.createElement("button");
+    box.type = "button";
+    box.className = "folder-box";
+    box.innerHTML = `<img class="folder-banner" alt="" loading="lazy" src="img/guide-banners/folder.svg" />
+      <span class="folder-text"><span class="folder-name"></span><span class="folder-count"></span></span>`;
+    box.querySelector(".folder-name").textContent = areaLabel(area);
+    box.querySelector(".folder-count").textContent = noun;
+    box.setAttribute("aria-label", `${areaLabel(area)}, ${noun}`);
+    box.addEventListener("click", () => {
+      publicFolder = area;
+      applyFilter();
+      document.getElementById("public-folder-back").focus();
+    });
+    item.append(box);
+    return item;
+  }));
+}
+
+document.getElementById("public-folder-back").addEventListener("click", () => {
+  publicFolder = null;
+  applyFilter();
+});
 const formatCache = {};
 
 function fmtDate(iso) {
@@ -177,6 +235,8 @@ function planActions(p) {
   const mine = activeTab === "mine";
   const draft = mine && p.status === "draft";
   const student = currentUser && currentUser.role === "student";
+  // Public plans are for reading; their authors download them from My Lesson Plans.
+  if (!mine) return [{ action: "preview", icon: "eye", label: "Preview" }];
   return [
     draft && { action: "continue", icon: "arrowRight", label: "Continue" },
     draft && { action: "rename", icon: "edit", label: "Rename" },
@@ -548,8 +608,21 @@ function applyFilter() {
   const q = searchInput.value.trim().toLowerCase();
   statusFilterField.hidden = !statusFilterApplies();
   const status = statusFilterApplies() ? statusFilter.value : "";
+  // Public tab: folders until one is opened or something is searched.
+  const isPublic = activeTab === "public";
+  const browsing = isPublic && !q && !publicFolder;
+  publicFolders.hidden = !browsing;
+  plansTableCard.hidden = browsing;
+  publicFolderHead.hidden = !(isPublic && publicFolder && !q);
+  if (publicFolder) document.getElementById("public-folder-name").textContent = areaLabel(publicFolder);
+  if (browsing) {
+    renderPublicFolders(allPlans);
+    return;
+  }
+  const area = isPublic && !q ? publicFolder : null;
   const filtered = allPlans.filter(
     (p) =>
+      (!area || learningArea(p) === area) &&
       (!status || p.status === status) &&
       (!q || (p.title || "").toLowerCase().includes(q) || (p.subject || "").toLowerCase().includes(q))
   );
@@ -580,6 +653,7 @@ const submissionsPanel = document.getElementById("submissions-panel");
 
 function selectTab(tab) {
   activeTab = tab;
+  publicFolder = null;
   tabSwitch.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   // Student submissions (teachers) share this page with the plan lists.
   const submissions = tab === "submissions";
