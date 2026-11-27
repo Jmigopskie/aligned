@@ -4197,6 +4197,7 @@ async function tidyGuidedPlan() {
   const stamp = JSON.stringify(values);
   if (!Object.keys(values).length || stamp === lastTidied) return 0;
   const locked = Object.keys(values).filter((key) => (fieldByKey(key) || {}).locked);
+  const organizing = showOrganizing();
   try {
     const { values: tidy } = await Api.tidyPlan(values, locked);
     const changed = Object.entries(tidy || {}).filter(([key]) => key in values);
@@ -4208,7 +4209,66 @@ async function tidyGuidedPlan() {
     return changed.length;
   } catch (err) {
     return 0; // the plan stands as written
+  } finally {
+    await organizing.done();
   }
+}
+
+// While a finished Guided plan is tidied (user, 2026-11-28): a screen saying
+// what is being organized, each step ticked off as the work goes on, so the
+// wait reads as the plan being put in order rather than a stall. The ticks
+// are paced, not measured (the tidy is one request); all of them are done
+// before the screen goes, and it stays at least a moment so it never flashes.
+const ORGANIZING_STEPS = [
+  "Arranging the spacing between lines and parts",
+  "Lining up bullets and numbering",
+  "Fixing spelling, grammar and punctuation",
+  "Laying out quiz items, tables and every other part",
+];
+function showOrganizing() {
+  const started = Date.now();
+  const overlay = document.createElement("div");
+  overlay.className = "organizing-overlay";
+  overlay.setAttribute("role", "status");
+  overlay.setAttribute("aria-live", "polite");
+  overlay.innerHTML = `
+    <div class="organizing-card">
+      <img src="img/owl/alan-loading.png" alt="" />
+      <h2>Organizing your lesson plan</h2>
+      <p>Alan is tidying what you wrote. Your content stays yours; only its layout and spelling are fixed.</p>
+      <ol class="organizing-steps"></ol>
+    </div>`;
+  const list = overlay.querySelector(".organizing-steps");
+  const items = ORGANIZING_STEPS.map((text) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="organizing-mark" aria-hidden="true"></span><span></span>`;
+    li.lastChild.textContent = text;
+    list.append(li);
+    return li;
+  });
+  document.body.append(overlay);
+  let at = 0;
+  const mark = () => {
+    items.forEach((li, i) => {
+      li.classList.toggle("is-done", i < at);
+      li.classList.toggle("is-active", i === at);
+    });
+  };
+  mark();
+  // The last step stays in progress until the tidy is back.
+  const timer = setInterval(() => {
+    if (at < items.length - 1) { at += 1; mark(); }
+  }, 1100);
+  return {
+    async done() {
+      clearInterval(timer);
+      at = items.length;
+      mark();
+      const shown = Date.now() - started;
+      await new Promise((r) => setTimeout(r, Math.max(700, 1500 - shown)));
+      overlay.remove();
+    },
+  };
 }
 
 // Writes one part's answer (or one day of a weekly part) and shows it in the
