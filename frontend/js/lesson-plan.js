@@ -136,6 +136,7 @@ function teacherCard(fmt) {
       <div class="format-card-heading">
         <h3></h3>
         <span class="badge${fmt.is_public ? "" : " badge-neutral"}">${fmt.is_public ? "Public" : "Private"}</span>
+        ${fmt.delete_requested_at ? `<span class="badge badge-neutral" title="Waiting for an admin to approve or decline">Deletion requested</span>` : ""}
       </div>
       ${
         hasMenu

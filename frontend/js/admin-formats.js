@@ -83,6 +83,55 @@ formatsBody.addEventListener("click", async (e) => {
   }
 });
 
+// ---- Teachers' requests to delete their formats (user, 2026-11-28) ----
+const deletionsSection = document.getElementById("deletions-section");
+const deletionsBody = document.getElementById("deletions-body");
+
+async function loadDeletions() {
+  try {
+    const rows = (await Api.formatDeletions()).formats || [];
+    deletionsSection.hidden = !rows.length;
+    deletionsBody.innerHTML = rows.map((f) => {
+      const name = escapeHtml(f.name || "Untitled format");
+      const asked = new Date(f.delete_requested_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+      return `
+        <tr>
+          <td><a href="format-builder.html?id=${f.id}">${name}</a></td>
+          <td data-label="Uploaded by">${escapeHtml(f.owner_name || "–")}</td>
+          <td data-label="Asked">${escapeHtml(asked)}</td>
+          <td data-label="Plans using it">${f.plans_using
+            ? `${f.plans_using} <span class="text-sm">(can't be deleted while plans use it)</span>` : "None"}</td>
+          <td data-label="Decision">
+            <div class="row-actions">
+              <button type="button" class="btn btn-danger btn-sm" data-decide="approve" data-id="${f.id}" data-name="${name}"
+                ${f.plans_using ? "disabled" : ""}>Approve and delete</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-decide="decline" data-id="${f.id}" data-name="${name}">Decline</button>
+            </div>
+          </td>
+        </tr>`;
+    }).join("");
+  } catch (err) {
+    errorBox.textContent = err.message;
+    errorBox.hidden = false;
+  }
+}
+
+deletionsBody.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-decide]");
+  if (!btn) return;
+  const approve = btn.dataset.decide === "approve";
+  if (approve && !confirm(`Delete "${btn.dataset.name}" for good? This can't be undone.`)) return;
+  setButtonLoading(btn, true, approve ? "Deleting" : "Declining");
+  try {
+    await Api.decideFormatDeletion(Number(btn.dataset.id), approve);
+    showToast(approve ? "Format deleted. The teacher was notified." : "Request declined. The teacher was notified.");
+    loadDeletions();
+  } catch (err) {
+    showToast(err.message, true);
+    setButtonLoading(btn, false);
+  }
+});
+
 async function init() {
   const user = await requireAuth();
   if (!user) return;
@@ -93,6 +142,7 @@ async function init() {
   wireTopbar(user);
   hydrateIcons(document.querySelector(".page-actions"));
   load();
+  loadDeletions();
 }
 
 init();

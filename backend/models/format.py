@@ -33,6 +33,9 @@ class LessonPlanFormat(db.Model):
     # admin has it switched on; built-ins start on hold until their fields
     # and what goes in each are reworked. Own formats are always available.
     available = db.Column(db.Boolean, nullable=False, default=True)
+    # The uploader asked for it to be deleted; an admin approves (it's
+    # deleted) or declines (this clears). Null when nobody has asked.
+    delete_requested_at = db.Column(db.DateTime)
 
     fields = db.relationship(
         "FormatField",
@@ -61,6 +64,7 @@ class LessonPlanFormat(db.Model):
             "fields_reviewed": bool(self.fields_reviewed),
             "available": bool(self.available),
             "builtin_key": self.builtin_key,
+            "delete_requested_at": iso_utc(self.delete_requested_at),
         }
         if include_fields:
             from services.grounding import field_kinds  # local: models import before services

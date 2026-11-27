@@ -86,7 +86,7 @@ function renderSidebarNav(active) {
     { key: "admin-documents", href: "admin-documents.html", icon: Icons.files, label: "Documents", role: "admin" },
     { key: "admin-users", href: "admin-users.html", icon: Icons.userCog, label: "Manage Users", role: "admin" },
     { key: "admin-sections", href: "admin-sections.html", icon: Icons.users, label: "Manage Sections", role: "admin" },
-    { key: "admin-formats", href: "admin-formats.html", icon: Icons.layoutTemplate, label: "Built-in formats", role: "admin" },
+    { key: "admin-formats", href: "admin-formats.html", icon: Icons.layoutTemplate, label: "Formats", role: "admin" },
     { key: "admin-archive", href: "admin-users.html?role=student&active=0", icon: Icons.archive, label: "Student Archive", role: "admin" },
     { key: "admin-announcements", href: "admin-announcements.html", icon: Icons.megaphone, label: "Announcements", role: "admin" },
     { key: "admin-activity", href: "admin-activity.html", icon: Icons.list, label: "User Activity", role: "admin" },

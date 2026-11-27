@@ -123,6 +123,10 @@ const Api = {
   editScannedContent: (sourceTempToken, edits) =>
     apiFetch("/api/formats/scan/content", { method: "PATCH", body: JSON.stringify({ source_temp_token: sourceTempToken, edits }) }),
   deleteFormat: (formatId) => apiFetch(`/api/formats/${formatId}`, { method: "DELETE" }),
+  cancelFormatDeletion: (formatId) => apiFetch(`/api/formats/${formatId}/delete-request`, { method: "DELETE" }),
+  formatDeletions: () => apiFetch("/api/admin/format-deletions"),
+  decideFormatDeletion: (formatId, approve) =>
+    apiFetch(`/api/admin/formats/${formatId}/deletion`, { method: "POST", body: JSON.stringify({ approve }) }),
   // roles: { field_key: "heavy" | "easy" | null }. null hands the decision back
   // to the server's keyword matching.
   setFieldRoles: (formatId, roles) =>

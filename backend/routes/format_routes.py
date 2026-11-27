@@ -2,6 +2,7 @@ import json
 import os
 import re
 import uuid
+from datetime import datetime
 
 from flask import Blueprint, request, jsonify, current_app, send_file
 from werkzeug.utils import secure_filename
@@ -10,7 +11,9 @@ from extensions import db
 from models.format import LessonPlanFormat, FormatField
 from models.lesson_plan import LessonPlan
 from routes.auth_routes import admin_required, login_required, staff_required, current_user
+from models.user import User
 from services import ai_service, docx_service
+from services.notify import notify, notify_many
 
 format_bp = Blueprint("formats", __name__)
 
@@ -387,14 +390,83 @@ def delete_format(format_id):
         # come back on the next restart anyway.
         return jsonify({"status": "error", "message": "This built-in ships with AlignED. Switch it off instead."}), 400
 
-    in_use = LessonPlan.query.filter_by(format_id=fmt.id).count()
+    in_use = _in_use_error(fmt)
     if in_use:
-        return jsonify({
-            "status": "error",
-            "message": f"This format is used by {in_use} lesson plan{'s' if in_use != 1 else ''} and can't be deleted. "
-                       f"Unshare it instead if you don't want others to use it.",
-        }), 400
+        return in_use
 
+    # A teacher's own format goes only once an admin approves (user, 2026-11-28).
+    if user.role != "admin":
+        fmt.delete_requested_at = datetime.utcnow()
+        admins = [a.id for a in User.query.filter_by(role="admin", is_active=True).all()]
+        notify_many(admins, "format", "Format deletion request",
+                    f"{user.full_name} asked to delete the format \"{fmt.name}\".", link="admin-formats.html")
+        db.session.commit()
+        return jsonify({"status": "ok", "pending": True, "format": fmt.to_dict()})
+
+    _delete_now(fmt)
+    return jsonify({"status": "ok"})
+
+
+def _in_use_error(fmt):
+    in_use = LessonPlan.query.filter_by(format_id=fmt.id).count()
+    if not in_use:
+        return None
+    return jsonify({
+        "status": "error",
+        "message": f"This format is used by {in_use} lesson plan{'s' if in_use != 1 else ''} and can't be deleted. "
+                   f"Unshare it instead if you don't want others to use it.",
+    }), 400
+
+
+@format_bp.delete("/formats/<int:format_id>/delete-request")
+@staff_required
+def cancel_format_deletion(format_id):
+    """The uploader takes their deletion request back."""
+    fmt = LessonPlanFormat.query.get_or_404(format_id)
+    if fmt.owner_id != current_user().id:
+        return jsonify({"status": "error", "message": "Only the teacher who created this format can do that."}), 403
+    fmt.delete_requested_at = None
+    db.session.commit()
+    return jsonify({"status": "ok", "format": fmt.to_dict()})
+
+
+@format_bp.get("/admin/format-deletions")
+@admin_required
+def list_format_deletions():
+    """Formats their uploaders asked to delete, oldest request first."""
+    rows = (LessonPlanFormat.query.filter(LessonPlanFormat.delete_requested_at.isnot(None))
+            .order_by(LessonPlanFormat.delete_requested_at).all())
+    return jsonify({"status": "ok", "formats": [
+        {**f.to_dict(), "plans_using": LessonPlan.query.filter_by(format_id=f.id).count()} for f in rows]})
+
+
+@format_bp.post("/admin/formats/<int:format_id>/deletion")
+@admin_required
+def decide_format_deletion(format_id):
+    """Admin: {"approve": true} deletes the format, false declines the request.
+    The uploader is told either way."""
+    fmt = LessonPlanFormat.query.get_or_404(format_id)
+    if not fmt.delete_requested_at:
+        return jsonify({"status": "error", "message": "Nobody has asked to delete this format."}), 400
+    approve = bool((request.get_json(silent=True) or {}).get("approve"))
+    owner_id, name = fmt.owner_id, fmt.name
+    if approve:
+        in_use = _in_use_error(fmt)  # plans may have been made since the request
+        if in_use:
+            return in_use
+        _delete_now(fmt)
+        notify(owner_id, "format", "Format deleted", f"An admin approved deleting your format \"{name}\".",
+               link="lesson-plan.html")
+    else:
+        fmt.delete_requested_at = None
+        notify(owner_id, "format", "Format kept", f"An admin declined deleting your format \"{name}\". It stays available.",
+               link="lesson-plan.html")
+    db.session.commit()
+    return jsonify({"status": "ok", "deleted": approve})
+
+
+def _delete_now(fmt):
+    """The format, its fields and its files, gone."""
     source_path = docx_service.resolve_source_path(fmt)
     cached_template_path = (fmt.template_docx_path or "").strip() or None
     for path in (source_path, cached_template_path):
@@ -406,7 +478,6 @@ def delete_format(format_id):
 
     db.session.delete(fmt)
     db.session.commit()
-    return jsonify({"status": "ok"})
 
 _EDIT_ACTIONS = {"delete", "format", "insert_image"}
 _IMG_ALIGNS = {"left", "center", "right"}

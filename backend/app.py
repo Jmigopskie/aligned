@@ -198,6 +198,7 @@ def _migrate_format_columns():
     had_column = "available" in {c["name"] for c in inspect(db.engine).get_columns("lesson_plan_formats")} \
         if "lesson_plan_formats" in inspect(db.engine).get_table_names() else True
     _add_column("lesson_plan_formats", "available", "BOOLEAN NOT NULL DEFAULT 1")
+    _add_column("lesson_plan_formats", "delete_requested_at", "DATETIME")
     if not had_column:
         with db.engine.begin() as conn:
             conn.execute(text("UPDATE lesson_plan_formats SET available = 0 WHERE is_builtin = 1"))

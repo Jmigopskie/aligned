@@ -971,12 +971,44 @@ createFormatBtn.addEventListener("click", async () => {
   }
 });
 
+// A teacher's format goes once an admin approves (user, 2026-11-28): the button
+// asks, or takes a pending request back. An admin deletes straight away.
+let deleteRequested = false;
+const isAdminUser = () => (getCachedUser() || {}).role === "admin";
+function syncDeleteButton() {
+  deleteFormatBtn.textContent = isAdminUser() ? "Delete format"
+    : deleteRequested ? "Take back deletion request" : "Ask admin to delete";
+  const note = document.getElementById("delete-request-note");
+  if (note) note.hidden = !deleteRequested;
+}
+
 deleteFormatBtn.addEventListener("click", async () => {
   if (!editingFormatId) return;
-  if (!confirm("Delete this format permanently? This can't be undone.")) return;
-  setButtonLoading(deleteFormatBtn, true, "Deleting");
+  if (deleteRequested && !isAdminUser()) {
+    try {
+      await Api.cancelFormatDeletion(editingFormatId);
+      deleteRequested = false;
+      syncDeleteButton();
+      showToast("Deletion request taken back.");
+    } catch (err) {
+      showError(err.message);
+    }
+    return;
+  }
+  const question = isAdminUser()
+    ? "Delete this format permanently? This can't be undone."
+    : "Ask the admin to delete this format? It stays usable until an admin approves, and you'll be notified.";
+  if (!confirm(question)) return;
+  setButtonLoading(deleteFormatBtn, true, isAdminUser() ? "Deleting" : "Sending");
   try {
-    await Api.deleteFormat(editingFormatId);
+    const res = await Api.deleteFormat(editingFormatId);
+    if (res.pending) {
+      deleteRequested = true;
+      setButtonLoading(deleteFormatBtn, false);
+      syncDeleteButton();
+      showToast("Deletion requested. An admin will approve or decline it.");
+      return;
+    }
     showToast("Format deleted.");
     window.location.href = doneUrl;
   } catch (err) {
@@ -1008,6 +1040,8 @@ async function enterEditMode(fmt) {
   // A built-in is switched off (on hold) rather than deleted, and is shared with
   // everyone by being switched on, not by the share box.
   deleteFormatBtn.hidden = !!fmt.is_builtin;
+  deleteRequested = !!fmt.delete_requested_at;
+  syncDeleteButton();
   showBuiltinNote(fmt.is_builtin, fmt.available);
   createFormatBtn.textContent = "Save changes";
 
