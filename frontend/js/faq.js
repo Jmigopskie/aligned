@@ -15,7 +15,7 @@ function renderTopics() {
         <a class="help-topic" href="#${group.id}" data-topic="${group.id}"${group.hidden ? " hidden" : ""}>
           <span class="help-topic-icon">${icon}</span>
           <span class="help-topic-label">${escapeHtml(title)}</span>
-          <span class="help-topic-count">${count}</span>
+          ${count ? `<span class="help-topic-count">${count}</span>` : ""}
         </a>`;
     })
     .join("");
@@ -34,7 +34,8 @@ faqSearch.addEventListener("input", () => {
       item.open = !!term && match;
       if (match) groupShown++;
     });
-    group.hidden = !groupShown;
+    // The tutorial has no questions: it shows whenever nothing is searched.
+    group.hidden = term ? !groupShown : false;
     shown += groupShown;
   });
   faqEmpty.hidden = shown > 0;
@@ -74,6 +75,27 @@ async function linkTutorial() {
   }
 }
 
+// The tutorial's steps for students or for teachers; opens on the reader's own.
+const roleTabs = Array.from(document.querySelectorAll("[data-role-tab]"));
+function showSteps(role) {
+  roleTabs.forEach((tab) => {
+    const on = tab.dataset.roleTab === role;
+    tab.classList.toggle("active", on);
+    tab.setAttribute("aria-selected", String(on));
+    tab.tabIndex = on ? 0 : -1;
+    document.getElementById(tab.getAttribute("aria-controls")).hidden = !on;
+  });
+}
+roleTabs.forEach((tab, i) => {
+  tab.addEventListener("click", () => showSteps(tab.dataset.roleTab));
+  tab.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    const next = roleTabs[(i + (e.key === "ArrowRight" ? 1 : roleTabs.length - 1)) % roleTabs.length];
+    showSteps(next.dataset.roleTab);
+    next.focus();
+  });
+});
+
 async function init() {
   const user = await requireAuth();
   if (!user) return;
@@ -81,6 +103,7 @@ async function init() {
   document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("faq");
   // The tour starts from the landing page for this role.
   document.getElementById("replay-tour-btn").href = `${homeForRole(user.role)}?tour=1`;
+  showSteps(user.role === "student" ? "student" : "teacher");
   hydrateIcons();
   renderTopics();
   watchTopics();
