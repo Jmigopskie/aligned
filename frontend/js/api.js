@@ -396,7 +396,7 @@ const Api = {
 // A small dialog that asks for one name: the export's file name, a draft's
 // name on save, a plan's new name. onSubmit(name) runs with the dialog still
 // open; if it throws, its message shows in the dialog, otherwise it closes.
-function askName({ title, label, value = "", suffix = "", action, busy, empty, clean = (s) => s, onSubmit, onCancel }) {
+function askName({ title, label, value = "", suffix = "", action, busy, empty, clean = (s) => s, onSubmit, onCancel, note = "" }) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay export-name-overlay";
   overlay.innerHTML = `
@@ -406,6 +406,7 @@ function askName({ title, label, value = "", suffix = "", action, busy, empty, c
         <button type="button" class="modal-close" aria-label="Cancel">&times;</button>
       </div>
       <div class="modal-body">
+        ${note ? `<p class="export-name-note">${escapeHtml(note)}</p>` : ""}
         <label for="export-name-input"></label>
         <div class="export-name-field">
           <input type="text" id="export-name-input" maxlength="120" autocomplete="off" />

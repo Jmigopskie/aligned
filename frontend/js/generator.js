@@ -2265,8 +2265,6 @@ function markDirty() {
   editSeq++;
   syncedWithServer = false;
   saveStatus.textContent = "Unsaved changes. Save to export the latest version.";
-  exportBtn.style.pointerEvents = "none";
-  exportBtn.style.opacity = "0.5";
   saveDraft();
   scheduleServerSave();
 }
@@ -2496,11 +2494,11 @@ function enableExport() {
   exportBtn.style.opacity = "1";
 }
 
-// Export asks for the file name first (api.js exportPlan).
-exportBtn.addEventListener("click", (e) => {
+// Export saves first if it must (ensureSaved), then asks for the file name
+// (api.js exportPlan).
+exportBtn.addEventListener("click", async (e) => {
   e.preventDefault();
-  if (!planId) return;
-  exportPlan(planId, exportName());
+  if (await ensureSaved("download it as Word")) exportPlan(planId, exportName());
 });
 
 function exportName() {
@@ -2508,8 +2506,9 @@ function exportName() {
   return [topic, fmt && fmt.name].filter(Boolean).join(" - ");
 }
 
-// The page as it is on screen, so it needs no save first.
-document.getElementById("pdf-btn").addEventListener("click", () => {
+// The page as it is on screen, once it is saved.
+document.getElementById("pdf-btn").addEventListener("click", async () => {
+  if (!(await ensureSaved("save it as a PDF"))) return;
   printPlanDocument(liveDocWrap.querySelector(".lp-doc") || (resultsEl.children.length ? resultsEl : null), exportName(),
     pageSizeSelect.value);
 });
@@ -2565,6 +2564,7 @@ document.getElementById("conflict-copy").addEventListener("click", async (e) => 
     history.replaceState(null, "", `generator.html?plan_id=${plan.id}`);
     closeDialog(conflictOverlay);
     saveStatus.textContent = "Saved as a separate copy.";
+    userSavedSeq = editSeq;
     enableExport();
     showToast("Saved your version as a separate plan. The other version is still in your list.");
   } catch (err) {
@@ -2906,6 +2906,8 @@ function applyOpenedPlan(plan) {
     enableExport();
   } finally {
     restoringDraft = false;
+    // Opened from the list: it was saved, and exports as it is until edited.
+    userSavedSeq = editSeq;
   }
 
 
@@ -3916,17 +3918,39 @@ pageSizeSelect.addEventListener("change", markDirty);
 
 // Saving asks what to call the plan first (its title in the list), prefilled
 // with the name it has; cancelling saves nothing.
-function askPlanName() {
+function askPlanName({ title = "Save lesson plan", note = "", action = "Save" } = {}) {
   return new Promise((resolve) => askName({
-    title: "Save lesson plan", label: "Lesson plan name", value: planTitle(),
-    action: "Save", busy: "Saving…", empty: "Give the lesson plan a name.",
+    title, note, label: "Lesson plan name", value: planTitle(),
+    action, busy: "Saving…", empty: "Give the lesson plan a name.",
     onSubmit: async (name) => resolve(name), onCancel: () => resolve(null),
   }));
 }
 
+// Exporting needs a plan the user saved (user, 2026-11-28): Save lesson plan,
+// with nothing typed since. An autosave doesn't count; neither does a draft
+// restored from this device. A plan opened from the list was saved already.
+let userSavedSeq = null;
+const savedByUser = () => !!planId && userSavedSeq === editSeq;
+
+// Before Export as Word or Save as PDF: the Save dialog, saying why, then the
+// export carries straight on. Resolves whether the plan is saved.
+async function ensureSaved(what) {
+  if (savedByUser()) return true;
+  const name = await askPlanName({
+    title: "Save before you export",
+    note: `Save your lesson plan before you ${what}. Give it a name, and the export starts right after.`,
+    action: "Save and continue",
+  });
+  return name ? savePlanAs(name) : false;
+}
+
 saveBtn.addEventListener("click", async () => {
   const name = await askPlanName();
-  if (!name) return;
+  if (name) await savePlanAs(name);
+});
+
+// Saves under `name`; true when everything on screen is now saved.
+async function savePlanAs(name) {
   planName = name;
   // A pending autosave would otherwise race this one and re-send the same
   // payload a moment later.
@@ -3937,11 +3961,13 @@ saveBtn.addEventListener("click", async () => {
     await persistPlan();
     // A refresh now reopens the saved plan instead of an empty run.
     if (planId) history.replaceState(null, "", `${location.pathname}?plan_id=${planId}`);
-    if (savedEverythingSince(seq)) {
+    const all = savedEverythingSince(seq);
+    if (all) {
       // The plan is on the server now and listed under "List of Lesson Plan",
       // so the local draft has done its job. Editing on from here marks the
       // page dirty again and starts a fresh draft.
       clearDraft();
+      userSavedSeq = editSeq;
       saveStatus.textContent = "Saved.";
       enableExport();
     } else {
@@ -3952,13 +3978,15 @@ saveBtn.addEventListener("click", async () => {
     showToast("Lesson plan saved.");
     setOwlState("celebrate", "Saved! Export it as Word whenever you're ready.");
     revealSubmitControlsIfStudent();
+    return all;
   } catch (err) {
     if (isStaleSave(err)) showConflict(err.data.lesson_plan);
     else showError(err.message);
+    return false;
   } finally {
     setButtonLoading(saveBtn, false);
   }
-});
+}
 
 document.getElementById("sidebar-nav").innerHTML = renderSidebarNav("lesson-plan");
 

@@ -7155,6 +7155,7 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
 .export-name-field input { flex: 1; min-width: 0; }
 .export-name-field span { font-size: 14px; color: var(--text-body); }
 .export-name-error { margin: 8px 0 0; font-size: 13px; color: var(--danger); }
+.export-name-note { margin: 0 0 14px; font-size: 14px; line-height: 1.5; color: var(--text-body); }
 .export-name-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 .flow-progress {
   flex: 1;
