@@ -94,7 +94,13 @@ def get_section(section_id):
     membership = SectionMembership.query.filter_by(section_id=section.id, student_id=user.id).first()
     if not membership:
         return jsonify({"status": "error", "message": "You haven't joined this class."}), 403
-    return jsonify({"status": "ok", "section": section.to_dict(include_counts=False)})
+    # A student sees who is in their class (user, 2026-11-28): names only,
+    # never classmates' emails, A to Z with themselves marked.
+    data = section.to_dict(include_counts=False)
+    data["members"] = sorted(
+        ({"name": m.student.full_name, "you": m.student_id == user.id} for m in section.memberships if m.student),
+        key=lambda m: (m["name"] or "").lower())
+    return jsonify({"status": "ok", "section": data})
 
 
 @section_bp.post("/sections/<int:section_id>/regenerate-code")

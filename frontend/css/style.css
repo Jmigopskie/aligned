@@ -3740,6 +3740,16 @@ body.auth-page {
   gap: 16px;
 }
 
+/* My Classes: the teacher and classmates, opened under a class card. */
+.class-card .btn svg { width: 16px; height: 16px; }
+.class-members { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.class-members-teacher { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
+.class-members-teacher > span:last-child { display: flex; flex-direction: column; }
+.class-members-title { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--text-heading); }
+.class-members-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 16px; margin: 0; padding: 0; list-style: none; }
+.class-members-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text-heading); }
+.class-members .avatar-chip { width: 30px; height: 30px; font-size: 12px; background: var(--primary-tint); }
+
 .class-card {
   border: 1px solid var(--border);
   border-radius: var(--radius);
