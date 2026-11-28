@@ -125,6 +125,17 @@ def main():
         answer = ai_service.owl_chat(context, Field("motivation", "Motivation"), {}, "", [], "Help me")
         assert [c["type"] for c in answer["choices"]] == ["direction", "direction"], answer
         print("  guided lesson proper comes whole, from the sources OK")
+
+        # --- No in-text citations after every point, still from the references (user, 2026-11-28) ---
+        assert "no in-text citations" in ai_service._TEACHING_NOTE
+        assert ai_service.uncite("Binary has 2 digits (0 and 1) (Department of Education, n.d.).") == \
+            "Binary has 2 digits (0 and 1)."
+        assert ai_service.uncite("A tag (W3Schools, 2023b) and (Cruz & Reyes, 2024).") == "A tag and."
+        assert ai_service.uncite("Windows (Version 10) in (2024)") == "Windows (Version 10) in (2024)"
+        cleaned = ai_service._uncite_lesson({"lesson_proper": "A bit is 0 or 1 (Kids Learn, n.d.).",
+                                             "generalization": "Bits (Kids Learn, n.d.)"}, [LESSON, GEN])
+        assert cleaned == {"lesson_proper": "A bit is 0 or 1.", "generalization": "Bits (Kids Learn, n.d.)"}, cleaned
+        print("  lesson proper without in-text citations OK")
     finally:
         ai_service.find_references, grounding.page_text, ai_service._call = real
     print("lesson proper OK")

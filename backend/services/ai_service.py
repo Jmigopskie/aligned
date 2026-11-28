@@ -204,7 +204,7 @@ _TEACHING_NOTE = (
     "definition, the key terms, the parts, types, steps or rules, and worked examples, written out in full the "
     "way the teacher will say and show them. Take every fact only from the sources given above: the online "
     "references' pages, the Budget of Work or Curriculum Guide, and any files the student selected or uploaded "
-    "(name the source a part comes from). Never invent facts the sources don't give. No \"direction\" choices."
+    "(no in-text citations like '(Author, year)' after the points; the References part lists them). Never invent facts the sources don't give. No \"direction\" choices."
 )
 _FLOW_NOTE = (
     " This part runs the whole session: give each step under its heading with its minutes, and inside the step "
@@ -745,9 +745,9 @@ _LESSON_PROPER_DIRECTIVE = (
     "to their own wording and put simply for these learners, and only what is about today's specific "
     "topic, never the wider subject. Where no reference covers a point, use the course guide; never "
     "invent a fact, term, definition or example, and leave out what they don't cover. Draw on every "
-    "reference whose content covers part of the topic, and end each definition, fact or example taken "
-    "from one with its APA 7 in-text citation: the author's surname or organization and the year as "
-    "that reference lists them, e.g. (Department of Education, n.d.). It teaches "
+    "reference whose content covers part of the topic. Write no in-text citations: no '(Author, year)' "
+    "or '(Department of Education, n.d.)' after the points (user, 2026-11-28); the references are "
+    "listed in the References part, and every point must still come from them. It teaches "
     "every learning objective already written for this plan, in order, so learners can do each one by "
     "the end. The length limits do not apply to this field."
 )
@@ -758,8 +758,8 @@ _LESSON_FLOW_DIRECTIVE = (
     " This part runs the whole session: keep its steps in order, each with its minutes and what the "
     "teacher and learners do. In the step where today's topic is taught, write the actual lesson, "
     "taken from the online references' content given above (definitions, key terms, parts or rules, "
-    "examples, on today's specific topic, close to their wording, each fact ending with its APA 7 "
-    "in-text citation), one point per line with '• ' or '1. ', never invented. It teaches every "
+    "examples, on today's specific topic, close to their wording, with no in-text citations after "
+    "the points), one point per line with '• ' or '1. ', never invented. It teaches every "
     "learning objective already written for this plan."
 )
 
@@ -1250,7 +1250,27 @@ def _trim(values, fields, guide_text="", citation="", context=None):
         )
         kept = grounding.snap_to_guide(kept, exact, guide_text)
         out.update(grounding.keep_working_links(kept, exact, citation))
+    out = _uncite_lesson(out, fields)
     return _unnumber_objectives(grounding.keep_given_logistics(out, fields, context), fields)
+
+
+# "(Department of Education, n.d.)", "(Cruz & Reyes, 2024)", "(W3Schools, 2023b)":
+# an APA in-text citation, which the lesson proper leaves out (user, 2026-11-28).
+_IN_TEXT_CITATION = re.compile(r"\s*\((?:[A-Za-z][^()]{1,79}?),\s*(?:n\.\s?d\.|\d{4}[a-z]?)\)")
+
+
+def uncite(text: str) -> str:
+    return _IN_TEXT_CITATION.sub("", text) if isinstance(text, str) else text
+
+
+def _uncite_lesson(values: dict, fields) -> dict:
+    """The lesson proper without in-text citations, in case the model adds them anyway."""
+    out = dict(values)
+    for f in fields:
+        v = out.get(f.field_key)
+        if v is not None and grounding.is_lesson_proper_field(f):
+            out[f.field_key] = [uncite(x) for x in v] if isinstance(v, list) else uncite(v)
+    return out
 
 
 _LIST_NUMBER = re.compile(r"^\s*\(?\d{1,2}[.)]\s+")
@@ -1953,7 +1973,7 @@ def _references_block(lines, material: str) -> str:
     if not lines:
         return ""
     listed = "\n".join(str(l).strip() for l in lines if str(l).strip())
-    block = f"\nThe lesson's online references (the lesson proper is taught from these and cites them):\n{listed}\n"
+    block = f"\nThe lesson's online references (the lesson proper is taught only from these, without in-text citations):\n{listed}\n"
     if material:
         block += f"\nWhat those references' pages say about the topic (the online references' content):\n---\n{material}\n---\n"
     return block
@@ -2152,6 +2172,9 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
         # Whatever the model sends, nothing ready-made goes into a locked field.
         return {**answer, "choices": [c for c in answer["choices"] if c["type"] != "use"]}
     answer = _ground_choices(answer, field, course_guide_text, course_guide_citation)
+    if teaching:
+        answer = {**answer, "choices": [{**c, "text": uncite(c["text"])} if c["type"] == "use" else c
+                                        for c in answer["choices"]]}
     if searching:
         # References Alan offers are real pages from a web search, not the model's guesses.
         try:
