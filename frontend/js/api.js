@@ -905,7 +905,7 @@ function loadTourIfDue(user) {
     return;
   }
   const script = document.createElement("script");
-  script.src = "js/owl-tour.js?v=2026-10-26f";
+  script.src = "js/owl-tour.js?v=2026-11-28t";
   script.onload = () => OwlTour.run(user);
   document.body.appendChild(script);
 }
@@ -1250,16 +1250,34 @@ const OwlGuide = {
     this._tour = tour;
     el.classList.add("is-touring");
     this.show(spec);
+    // A tour step reads as a step (user, 2026-11-28: "too small and plain"):
+    // a bar of the steps, then the tab's name as a title over the line.
+    const bubble = this._bubble();
+    let head = bubble.querySelector(".owl-tour-head");
+    if (!head) {
+      head = document.createElement("div");
+      head.className = "owl-tour-head";
+      bubble.prepend(head);
+    }
+    head.hidden = false;
+    head.innerHTML = `
+      <div class="owl-tour-steps" aria-hidden="true">${Array.from({ length: tour.total }, (_, i) =>
+        `<span class="${i < tour.index ? "is-done" : i === tour.index ? "is-now" : ""}"></span>`).join("")}</div>
+      ${spec.title ? `<h2 class="owl-tour-title">${escapeHtml(spec.title)}</h2>` : ""}`;
+    // Replays the entrance on every step, not only the first.
+    el.classList.remove("is-stepping");
+    void el.offsetWidth;
+    el.classList.add("is-stepping");
     let bar = el.querySelector(".owl-tour-controls");
     if (!bar) {
       bar = document.createElement("div");
       bar.className = "owl-tour-controls";
-      this._bubble().appendChild(bar);
+      bubble.appendChild(bar);
     }
     const last = tour.index === tour.total - 1;
     const nextLabel = tour.nextLabel || (last ? "Finish" : "Next");
     bar.innerHTML = `
-      <span class="owl-tour-count">${tour.index + 1} of ${tour.total}</span>
+      <span class="owl-tour-count">Step ${tour.index + 1} of ${tour.total}</span>
       <button type="button" class="owl-tour-skip" data-tour="skip">Skip tour</button>
       ${tour.onBack ? '<button type="button" class="btn btn-secondary btn-sm" data-tour="back">Back</button>' : ""}
       <button type="button" class="btn btn-primary btn-sm" data-tour="next">${nextLabel}</button>`;
@@ -1273,9 +1291,11 @@ const OwlGuide = {
 
   endTour() {
     this._tour = null;
-    if (this._el) this._el.classList.remove("is-touring");
+    if (this._el) this._el.classList.remove("is-touring", "is-stepping");
     const bar = this._el && this._el.querySelector(".owl-tour-controls");
     if (bar) bar.hidden = true;
+    const head = this._el && this._el.querySelector(".owl-tour-head");
+    if (head) head.hidden = true;
     this.hide();
   },
 
