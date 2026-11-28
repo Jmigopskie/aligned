@@ -41,19 +41,33 @@ function renderSections(sections) {
   sectionGrid.innerHTML = sections
     .map(
       (s) => `
-      <div class="class-card" data-section="${s.id}">
+      <div class="class-card" data-section="${s.id}" role="link" tabindex="0" title="See the lesson plans submitted to ${escapeHtml(s.name)}">
         <h3>${escapeHtml(s.name)}</h3>
         <div class="join-code-chip">${escapeHtml(s.join_code)}</div>
         <div class="class-stats" style="margin-top:14px;">
           <div><strong>${s.student_count}</strong>students</div>
           <div><strong>${s.pending_count}</strong>pending</div>
         </div>
+        <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:8px;">
+          <button class="btn btn-primary btn-sm" type="button" data-open="${s.id}">Submitted lesson plans</button>
+          <button class="btn btn-secondary btn-sm" type="button" data-detail="${s.id}">${Icons.users}<span>Code &amp; students</span></button>
+        </div>
       </div>`
     )
     .join("");
 
+  // Clicking a section shows the plans submitted to it (user, 2026-11-28);
+  // the join code, roster and points moved behind "Code & students".
+  const openSubmissions = (id) => { window.location.href = `lesson-plan-list.html?tab=submissions&section=${id}`; };
   sectionGrid.querySelectorAll(".class-card").forEach((card) => {
-    card.addEventListener("click", () => openDetail(card.dataset.section));
+    card.addEventListener("click", (e) => {
+      const detail = e.target.closest("[data-detail]");
+      if (detail) openDetail(detail.dataset.detail);
+      else openSubmissions(card.dataset.section);
+    });
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && e.target === card) openSubmissions(card.dataset.section);
+    });
   });
 }
 

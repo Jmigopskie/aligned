@@ -78,6 +78,9 @@ async function loadSectionOptions() {
   sectionSelect.innerHTML = sections
     .map((s) => `<option value="${s.id}">${escapeHtml(s.name)} (${s.pending_count} pending)</option>`)
     .join("");
+  // ?section=<id>: a section card on My Sections lands here with it picked.
+  const wanted = new URLSearchParams(location.search).get("section");
+  if (wanted && sections.some((s) => String(s.id) === wanted)) sectionSelect.value = wanted;
   return sections;
 }
 

@@ -154,6 +154,21 @@ def is_lesson_proper_field(field) -> bool:
     return bool(_LESSON_PROPER_FIELD.search(_haystack(field)))
 
 
+# Parts with one fitting answer for the lesson (user, 2026-11-28): choosing
+# between two approaches adds nothing, so Guided suggests the part straight
+# away. Objectives, motivation, activities and assessment keep two directions.
+_DIRECT_FIELD = re.compile(
+    r"assignment|agreement|homework|extended learning|additional activit|"
+    r"material|resource|reference|value|integration|reflection|remark|"
+    r"standard|competenc|subject matter|\btopic\b|^\s*(?:[ivx]+\.\s*)?content\b|"
+    r"time allot|duration|generali[sz]ation",
+    re.I | re.M)
+
+
+def is_direct_field(field) -> bool:
+    return bool(_DIRECT_FIELD.search(field.label or "")) and not is_lesson_proper_field(field)
+
+
 def reference_urls(lines) -> list:
     """The links in a references list, in order, each once."""
     seen = []

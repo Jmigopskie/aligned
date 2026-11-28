@@ -118,11 +118,11 @@ def main():
         assert "inside the step" in prompts[0] and "COMPLETE lesson content" in prompts[0]
         # Any part asked for its whole content gets it, not directions.
         prompts.clear()
-        answer = ai_service.owl_chat(context, GEN, {}, "", [], "Give me the complete generalization")
+        answer = ai_service.owl_chat(context, Field("motivation", "Motivation"), {}, "", [], "Give me the complete motivation")
         assert "asks for the complete content" in prompts[0] and all(c["type"] != "direction" for c in answer["choices"])
         # A general request on another part still starts with directions.
         ai_service._call = lambda system, parts, label: DIRECTIONS
-        answer = ai_service.owl_chat(context, GEN, {}, "", [], "Help me")
+        answer = ai_service.owl_chat(context, Field("motivation", "Motivation"), {}, "", [], "Help me")
         assert [c["type"] for c in answer["choices"]] == ["direction", "direction"], answer
         print("  guided lesson proper comes whole, from the sources OK")
     finally:

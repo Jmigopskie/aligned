@@ -2064,9 +2064,13 @@ def owl_chat(context: dict, field, prior_values: dict, course_guide_text: str,
     # teach. It is the lesson itself, so it always comes in full, from the
     # sources. Any other part asked for its complete content gets it too.
     teaching = grounding.is_lesson_proper_field(field) and not locked
-    full = bool(direction) or teaching or bool(_WANTS_FULL.search(message))
+    direct = grounding.is_direct_field(field) and not locked
+    full = bool(direction) or teaching or direct or bool(_WANTS_FULL.search(message))
     if teaching:
         weekly_note += _TEACHING_NOTE + (_FLOW_NOTE if grounding.is_lesson_flow(field) else "")
+    elif direct:
+        weekly_note += ("\nThis part has one fitting answer for this lesson, so there is nothing to choose: "
+                        "suggest it now as ONE \"use\" choice, complete. No \"direction\" choices.")
     elif full and not locked:
         weekly_note += ("\nThe student asks for the complete content: give it now as ONE \"use\" choice with "
                         "nothing left out, not directions or an outline.")
@@ -2100,7 +2104,8 @@ The teacher is writing the field "{field.label}" ({field.field_type}).
     try:
         data = _call(_OWL_SYSTEM_INSTRUCTION, [lesson, task], "Owl chat")
         answer = _clean_owl_reply(data, _MAX_USE_TEXT)
-        if full and not locked and not any(c["type"] == "use" for c in answer["choices"]):
+        # A references search brings its own "use" card, so no second call there.
+        if full and not locked and not searching and not any(c["type"] == "use" for c in answer["choices"]):
             # Directions again instead of the content: asked once more, plainly.
             data = _call(_OWL_SYSTEM_INSTRUCTION, [lesson, task + _FULL_RETRY], "Owl chat (full content)")
             answer = _clean_owl_reply(data, _MAX_USE_TEXT)

@@ -77,6 +77,20 @@ def main():
         assert [c["type"] for c in out["choices"]] == ["use"], out
         print("  a specific request is answered in full OK")
 
+        # --- direct_part_suggested_at_once (user, 2026-11-28) ---
+        ai_service._call = stub({"reply": "Here is an assignment.", "choices": [
+            direction("Research task"), direction("Practice task"),
+            {"type": "use", "label": "Measuring at home", "text": "Measure three objects at home.", "why": "Practice."}]})
+        out = ai_service.owl_chat(CTX, Field("assignment", "Assignment"), WRITTEN, "", [], "Help me with this part")
+        assert [c["type"] for c in out["choices"]] == ["use"], out
+        assert "nothing to choose" in prompts[-1]
+        from services import grounding
+        assert all(grounding.is_direct_field(Field("k", l)) for l in
+                   ["Assignment", "Materials", "References", "Values Integration", "Content Standard", "I. Content"])
+        assert not any(grounding.is_direct_field(Field("k", l)) for l in
+                       ["Motivation", "Learning Objectives", "Evaluation", "Activity", "Discussion"])
+        print("  a one-answer part is suggested at once OK")
+
         # --- locked_direction_coaches ---
         ai_service._call = stub({"reply": "Think about it.", "choices": [
             {"type": "use", "label": "Done for you", "text": "Complete content", "why": "x"},
