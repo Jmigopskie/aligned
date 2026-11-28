@@ -53,7 +53,7 @@ function renderUsers(users) {
     .map((g) => `
       <tr class="user-group-row">
         <th colspan="7" scope="rowgroup">
-          <button type="button" class="user-group-toggle" data-group="${g.key}" aria-expanded="${!collapsed.has(g.key)}">
+          <button type="button" class="user-group-toggle" data-group="${g.key}" aria-expanded="${expanded.has(g.key)}">
             <span class="user-group-chevron" aria-hidden="true"></span>
             <span class="user-group-name">${escapeHtml(g.name)}</span>
             ${g.teacher ? `<span class="user-group-meta">${escapeHtml(g.teacher)}</span>` : ""}
@@ -66,10 +66,10 @@ function renderUsers(users) {
   usersBody.querySelectorAll(".user-group-toggle").forEach((btn) => {
     btn.addEventListener("click", () => {
       const key = btn.dataset.group;
-      if (collapsed.has(key)) collapsed.delete(key);
-      else collapsed.add(key);
-      btn.setAttribute("aria-expanded", String(!collapsed.has(key)));
-      usersBody.querySelectorAll(`tr[data-group="${key}"]`).forEach((row) => { row.hidden = collapsed.has(key); });
+      if (expanded.has(key)) expanded.delete(key);
+      else expanded.add(key);
+      btn.setAttribute("aria-expanded", String(expanded.has(key)));
+      usersBody.querySelectorAll(`tr[data-group="${key}"]`).forEach((row) => { row.hidden = !expanded.has(key); });
     });
   });
 
@@ -84,7 +84,8 @@ function renderUsers(users) {
 // Grouped by section (user, 2026-11-28): each section A to Z with its teacher
 // first, then students; anyone in no section under Unenrolled; admins last.
 // Someone in several sections is listed under the first, the rest named.
-const collapsed = new Set();
+// Groups start closed (user, 2026-11-28); a click opens one.
+const expanded = new Set();
 const ROLE_ORDER = { teacher: 0, student: 1, admin: 2 };
 function groupBySection(users) {
   const groups = new Map();
@@ -108,7 +109,7 @@ function groupBySection(users) {
 function userRow(u, g) {
   const others = (u.sections || []).slice(1).map((s) => s.name);
   return `
-      <tr data-group="${g.key}"${collapsed.has(g.key) ? " hidden" : ""}>
+      <tr data-group="${g.key}"${expanded.has(g.key) ? "" : " hidden"}>
         ${bulkCheckboxCell(u.id, u.full_name)}
         <td>${escapeHtml(u.full_name)}${others.length ? `<span class="user-also">Also in ${escapeHtml(others.join(", "))}</span>` : ""}</td>
         <td>${escapeHtml(u.email)}</td>
