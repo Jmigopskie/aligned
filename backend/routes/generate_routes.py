@@ -335,6 +335,21 @@ def owl_chat():
 _TIDY_VALUE_LIMIT = 40000
 
 
+@generate_bp.post("/curriculum-match")
+@login_required
+def curriculum_match():
+    """Where the setup's topic sits in each document it picked (Budgets of
+    Work, Curriculum Guides, the user's own files), so step 8 can show it and
+    ask what kind of lesson this is. Text search only: no AI, no cost."""
+    data = request.get_json(silent=True) or {}
+    guides, err = _resolve_guides(data)
+    if err:
+        return err
+    context = _clean_context(data.get("context"))
+    docs = _guide_sources(guides) + _resolve_sources(data, current_user())
+    matches = [ai_service.curriculum_match(title, text, context) for title, text in docs if (text or "").strip()]
+    return jsonify({"status": "ok", "matches": matches})
+
 @generate_bp.post("/lesson-plans/tidy")
 @login_required
 def tidy_plan():

@@ -7305,6 +7305,15 @@ body:has(.flow:not([hidden])) .owl-guide { display: none; }
 }
 .flow-answer { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
 .flow-label { margin: 6px 0 -4px; font-size: var(--text-sm); font-weight: 600; color: var(--text-heading); }
+/* Step 8: where the topic sits in the picked curriculum, above the choices. */
+.flow-match { margin-bottom: 14px; }
+.flow-match-title { margin: 0 0 8px; font-size: var(--text-sm); font-weight: 600; color: var(--text-heading); }
+.flow-match-line {
+  display: grid; gap: 4px; margin: 0 0 8px; padding: 12px 16px;
+  border-radius: 14px; background: var(--primary-tint); color: var(--text-heading); font-size: 15px; line-height: 1.5;
+}
+.flow-match-line cite { font-size: 12.5px; font-style: normal; color: var(--text-body); }
+
 /* Step 1's learning modality: two choices side by side, stacked on phones. */
 .flow-modality { display: grid; gap: 10px; margin-top: 14px; }
 .flow-modality .flow-label { margin: 0; }

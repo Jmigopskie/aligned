@@ -3,15 +3,25 @@
 // blanks from the answers, and which formats an account may pick. No DOM here,
 // so frontend/js/setup-flow-steps.check.js can run it under node.
 
-// Nine steps, a few fields each: format + school, how the lesson is assessed,
-// people, class, subject + duration, the four topics, supplementary sources,
-// a sample plan (optional), mode.
-const FLOW_STEP_IDS = ["format", "assessment", "people", "class", "subject", "topics", "sources", "sample", "mode"];
+// Ten steps, a few fields each: format + school + modality, how the lesson is
+// assessed, people, class, subject + duration, the four topics, supplementary
+// sources, what kind of lesson it is, a sample plan (optional), mode.
+const FLOW_STEP_IDS = ["format", "assessment", "people", "class", "subject", "topics", "sources", "level", "sample", "mode"];
+
+// Step 8, after the documents: what kind of lesson this is, so its depth,
+// objectives and assessment fit where it sits in the unit (user, 2026-11-28).
+const LESSON_LEVELS = [
+  { value: "introductory", title: "Introductory lesson", sub: "Learners meet this topic for the first time." },
+  { value: "developing", title: "Developing lesson", sub: "Learners know the basics; this lesson goes deeper." },
+  { value: "application", title: "Application / practice", sub: "Learners already understand it; they use the skill." },
+  { value: "review", title: "Review / mastery", sub: "Consolidate before the unit assessment, with remediation." },
+];
+
 
 // Alan's pose for each step (keys from js/alan3d.js POSES).
 const FLOW_POSES = {
   format: "hi", assessment: "think", people: "present", class: "present", subject: "point",
-  topics: "think", sources: "reading", sample: "check", mode: "idea",
+  topics: "think", sources: "reading", level: "think", sample: "check", mode: "idea",
 };
 
 const DURATION_CHOICES = [30, 45, 60, 90];
@@ -134,6 +144,8 @@ function stepProblem(stepId, answers) {
     case "sources": // at least one source of any kind
       return (a.guides || []).length + (a.sources || []).length > 0
         ? null : problem(null, "Pick at least one Budget of Work, Curriculum Guide or file for me to read.");
+    case "level":
+      return LESSON_LEVELS.some((l) => l.value === a.lessonLevel) ? null : problem(null, "Choose what kind of lesson this is.");
     case "sample": return null; // optional: a finished plan to learn the layout from
     case "mode":
       return a.mode === "full" || a.mode === "step" ? null : problem(null, "Choose Building Proficiency or Guided.");

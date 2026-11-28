@@ -281,6 +281,7 @@ const Api = {
       method: "POST",
       body: JSON.stringify({ section_id: sectionId }),
     }),
+  curriculumMatch: (payload) => apiFetch("/api/curriculum-match", { method: "POST", body: JSON.stringify(payload) }),
   rateLessonPlan: (planId, stars) =>
     apiFetch(`/api/lesson-plans/${planId}/rating`, { method: "POST", body: JSON.stringify({ stars }) }),
   reviewLessonPlan: (planId, feedback, score) =>

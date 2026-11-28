@@ -50,6 +50,11 @@ const COPY = {
     help: "Pick from the library or upload your own files.",
     say: "I'll read every source you pick. Files you upload stay private to you.",
   },
+  level: {
+    q: "What kind of lesson is this?",
+    help: "Where today's lesson sits in the unit. I'll pitch the depth, objectives and assessment to match.",
+    say: "Let me check where your topic sits in the curriculum you picked.",
+  },
   sample: {
     q: "Do you have a sample lesson plan?",
     help: "Optional. Upload a finished plan with its content filled in, on any topic. I'll follow what goes in each part and how much, never its topic.",
@@ -192,6 +197,7 @@ function startNewRun() {
     durationMinutes: 45,
     levelType: "k12",
     modality: "Face to Face", // the most common; Online is the other choice
+    lessonLevel: "introductory",
   });
 }
 
@@ -514,6 +520,50 @@ const STEPS = {
     const box = el("div", { class: "flow-guide-kind" });
     paintSources(box);
     return el("div", { class: "flow-answer" }, box);
+  },
+  level: () => {
+    const wrap = el("div", { class: "flow-answer" });
+    const found = el("div", { class: "flow-match", "aria-live": "polite" }, el("p", { class: "flow-help" }, "Looking for your topic in the curriculum…"));
+    const choices = el("div", { class: "flow-choices flow-choices-stack flow-mode-choices", role: "group", "aria-labelledby": "flow-question" });
+    // A draft from before this step starts at Introductory.
+    if (!LESSON_LEVELS.some((l) => l.value === G.getAnswers().lessonLevel)) G.setAnswers({ lessonLevel: "introductory" });
+    LESSON_LEVELS.forEach((l) => {
+      const btn = el("button", { type: "button", class: "flow-choice flow-format flow-mode", "aria-pressed": String(l.value === G.getAnswers().lessonLevel) },
+        twoLine(l.title, l.sub), tick());
+      btn.addEventListener("click", () => {
+        choices.querySelectorAll(".flow-mode").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+        G.setAnswers({ lessonLevel: l.value });
+        refresh();
+      });
+      choices.append(btn);
+    });
+    G.curriculumMatch().then((matches) => {
+      const hits = matches.filter((m) => m.line);
+      const topic = G.getAnswers().topic || "your topic";
+      if (!hits.length) {
+        found.replaceChildren(el("p", { class: "flow-help" },
+          `I couldn't find "${topic}" by name in the documents you picked, so I'll use their closest section.`));
+        say("Your topic isn't named in those documents; I'll align it to the closest part.", "think");
+        return;
+      }
+      // Said as it is: the topic itself, its main topic, or the closest section.
+      const how = hits.some((m) => m.how === "exact") ? "exact" : hits.some((m) => m.how === "main") ? "main" : "closest";
+      const title = {
+        exact: `Found "${topic}" in the curriculum`,
+        main: `"${topic}" isn't named by itself, but its main topic is here`,
+        closest: `"${topic}" isn't named; this is the closest part of the curriculum`,
+      }[how];
+      const best = hits.filter((m) => m.how === how).concat(hits.filter((m) => m.how !== how));
+      found.replaceChildren(
+        el("p", { class: "flow-match-title" }, title),
+        ...best.slice(0, 2).map((m) => el("blockquote", { class: "flow-match-line" },
+          el("span", {}, m.line), el("cite", {}, m.title))));
+      say(how === "exact" ? "Found it. Now, what kind of lesson is this?" : "I'll align it to that part. What kind of lesson is this?", "check");
+    }).catch(() => {
+      found.replaceChildren(el("p", { class: "flow-help" }, "I couldn't check the curriculum just now; your answer still shapes the plan."));
+    });
+    wrap.append(found, choices);
+    return wrap;
   },
   sample: () => {
     const input = el("input", { type: "file", accept: ".docx,.dotx,.pdf", hidden: true });
@@ -1052,6 +1102,7 @@ const DETAIL_ROWS = [
   ["topics", "Next topic", (a) => (a.nextUnsure ? "Not sure yet" : a.nextTopic)],
   ["sources", "Supplementary sources", (a) => [...(a.guides || []).map((g) => g.title), ...(a.sources || []).map((s) => s.name)].join(", ")],
   ["sources", "Week", (a) => weekLabel(a.week), (a) => a.levelType === "college"],
+  ["level", "Kind of lesson", (a) => (LESSON_LEVELS.find((l) => l.value === a.lessonLevel) || LESSON_LEVELS[0]).title],
   ["sample", "Sample lesson plan", (a) => (a.sample ? a.sample.name : "None")],
 ];
 

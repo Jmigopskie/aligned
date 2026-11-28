@@ -934,7 +934,7 @@ def _learners_directive(context: dict) -> str:
     if context.get("duration_minutes"):
         out += (f"\nThe session lasts {minutes} minutes: plan only what fits in it, with every timed part "
                 f"together adding up to {minutes} minutes, and activities and the assessment sized for that time.\n")
-    return out + _MODALITY_NOTES[learning_modality(context)]
+    return out + _MODALITY_NOTES[learning_modality(context)] + lesson_stage_note(context)
 
 
 # Step 1's learning modality (user, 2026-11-28): Face to Face unless the
@@ -952,6 +952,52 @@ _MODALITY_NOTES = {
         "submitted online (e.g. a Google Form or a photo or file upload). Never ask for handouts, the board or "
         "classroom equipment.\n"),
 }
+
+
+# What kind of lesson this is in the unit (user, 2026-11-28): asked once the
+# topic is found in the curriculum, so the plan's depth, objectives and
+# assessment fit where the lesson sits. A plan without it reads as before.
+_LESSON_STAGES = {
+    "introductory": (
+        "\nKind of lesson: INTRODUCTORY. The learners meet this topic for the first time. Start from what they "
+        "already know, define every new term, teach the basics with simple, guided examples, keep objectives at the "
+        "remembering, understanding and basic applying levels, and check basic understanding in the assessment.\n"),
+    "developing": (
+        "\nKind of lesson: DEVELOPING. The learners already know the basics of this topic from earlier lessons. "
+        "Recap briefly, then deepen it: more detail, varied and harder examples, guided practice moving to "
+        "independent practice, objectives up to applying and analyzing, and an assessment that checks it.\n"),
+    "application": (
+        "\nKind of lesson: APPLICATION. The learners already understand this topic. Keep the recap short and spend "
+        "the session on hands-on practice and a realistic task that uses the skill, with objectives at applying, "
+        "analyzing and creating; a performance task with a rubric suits the assessment.\n"),
+    "review": (
+        "\nKind of lesson: REVIEW / MASTERY. The topic has been taught. Consolidate it before the unit assessment: "
+        "recap the key ideas, practice with mixed items, give remediation for those still struggling and "
+        "enrichment for those who have mastered it, and check mastery of the competency in the assessment.\n"),
+}
+
+
+def lesson_stage_note(context: dict) -> str:
+    return _LESSON_STAGES.get(str((context or {}).get("lesson_stage") or "").strip().lower(), "")
+
+
+def curriculum_match(title: str, text: str, context: dict) -> dict:
+    """Where the lesson's topic sits in one curriculum document, without any
+    AI call: {"title", "how" (exact | main | closest | none), "line"} with the
+    document's line that names it best, for the setup to show."""
+    excerpt, how = _guide_match(text, context, budget=4000, ask_ai=False)
+    # The words the match was made on: the main topic's when that's what was found.
+    terms = (_focus_terms(context.get("main_topic")) if how == "main" else None) or _focus_terms(context.get("topic"))
+    # The line naming the most of those words; among equals the shortest, so a
+    # competency bullet wins over a whole merged table row.
+    best, score = "", (0, 0)
+    for line in excerpt.split("\n"):
+        line = re.sub(r"\s+", " ", line).strip()
+        hits = sum(1 for t in terms if re.search(rf"\b{re.escape(t)}", line.lower()))
+        rank = (hits, -len(line))
+        if hits and len(line) > 12 and rank > score:
+            best, score = line, rank
+    return {"title": title, "how": how if best or how == "none" else "none", "line": best[:260]}
 
 
 def learning_modality(context: dict) -> str:

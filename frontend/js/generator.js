@@ -978,6 +978,8 @@ function getAdvancedContext() {
     week: isCollege ? String(flowFlags.week || "").trim() : "",
     // Step 1: Face to Face (the default, and every plan from before the choice) or Online.
     learning_modality: flowFlags.modality === "Online" ? "Online" : "Face to Face",
+    // Step 8: what kind of lesson this is (introductory, developing, application, review).
+    lesson_stage: flowFlags.lessonLevel || "",
   };
   // Only when Alan actually asked (the plan went through the flow): then an
   // empty value means "first lesson" / "not sure yet" and the server grounds
@@ -4067,7 +4069,7 @@ const ANSWER_INPUTS = {
   section: sectionInput, previousTopic: prevTopicInput, topic: topicInput, nextTopic: nextTopicInput,
   mainTopic: mainTopicInput,
 };
-const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "week", "sample", "assessment", "quizItems", "guidedAt", "modality"];
+const ANSWER_FLAGS = ["firstLesson", "nextUnsure", "flowStep", "stage", "mode", "sources", "guides", "week", "sample", "assessment", "quizItems", "guidedAt", "modality", "lessonLevel"];
 
 function getAnswers() {
   const answers = {};
@@ -4403,6 +4405,13 @@ window.Generator = {
   getAnswers,
   setAnswers,
   // Both kinds of library document for the subject, official ones first.
+  // Step 8: where the topic sits in the picked documents (text search, no AI).
+  curriculumMatch: async () => {
+    const p = baseGenerationPayload();
+    const data = await Api.curriculumMatch({ guide_ids: p.guide_ids, source_ids: p.source_ids,
+      course_guide_id: p.course_guide_id, budget_of_work_id: p.budget_of_work_id, context: p.context });
+    return data.matches || [];
+  },
   searchCourseGuides: async () => {
     const data = await Api.searchCourseGuides({ subject: subjectInput.value.trim(), prefer_grade_band: gradeBandFor() });
     return data.course_guides || [];

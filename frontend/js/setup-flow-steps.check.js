@@ -9,8 +9,8 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, "setup-flow-steps.js"), "utf8"), ctx);
 const get = (name) => vm.runInContext(name, ctx);
 
-// Nine steps, several fields each; teachers get the same steps.
-const ids = ["format", "assessment", "people", "class", "subject", "topics", "sources", "sample", "mode"];
+// Ten steps, several fields each; teachers get the same steps.
+const ids = ["format", "assessment", "people", "class", "subject", "topics", "sources", "level", "sample", "mode"];
 assert.deepStrictEqual(Array.from(ctx.flowSteps("student")), ids);
 assert.deepStrictEqual(Array.from(ctx.flowSteps("teacher")), ids);
 assert.deepStrictEqual(Array.from(get("FLOW_STEP_IDS")), ids);
