@@ -26,11 +26,18 @@ class Field:
 
 
 ON_TOPIC = "A number system is a way of writing numbers. Each number system has a base. " * 30
+
+
+def own_page(n, words="number system"):
+    """An on-topic page with text of its own (identical text reads as a copy)."""
+    return " ".join(f"Page {n} line {i}: a {words} sample {i * 7 + n} uses base {i + n * 3}." for i in range(80))
+
+
 PAGES = {
-    "https://a.edu/numbers": ON_TOPIC,
-    "https://www.b.org/binary": ON_TOPIC,
-    "https://www.f.gov.ph/number-systems": ON_TOPIC,
-    "https://g.com/numbers": ON_TOPIC,
+    "https://a.edu/numbers": own_page(1),
+    "https://www.b.org/binary": own_page(2),
+    "https://www.f.gov.ph/number-systems": own_page(3),
+    "https://g.com/numbers": own_page(4),
     "https://a.edu/other": "Number systems, briefly. " + "x " * 900,   # same site as the first, thinner
     "https://c.com/broken": "",                                          # doesn't open
     "https://d.net/thin": "number systems",                              # opens, but no real text
@@ -90,6 +97,22 @@ def main():
         ai_service.find_references({"topic": "Number systems", "subject": "ICT"})
         assert len(calls) == 6, len(calls)
         grounding.page_text = lambda url: PAGES.get(url, "")
+
+        # --- At most five, the most on-topic first, no repeated titles (user, 2026-11-28) ---
+        ai_service._FOUND_REFERENCES.clear()
+        pages = {f"https://s{n}.com/binary": own_page(n, "binary number system") for n in range(12)}
+        pages["https://copy.org/binary"] = pages["https://s0.com/binary"]     # the same page on another site
+        pages["https://deped.gov.ph/numbers"] = own_page(50)                   # 2 of the topic's 3 terms
+        ai_service._web_search_post = lambda prompt: {u: "Binary number systems" for u in pages}
+        grounding.page_text = lambda url: pages.get(url, "")
+        found = ai_service.find_references({"topic": "Binary number systems"})
+        urls = [grounding.reference_urls([l])[0] for l in found]
+        assert len(found) == ai_service._WEB_REFERENCES == 5, found
+        assert not {"https://copy.org/binary", "https://s0.com/binary"} <= set(urls), "a copied page isn't cited twice"
+        assert "https://deped.gov.ph/numbers" not in urls, "a page covering the whole topic beats a .gov covering part"
+        ai_service._web_search_post = search
+        grounding.page_text = lambda url: PAGES.get(url, "")
+        print("  five references at most, on-topic first, no repeats OK")
         ai_service._FOUND_REFERENCES.clear()
         print("  only a set of 3+ is cached OK")
 

@@ -1768,8 +1768,9 @@ Now fill ONLY the following fields. Return strict JSON with field_key as keys:
 # Testers saw two references at most, usually beside the course guide: one
 # search's ten results thinned out by the checks below. Two searches now run
 # side by side, and every page that passes is kept, up to this ceiling (it
-# bounds how much reading goes into the lesson proper's prompt).
-_WEB_REFERENCES = 10
+# bounds how much reading goes into the lesson proper's prompt). Ten was too
+# many to read and cite (user, 2026-11-28): the five most on-topic, no repeats.
+_WEB_REFERENCES = 5
 _WEB_RESULTS = 10
 _REFERENCE_SEARCHES = (
     "Find {n} accessible online pages, each on a different website, that explain this lesson's topic "
@@ -1844,6 +1845,17 @@ def _apa_from_result(url: str, title: str) -> str:
     return grounding.to_apa(f"{author.rstrip('.')}. ({date}). {title}.{where} {url}")
 
 
+def _shingles(text: str) -> set:
+    """Runs of 8 words, for telling a copied page from a different one."""
+    words = re.findall(r"[a-z0-9]+", (text or "").lower())[:4000]
+    return {" ".join(words[i:i + 8]) for i in range(0, max(0, len(words) - 7))}
+
+
+def _same_content(a: set, b: set) -> bool:
+    """One page mostly repeats the other (a module copied to another site)."""
+    return bool(a and b) and len(a & b) / min(len(a), len(b)) >= 0.5
+
+
 def _search_references(prompt: str) -> dict:
     """{url: title} of one search's results; {} when the search fails."""
     try:
@@ -1863,8 +1875,9 @@ _REMEMBER_AT = 3
 def find_references(context: dict, count: int = _WEB_REFERENCES) -> list:
     """Up to `count` APA 7 references for the lesson's topic: pages a web
     search returned that come from a reliable kind of site, really open with
-    readable text that covers the topic, one per website, government, school
-    and university pages first. [] when search is unavailable or finds none."""
+    readable text that covers the topic, one per website and never a copy of
+    another kept page; those covering most of the topic first, then
+    government, school and university pages. [] when search is unavailable or finds none."""
     topic = str(context.get("topic") or context.get("main_topic") or "").strip()
     if PROVIDER != "openrouter" or not topic:
         return []
@@ -1874,7 +1887,8 @@ def find_references(context: dict, count: int = _WEB_REFERENCES) -> list:
         return _FOUND_REFERENCES[key][:count]
     ask = f"\nLesson topic: {topic}" + (f"\nFor: {about}" if about else "")
     with ThreadPoolExecutor(max_workers=len(_REFERENCE_SEARCHES)) as pool:
-        results = list(pool.map(_search_references, [q.format(n=count) + ask for q in _REFERENCE_SEARCHES]))
+        # Still ask for a full page of results: more to choose the best few from.
+        results = list(pool.map(_search_references, [q.format(n=_WEB_RESULTS) + ask for q in _REFERENCE_SEARCHES]))
     cited = {}
     for found in results:
         for u, t in found.items():
@@ -1891,14 +1905,20 @@ def find_references(context: dict, count: int = _WEB_REFERENCES) -> list:
         line = _apa_from_result(u, cited[u]) if len(page) >= _MIN_PAGE_TEXT else ""
         if line and grounding.covers_topic(page, terms):
             share, mentions = grounding.topic_coverage(page, terms)
-            ranked.append((grounding.source_rank(u), -share, -mentions, u, line))
+            # Most of the topic covered first, then school/government, then most mentions.
+            ranked.append((-share, grounding.source_rank(u), -mentions, u, line, page))
     ranked.sort(key=lambda r: r[:3])
-    kept, sites = [], set()
-    for *_, u, line in ranked:
+    kept, sites, seen = [], set(), []
+    for *_, u, line, page in ranked:
         site = grounding.site_of(u)
         if site in sites:
             continue
+        # No page that repeats one already kept, copied onto another site.
+        runs = _shingles(page)
+        if any(_same_content(runs, s) for s in seen):
+            continue
         sites.add(site)
+        seen.append(runs)
         kept.append(line)
         if len(kept) == count:
             break
